@@ -276,7 +276,7 @@ export default function SimulatorPage() {
             >
               <ArrowLeft size={20} />
             </button>
-            <h1 className="font-bold text-slate-800">Simulateur d&apos;achat</h1>
+            <h1 className="font-bold text-slate-800">Simulateur d'achat</h1>
           </div>
         </div>
 
@@ -302,7 +302,7 @@ export default function SimulatorPage() {
 
                     <div>
                       <label className="block text-sm font-medium text-slate-600 mb-2">
-                        Quel type d&apos;achat ?
+                        Quel type d'achat ?
                       </label>
                       <div className="grid grid-cols-3 gap-2">
                         {Object.values(PURCHASE_TYPES).map((type) => (
@@ -384,7 +384,7 @@ export default function SimulatorPage() {
                         className="w-full md:w-auto md:px-8"
                         disabled={!purchase.amount || !purchase.name}
                       >
-                        Analyser l&apos;achat
+                        Analyser l'achat
                       </Button>
                     </div>
                   </div>
@@ -536,7 +536,7 @@ export default function SimulatorPage() {
 
                   <div className="flex flex-col gap-3">
                     <Button onClick={handleSave} className="w-full shadow-xl">
-                      Enregistrer dans l&apos;historique
+                      Enregistrer dans l'historique
                     </Button>
                     <Button
                       variant="secondary"
