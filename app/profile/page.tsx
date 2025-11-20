@@ -317,7 +317,7 @@ export default function ProfilePage() {
                   >
                     {stats.safetyMonths < 3 ? '⚠️' : '✅'} Tu as{' '}
                     <strong>{stats.safetyMonths.toFixed(1)} mois</strong>{' '}
-                    d'avance.
+                    d&apos;avance.
                   </div>
                 </div>
               </Card>

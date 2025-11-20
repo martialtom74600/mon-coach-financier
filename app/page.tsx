@@ -70,16 +70,16 @@ export default function DashboardPage() {
                   <Shield className="w-12 h-12 text-indigo-600" />
                 </div>
                 <h1 className="text-3xl md:text-4xl font-extrabold text-slate-800 mb-4 tracking-tight">
-                  Coach d'achats
+                  Coach d&apos;achats
                 </h1>
                 <p className="text-slate-600 text-lg max-w-lg mx-auto mb-8 leading-relaxed">
-                  Pour que je puisse t'aider, j'ai besoin de comprendre ta
+                  Pour que je puisse t&apos;aider, j&apos;ai besoin de comprendre ta
                   situation financière.
                   <br className="hidden md:block" />
                   <span className="bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded font-medium mt-2 inline-block">
                     5 minutes
                   </span>{' '}
-                  pour configurer ton profil et tester n'importe quel achat.
+                  pour configurer ton profil et tester n&apos;importe quel achat.
                 </p>
                 <div className="flex justify-center">
                   <Button
@@ -136,11 +136,11 @@ export default function DashboardPage() {
                       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
                         <div>
                           <h2 className="text-2xl md:text-3xl font-bold mb-2">
-                            Envie d'un nouvel achat ?
+                            Envie d&apos;un nouvel achat ?
                           </h2>
                           <p className="text-indigo-100 max-w-md text-sm md:text-base leading-relaxed opacity-90">
-                            Je t'aide à décider. Entre le prix, ta sécurité et
-                            tes objectifs, découvre si c'est une bonne idée tout
+                            Je t&apos;aide à décider. Entre le prix, ta sécurité et
+                            tes objectifs, découvre si c&apos;est une bonne idée tout
                             de suite.
                           </p>
                         </div>
