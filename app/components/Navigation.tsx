@@ -3,7 +3,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Home, PlusCircle, History, Shield } from 'lucide-react';
+import { Home, PlusCircle, History, Shield, User } from 'lucide-react';
 
 export default function Navigation() {
   const pathname = usePathname();
@@ -28,7 +28,7 @@ export default function Navigation() {
   return (
     <>
       {/* --- VERSION MOBILE (Bottom Bar) --- */}
-      <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 px-6 py-3 flex justify-between items-center z-50 shadow-[0_-4px_10px_rgba(0,0,0,0.03)]">
+      <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 px-6 py-3 pb-safe flex justify-between items-center z-50 shadow-[0_-4px_10px_rgba(0,0,0,0.03)]">
         <Link
           href="/"
           className={`flex flex-col items-center gap-1 ${
@@ -79,6 +79,22 @@ export default function Navigation() {
             Historique
           </span>
         </Link>
+
+        <Link
+          href="/profile"
+          className={`flex flex-col items-center gap-1 ${
+            isActive('/profile') ? 'text-indigo-600' : 'text-slate-400'
+          }`}
+        >
+          <User size={24} strokeWidth={isActive('/profile') ? 2.5 : 2} />
+          <span
+            className={`text-[10px] ${
+              isActive('/profile') ? 'font-bold' : 'font-medium'
+            }`}
+          >
+            Profil
+          </span>
+        </Link>
       </div>
 
       {/* --- VERSION DESKTOP (Sidebar Gauche) --- */}
@@ -94,7 +110,8 @@ export default function Navigation() {
         </div>
 
         {/* Links */}
-        <div className="flex-1 px-4 space-y-2">
+        {/* Ajout de 'flex flex-col' pour permettre l'utilisation de mt-auto */}
+        <div className="flex-1 px-4 space-y-2 flex flex-col">
           <Link href="/" className={getLinkClass('/')}>
             <Home size={20} />
             <span>Accueil</span>
@@ -108,6 +125,12 @@ export default function Navigation() {
           <Link href="/history" className={getLinkClass('/history')}>
             <History size={20} />
             <span>Historique</span>
+          </Link>
+
+          {/* Le bouton Profil est poussé vers le bas grâce à mt-auto */}
+          <Link href="/profile" className={`${getLinkClass('/profile')} mt-auto`}>
+            <User size={20} />
+            <span>Mon Profil</span>
           </Link>
         </div>
 

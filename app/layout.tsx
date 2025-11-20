@@ -1,14 +1,15 @@
 import './globals.css';
 import type { Metadata, Viewport } from 'next';
 import { Inter } from 'next/font/google';
+import Navigation from '@/app/components/Navigation';
+import Header from '@/app/components/Header';
 
 const inter = Inter({ subsets: ['latin'] });
 
-// 1. CONFIGURATION PWA & METADATA
 export const metadata: Metadata = {
   title: 'Mon Coach Financier',
   description: 'Prenez le contrôle de votre budget.',
-  manifest: '/manifest.json', // Lien essentiel vers le manifeste
+  manifest: '/manifest.json',
   appleWebApp: {
     capable: true,
     statusBarStyle: 'default',
@@ -31,13 +32,12 @@ export const metadata: Metadata = {
   },
 };
 
-// 2. CONFIGURATION VIEWPORT (Couleur & Zoom)
 export const viewport: Viewport = {
-  themeColor: '#4f46e5', // Couleur de la barre de statut (Indigo)
+  themeColor: '#4f46e5',
   width: 'device-width',
   initialScale: 1,
   maximumScale: 1,
-  userScalable: false, // Empêche le zoom accidentel sur mobile (sensation app native)
+  userScalable: false,
 };
 
 export default function RootLayout({
@@ -48,10 +48,29 @@ export default function RootLayout({
   return (
     <html lang="fr">
       <head>
-        {/* 3. Icône spécifique pour iOS (Apple Touch Icon) */}
         <link rel="apple-touch-icon" href="/icon-192.png" />
       </head>
-      <body className={inter.className}>{children}</body>
+      <body className={`${inter.className} bg-slate-50 text-slate-900`}>
+        
+        {/* 2. NAVIGATION GLOBALE (Menu) */}
+        <Navigation />
+
+        {/* 3. WRAPPER INTELLIGENT (Marges pour le menu) */}
+        <main className="min-h-screen transition-all duration-300 md:pl-64 pb-24 md:pb-0">
+          
+          {/* 4. CONTENEUR GLOBAL (Centrage et padding du contenu) */}
+          <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 md:pt-10">
+            
+            {/* 5. HEADER AUTOMATIQUE (Change selon la page) */}
+            <Header />
+
+            {/* Le contenu spécifique de chaque page s'insère ici */}
+            {children}
+          </div>
+
+        </main>
+        
+      </body>
     </html>
   );
 }
