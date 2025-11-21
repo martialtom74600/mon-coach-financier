@@ -2,31 +2,16 @@
 @tailwind components;
 @tailwind utilities;
 
-/* --- Zone de sécurité et correction de fond --- */
+/* --- Nettoyage du CSS par défaut ---
+  On supprime toutes les règles :root, les dégradés et les media queries 
+  qui créent des conflits avec notre design clair et le mode sombre du téléphone.
+*/
 
 html,
 body {
   height: 100%;
-  background-color: #f8fafc; /* Force fond clair */
+  /* On force le fond à la couleur slate-50 (qui est #f8fafc) */
+  background-color: #f8fafc;
+  /* On force la couleur de texte de base à slate-900 */
   color: #0f172a; 
-}
-
-/* 1. Nouvelle variable pour la zone de sécurité en bas */
-/* Permet d'utiliser pb-safe dans Tailwind */
-@supports(padding-bottom: constant(safe-area-inset-bottom)) {
-  .pb-safe {
-    padding-bottom: constant(safe-area-inset-bottom);
-  }
-}
-@supports(padding-bottom: env(safe-area-inset-bottom)) {
-  .pb-safe {
-    padding-bottom: env(safe-area-inset-bottom);
-  }
-}
-
-/* 2. Style des liens (utile si tu veux surcharger l'apparence des liens) */
-@layer base {
-    a {
-        text-decoration: none;
-    }
 }
