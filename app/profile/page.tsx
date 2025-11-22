@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useFinancialData } from '@/app/hooks/useFinancialData';
 import {
@@ -10,6 +10,7 @@ import {
   PERSONA_PRESETS
 } from '@/app/lib/logic';
 
+// Imports Icones
 import {
   Trash2,
   Plus,
@@ -22,9 +23,6 @@ import {
   Calendar,
   TrendingDown,
   TrendingUp,
-  Download,
-  Upload,
-  FileJson,
   User,
   Briefcase,
   GraduationCap,
@@ -34,33 +32,19 @@ import {
   Minus,
   CheckCircle,
   AlertTriangle,
-  Search // Pour le statut "En recherche"
+  Search,
+  Info // <--- AJOUTÉ ICI
 } from 'lucide-react';
 
-// --- COMPOSANTS UI ---
+// --- IMPORTS UI KIT (NETTOYAGE 🧹) ---
+import Card from '@/app/components/ui/Card';
+import Button from '@/app/components/ui/Button';
+import InputGroup from '@/app/components/ui/InputGroup'; // Pour le prénom
+import Badge from '@/app/components/ui/Badge'; // Pour les status
+import Tooltip from '@/app/components/ui/Tooltip'; // Pour l'aide
 
-const Card = ({ children, className = '' }: { children: React.ReactNode, className?: string }) => (
-  <div className={`bg-white rounded-xl shadow-sm border border-slate-100 ${className}`}>
-    {children}
-  </div>
-);
+// --- COMPOSANTS UI SPÉCIFIQUES (Restent ici car trop spécifiques) ---
 
-const Button = ({ children, onClick, variant = 'primary', className = '' }: any) => {
-  const baseStyle = 'px-4 py-3 rounded-lg font-bold transition-all duration-200 flex items-center justify-center gap-2 active:scale-95';
-  const variants: any = {
-    primary: 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-lg shadow-indigo-200',
-    secondary: 'bg-white text-indigo-700 border border-indigo-100 hover:bg-indigo-50',
-    ghost: 'bg-transparent text-slate-500 hover:text-indigo-600 hover:bg-indigo-50',
-    danger: 'bg-white text-rose-600 border border-rose-200 hover:bg-rose-50',
-  };
-  return (
-    <button onClick={onClick} className={`${baseStyle} ${variants[variant]} ${className}`}>
-      {children}
-    </button>
-  );
-};
-
-// --- COMPOSANT SÉLECTEUR DE PERSONA (CORRIGÉ) ---
 const PersonaSelector = ({ currentPersona, onChange }: any) => {
   const icons: any = {
     salaried: Briefcase,
@@ -104,7 +88,6 @@ const PersonaSelector = ({ currentPersona, onChange }: any) => {
   );
 };
 
-// --- COMPOSANT COMPTEUR FAMILLE ---
 const HouseholdCounter = ({ label, value, onChange, icon: Icon }: any) => (
   <div className="flex items-center justify-between p-3 bg-slate-50 rounded-xl border border-slate-200">
     <div className="flex items-center gap-3">
@@ -131,7 +114,7 @@ const HouseholdCounter = ({ label, value, onChange, icon: Icon }: any) => (
   </div>
 );
 
-// --- SECTION LISTE ---
+// Section Liste (Lignes de revenus/dépenses)
 const ProfileSection = ({ title, icon: Icon, items = [], onItemChange, onItemAdd, onItemRemove, type = 'standard', colorClass = 'text-slate-800' }: any) => {
   const subTotal = items.reduce((acc: number, item: any) => {
     let val = parseFloat(item.amount) || 0;
@@ -232,7 +215,7 @@ export default function ProfilePage() {
           </div>
         </div>
 
-        {/* CARTE OBJECTIFS DYNAMIQUES (Selon Persona) */}
+        {/* CARTE OBJECTIFS DYNAMIQUES */}
         <Card className="p-6 border-l-4 border-l-indigo-500">
           <div className="flex items-center gap-2 mb-4">
             <div className="p-2 bg-indigo-50 text-indigo-600 rounded-lg"><Target size={20} /></div>
@@ -241,27 +224,33 @@ export default function ProfilePage() {
           
           <div className="space-y-4 text-sm">
             <div className="flex justify-between items-center">
-                <span className="text-slate-500">Sécurité visée</span>
+                <span className="text-slate-500 flex items-center gap-1">Sécurité <Tooltip text="Objectif d'épargne de précaution en mois de dépenses." /></span>
                 <span className="font-bold text-indigo-700">{stats.rules.safetyMonths} mois</span>
             </div>
             <div className="flex justify-between items-center">
-                <span className="text-slate-500">Dette Max</span>
+                <span className="text-slate-500 flex items-center gap-1">Dette Max <Tooltip text="Seuil maximal de charges fixes conseillé." /></span>
                 <span className="font-bold text-indigo-700">{stats.rules.maxDebt}%</span>
             </div>
             <div className="flex justify-between items-center">
-                <span className="text-slate-500">Seuil Survie</span>
+                <span className="text-slate-500 flex items-center gap-1">Seuil Survie <Tooltip text="Le minimum vital estimé pour ton foyer." /></span>
                 <span className="font-bold text-indigo-700">{formatCurrency(stats.rules.minLiving)}</span>
             </div>
             <div className="pt-3 border-t border-slate-100">
-                <div className={`text-xs font-medium p-2 rounded-lg flex gap-2 items-center ${stats.safetyMonths >= stats.rules.safetyMonths ? 'bg-emerald-50 text-emerald-700' : 'bg-orange-50 text-orange-700'}`}>
-                    {stats.safetyMonths >= stats.rules.safetyMonths ? <CheckCircle size={14}/> : <AlertTriangle size={14}/>}
-                    Actuellement : {stats.safetyMonths.toFixed(1)} mois d&apos;avance
-                </div>
+                 {stats.safetyMonths >= stats.rules.safetyMonths ? (
+                    <Badge color="bg-emerald-50 text-emerald-700 border border-emerald-100 flex w-full justify-center gap-2">
+                        <CheckCircle size={14}/> {stats.safetyMonths.toFixed(1)} mois d&apos;avance
+                    </Badge>
+                 ) : (
+                    <Badge color="bg-amber-50 text-amber-700 border border-amber-100 flex w-full justify-center gap-2">
+                        <AlertTriangle size={14}/> {stats.safetyMonths.toFixed(1)} mois d&apos;avance
+                    </Badge>
+                 )}
             </div>
           </div>
         </Card>
 
         <div className="hidden lg:block">
+          {/* Utilisation du Button du UI Kit */}
           <Button onClick={() => router.push('/')} className="w-full"><Save size={18} /> Enregistrer et Terminer</Button>
         </div>
       </div>
@@ -269,7 +258,7 @@ export default function ProfilePage() {
       {/* --- COLONNE GAUCHE (FORMULAIRES) --- */}
       <div className="lg:col-span-8 space-y-8">
         
-        {/* SECTION 1 : IDENTITÉ & PERSONA (GAMIFICATION) */}
+        {/* SECTION 1 : IDENTITÉ */}
         <section className="space-y-4">
             <div className="flex items-center gap-3 mb-2">
                 <div className="w-8 h-8 rounded-full bg-indigo-600 text-white flex items-center justify-center font-bold">1</div>
@@ -278,19 +267,16 @@ export default function ProfilePage() {
             
             <Card className="p-6">
                 <div className="space-y-6">
-                    <div>
-                        <label className="block text-sm font-bold text-slate-700 mb-2">Ton Prénom</label>
-                        <input 
-                            type="text" 
-                            placeholder="Comment doit-on t'appeler ?" 
-                            value={profile.firstName || ''} 
-                            onChange={(e) => saveProfile({ ...profile, firstName: e.target.value })}
-                            className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:border-indigo-500 outline-none transition-colors"
-                        />
-                    </div>
+                    {/* Utilisation de InputGroup du UI Kit */}
+                    <InputGroup 
+                        label="Ton Prénom" 
+                        placeholder="Comment doit-on t'appeler ?" 
+                        value={profile.firstName || ''} 
+                        onChange={(val: string) => saveProfile({ ...profile, firstName: val })} 
+                    />
 
                     <div>
-                        <label className="block text-sm font-bold text-slate-700 mb-3">Ta situation (Le Coach adapte ses conseils)</label>
+                        <label className="block text-sm font-medium text-slate-600 mb-3">Ta situation <span className="text-xs font-normal text-slate-400">(Le Coach adapte ses conseils)</span></label>
                         <PersonaSelector 
                             currentPersona={profile.persona || 'salaried'} 
                             onChange={(id: string) => saveProfile({ ...profile, persona: id })}
@@ -298,7 +284,7 @@ export default function ProfilePage() {
                     </div>
 
                     <div>
-                        <label className="block text-sm font-bold text-slate-700 mb-3">Ton foyer</label>
+                        <label className="block text-sm font-medium text-slate-600 mb-3">Ton foyer</label>
                         <div className="grid grid-cols-2 gap-4">
                             <HouseholdCounter 
                                 label="Adultes" 
@@ -318,7 +304,7 @@ export default function ProfilePage() {
             </Card>
         </section>
 
-        {/* SECTION 2 : FINANCES (CHIFFRES) */}
+        {/* SECTION 2 : FINANCES */}
         <section className="space-y-4">
             <div className="flex items-center gap-3 mb-2">
                 <div className="w-8 h-8 rounded-full bg-emerald-500 text-white flex items-center justify-center font-bold">2</div>
@@ -341,7 +327,9 @@ export default function ProfilePage() {
                   />
                   <span className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold">€</span>
               </div>
-              <p className="text-xs text-slate-500 mt-2">Uniquement l&apos;argent accessible immédiatement (Livret A, Compte courant...).</p>
+              <p className="text-xs text-slate-500 mt-2 flex items-center gap-1">
+                  <Info size={12} /> Uniquement l&apos;argent accessible immédiatement (Livret A, Compte courant...).
+              </p>
             </Card>
 
             <ProfileSection title="Revenus (Net Mensuel)" icon={Wallet} colorClass="text-emerald-600" items={profile.incomes} onItemChange={(id: any, f: any, v: any) => updateItem('incomes', id, f, v)} onItemAdd={() => addItem('incomes')} onItemRemove={(id: any) => removeItem('incomes', id)} />

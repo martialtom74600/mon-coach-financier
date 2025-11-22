@@ -2,6 +2,17 @@
 
 import { useState, useMemo, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { useFinancialData } from '@/app/hooks/useFinancialData';
+import {
+  calculateFinancials,
+  analyzePurchaseImpact,
+  formatCurrency,
+  PURCHASE_TYPES,
+  PAYMENT_MODES,
+  generateId,
+} from '@/app/lib/logic';
+
+// Imports Icônes
 import {
   CheckCircle,
   AlertTriangle,
@@ -15,7 +26,6 @@ import {
   Clock,
   TrendingUp,
   PiggyBank,
-  Lightbulb,
   Settings,
   Briefcase,
   RefreshCw,
@@ -28,85 +38,15 @@ import {
   Tag,
   CreditCard
 } from 'lucide-react';
-import { useFinancialData } from '@/app/hooks/useFinancialData';
-import {
-  calculateFinancials,
-  analyzePurchaseImpact,
-  formatCurrency,
-  PURCHASE_TYPES,
-  PAYMENT_MODES,
-  generateId,
-} from '@/app/lib/logic';
 
-// --- COMPOSANTS UI INTERNES ---
+// --- IMPORTS UI KIT (NETTOYAGE 🧹) ---
+import Card from '@/app/components/ui/Card';
+import Button from '@/app/components/ui/Button';
+import InputGroup from '@/app/components/ui/InputGroup';
+import Badge from '@/app/components/ui/Badge';
+// ProgressBar n'est pas utilisé ici, mais Card et Button oui.
 
-const Card = ({ children, className = '' }: { children: React.ReactNode, className?: string }) => (
-  <div className={`bg-white rounded-xl shadow-sm border border-slate-100 ${className}`}>
-    {children}
-  </div>
-);
-
-const Button = ({
-  children,
-  onClick,
-  variant = 'primary',
-  className = '',
-  disabled = false,
-}: any) => {
-  const baseStyle =
-    'px-4 py-3 rounded-lg font-bold transition-all duration-200 flex items-center justify-center gap-2 active:scale-95 disabled:opacity-70 disabled:cursor-not-allowed';
-  
-  const variants: any = {
-    primary:
-      'bg-indigo-600 text-white hover:bg-indigo-700 shadow-lg shadow-indigo-200',
-    secondary:
-      'bg-white text-indigo-700 border border-indigo-100 hover:bg-indigo-50',
-  };
-
-  return (
-    <button
-      disabled={disabled}
-      onClick={onClick}
-      className={`${baseStyle} ${variants[variant]} ${className}`}
-    >
-      {children}
-    </button>
-  );
-};
-
-const InputGroup = ({
-  label,
-  type = 'text',
-  placeholder,
-  value,
-  onChange,
-  suffix,
-}: any) => (
-  <div>
-    <label className="block text-sm font-medium text-slate-600 mb-2">
-      {label}
-    </label>
-    <div className="relative">
-      <input
-        type={type}
-        min="0"
-        placeholder={placeholder}
-        value={value}
-        onChange={(e) => {
-            const val = e.target.value;
-            if (type === 'number' && parseFloat(val) < 0) return;
-            onChange(val);
-        }}
-        className="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg outline-none focus:border-indigo-500 focus:bg-white transition-colors"
-      />
-      {suffix && (
-        <span className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 font-medium">
-          {suffix}
-        </span>
-      )}
-    </div>
-  </div>
-);
+// --- COMPOSANTS UI SPÉCIFIQUES (Non présents dans le UI Kit) ---
 
 const ContextToggle = ({ label, subLabel, icon: Icon, checked, onChange }: any) => (
   <label className={`flex items-center gap-4 p-4 border rounded-xl cursor-pointer transition-all duration-200 ${checked ? 'bg-indigo-50 border-indigo-200 ring-1 ring-indigo-200' : 'bg-white border-slate-200 hover:bg-slate-50'}`}>
@@ -124,9 +64,8 @@ const ContextToggle = ({ label, subLabel, icon: Icon, checked, onChange }: any) 
   </label>
 );
 
-// --- COMPOSANT RÉCAPITULATIF ACHAT (NOUVEAU) ---
+// --- COMPOSANT RÉCAPITULATIF ACHAT ---
 const PurchaseRecap = ({ purchase }: { purchase: any }) => {
-  // Mapping sécurisé pour retrouver les labels
   const typeKey = purchase.type.toUpperCase();
   // @ts-ignore
   const typeInfo = PURCHASE_TYPES[typeKey] || { label: purchase.type, color: 'bg-gray-100 text-gray-600' };
@@ -139,19 +78,16 @@ const PurchaseRecap = ({ purchase }: { purchase: any }) => {
         <div>
           <div className="flex items-center gap-2 mb-1">
             <h3 className="text-xl font-bold text-slate-800">{purchase.name}</h3>
+            {/* Utilisation des Badges du UI Kit */}
             {purchase.isPro && (
-                <span className="px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wide bg-indigo-100 text-indigo-700 border border-indigo-200">
-                  Pro
-                </span>
+                <Badge color="bg-indigo-100 text-indigo-700 border border-indigo-200">Pro</Badge>
             )}
             {purchase.isReimbursable && (
-                <span className="px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wide bg-emerald-100 text-emerald-700 border border-emerald-200">
-                  Remboursable
-                </span>
+                <Badge color="bg-emerald-100 text-emerald-700 border border-emerald-200">Remboursable</Badge>
             )}
           </div>
           
-          <div className="flex flex-wrap gap-3 text-sm text-slate-500">
+          <div className="flex flex-wrap gap-3 text-sm text-slate-500 mt-2">
             <div className="flex items-center gap-1.5">
                 <Tag size={14} />
                 <span>{typeInfo.label}</span>
@@ -162,9 +98,9 @@ const PurchaseRecap = ({ purchase }: { purchase: any }) => {
                 <span>{paymentLabel}</span>
             </div>
             {(purchase.paymentMode === 'CREDIT' || purchase.paymentMode === 'SPLIT') && (
-                <span className="text-xs bg-slate-100 px-1.5 py-0.5 rounded text-slate-600">
+                <Badge color="bg-slate-100 text-slate-600">
                     {purchase.duration} mois {purchase.rate ? `@ ${purchase.rate}%` : ''}
-                </span>
+                </Badge>
             )}
           </div>
         </div>
@@ -182,7 +118,7 @@ const PurchaseRecap = ({ purchase }: { purchase: any }) => {
   );
 };
 
-// --- CARTE DIAGNOSTIC V4 : MULTI-TIPS ---
+// --- CARTE DIAGNOSTIC V4 ---
 const DiagnosticCard = ({ result }: { result: any }) => {
   const [showDetails, setShowDetails] = useState(true);
 
@@ -206,7 +142,7 @@ const DiagnosticCard = ({ result }: { result: any }) => {
   };
 
   return (
-    <div className="rounded-2xl overflow-hidden shadow-lg border border-slate-100 animate-fade-in">
+    <Card className="overflow-hidden shadow-lg animate-fade-in p-0 border-slate-100">
       {/* EN-TÊTE */}
       <div className={`${theme.bg} p-6 text-white flex items-center gap-4 relative overflow-hidden`}>
         <div className="absolute -right-6 -top-6 w-32 h-32 bg-white opacity-10 rounded-full blur-2xl"></div>
@@ -217,7 +153,7 @@ const DiagnosticCard = ({ result }: { result: any }) => {
         </div>
       </div>
 
-      {/* CORPS : LISTE DES CONSEILS */}
+      {/* CORPS */}
       <div className="bg-white p-6 space-y-4">
         <h3 className="font-bold text-slate-800 text-sm uppercase tracking-wide flex items-center gap-2">
             <Target size={16} /> L&apos;avis du Coach
@@ -241,7 +177,7 @@ const DiagnosticCard = ({ result }: { result: any }) => {
             })}
         </div>
 
-        {/* PIED : POINTS D'ATTENTION TECHNIQUES */}
+        {/* DÉTAILS TECHNIQUES */}
         {result.issues.length > 0 && (
           <div className="mt-6 pt-6 border-t border-slate-100">
             <button 
@@ -265,11 +201,11 @@ const DiagnosticCard = ({ result }: { result: any }) => {
           </div>
         )}
       </div>
-    </div>
+    </Card>
   );
 };
 
-// --- PAGE SIMULATEUR ---
+// --- PAGE PRINCIPALE ---
 
 export default function SimulatorPage() {
   const router = useRouter();
@@ -307,7 +243,7 @@ export default function SimulatorPage() {
     if (!result) return;
     
     setIsSaving(true);
-    await new Promise(resolve => setTimeout(resolve, 600));
+    await new Promise(resolve => setTimeout(resolve, 600)); // Simulation chargement
 
     const decision = {
       id: generateId(),
@@ -348,14 +284,16 @@ export default function SimulatorPage() {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start animate-fade-in">
       
-      {/* --- COLONNE GAUCHE --- */}
+      {/* --- COLONNE GAUCHE (FORMULAIRE) --- */}
       <div className="lg:col-span-7 xl:col-span-8 space-y-6">
         
         {step === 'input' && (
-          <div className="bg-white rounded-2xl p-6 md:p-8 shadow-sm border border-slate-100">
+          <Card className="p-6 md:p-8">
             <h2 className="text-2xl font-bold text-slate-800 mb-6">Décris ton achat</h2>
             <div className="space-y-6">
+              {/* Utilisation des InputGroup du UI Kit */}
               <InputGroup label="C'est quoi ?" placeholder="iPhone, Réparation..." value={purchase.name} onChange={(v: string) => setPurchase({ ...purchase, name: v })} />
+              
               <div>
                 <label className="block text-sm font-medium text-slate-600 mb-2">Quel type d&apos;achat ?</label>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
@@ -367,19 +305,23 @@ export default function SimulatorPage() {
                   ))}
                 </div>
               </div>
+              
               <InputGroup label="Montant total" type="number" placeholder="0" suffix="€" value={purchase.amount} onChange={(v: string) => setPurchase({ ...purchase, amount: v })} />
+              
               <div>
                 <label className="block text-sm font-medium text-slate-600 mb-2">Comment tu paies ?</label>
-                <select className="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg outline-none focus:border-indigo-500" value={purchase.paymentMode} onChange={(e) => setPurchase({ ...purchase, paymentMode: e.target.value })}>
+                <select className="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500" value={purchase.paymentMode} onChange={(e) => setPurchase({ ...purchase, paymentMode: e.target.value })}>
                   {Object.entries(PAYMENT_MODES).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
                 </select>
               </div>
+              
               {(purchase.paymentMode === 'SPLIT' || purchase.paymentMode === 'CREDIT') && (
                 <div className="grid grid-cols-2 gap-4 animate-fade-in">
                   <InputGroup label="Durée (mois)" type="number" value={purchase.duration} onChange={(v: string) => setPurchase({ ...purchase, duration: v })} />
                   {purchase.paymentMode === 'CREDIT' && <InputGroup label="Taux (%)" type="number" value={purchase.rate} onChange={(v: string) => setPurchase({ ...purchase, rate: v })} />}
                 </div>
               )}
+              
               <div className="pt-2 space-y-3">
                 <label className="block text-sm font-medium text-slate-600">Contexte particulier (optionnel)</label>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -387,11 +329,12 @@ export default function SimulatorPage() {
                     <ContextToggle label="Investissement / Pro" subLabel="Ça va me rapporter de l'argent" icon={Briefcase} checked={purchase.isPro} onChange={(v: boolean) => setPurchase({ ...purchase, isPro: v })} />
                 </div>
               </div>
+              
               <div className="pt-4">
                 <Button onClick={() => setStep('result')} className="w-full md:w-auto md:px-8" disabled={!purchase.amount || !purchase.name}>Analyser l&apos;achat</Button>
               </div>
             </div>
-          </div>
+          </Card>
         )}
 
         {step === 'result' && result && (
@@ -400,16 +343,16 @@ export default function SimulatorPage() {
               <ArrowLeft size={16} /> Modifier la saisie
             </button>
             
-            {/* NOUVEAU : RÉCAPITULATIF DE L'ACHAT */}
+            {/* Récapitulatif refactorisé avec Badge */}
             <PurchaseRecap purchase={purchase} />
 
-            {/* CARTE DIAGNOSTIC V4 */}
+            {/* Diagnostic Refactorisé avec Card */}
             <DiagnosticCard result={result} />
           </div>
         )}
       </div>
 
-      {/* --- COLONNE DROITE --- */}
+      {/* --- COLONNE DROITE (IMPACT) --- */}
       <div className="lg:col-span-5 xl:col-span-4 lg:sticky lg:top-24 space-y-6">
         {step === 'input' ? (
           <Card className="p-6 bg-slate-50/50 border-slate-200">
@@ -428,7 +371,9 @@ export default function SimulatorPage() {
                   <div className="text-xs text-slate-400 font-bold uppercase mb-1">Nouveau Matelas</div>
                   <div className="flex justify-between items-end">
                     <div className="font-bold text-slate-800 text-2xl">{formatCurrency(result.newMatelas)}</div>
-                    <div className={`text-xs font-bold px-2 py-1 rounded ${result.newSafetyMonths < 3 ? 'bg-orange-100 text-orange-700' : 'bg-emerald-100 text-emerald-700'}`}>{result.newSafetyMonths.toFixed(1)} mois sécu</div>
+                    <Badge color={result.newSafetyMonths < 3 ? 'bg-orange-100 text-orange-700' : 'bg-emerald-100 text-emerald-700'}>
+                        {result.newSafetyMonths.toFixed(1)} mois sécu
+                    </Badge>
                   </div>
                 </div>
                 <div className="h-px bg-slate-100"></div>

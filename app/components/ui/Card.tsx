@@ -1,17 +1,23 @@
 import React from 'react';
 
-const Card = ({
-  children,
-  className = '',
-}: {
+interface CardProps {
   children: React.ReactNode;
   className?: string;
-}) => (
-  <div
-    className={`bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden ${className}`}
-  >
-    {children}
-  </div>
-);
+  onClick?: () => void;
+}
 
-export default Card;
+export default function Card({ children, className = '', onClick }: CardProps) {
+  return (
+    <div 
+      onClick={onClick}
+      className={`
+        bg-white rounded-2xl shadow-sm border border-slate-100 
+        transition-all duration-300 
+        ${onClick ? 'cursor-pointer hover:shadow-md hover:border-indigo-100 active:scale-[0.98]' : 'hover:shadow-md'} 
+        ${className}
+      `}
+    >
+      {children}
+    </div>
+  );
+}

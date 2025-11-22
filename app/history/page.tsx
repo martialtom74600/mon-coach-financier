@@ -9,45 +9,16 @@ import {
   AlertTriangle,
   XCircle,
   TrendingDown,
+  ArrowRight
 } from 'lucide-react';
 import { useFinancialData } from '@/app/hooks/useFinancialData';
 import { formatCurrency } from '@/app/lib/logic';
 
-// PLUS DE NAVIGATION ICI
-
-// --- COMPOSANTS UI ---
-
-const Card = ({ children, className = '' }) => (
-  <div
-    className={`bg-white rounded-xl shadow-sm border border-slate-100 ${className}`}
-  >
-    {children}
-  </div>
-);
-
-const Button = ({
-  children,
-  onClick,
-  variant = 'primary',
-  className = '',
-}) => {
-  const baseStyle =
-    'px-4 py-3 rounded-lg font-bold transition-all duration-200 flex items-center justify-center gap-2 active:scale-95';
-  const variants = {
-    primary:
-      'bg-indigo-600 text-white hover:bg-indigo-700 shadow-lg shadow-indigo-200',
-    danger: 'bg-white text-rose-600 border border-rose-100 hover:bg-rose-50',
-    ghost: 'bg-transparent text-slate-500 hover:text-slate-800',
-  };
-  return (
-    <button
-      onClick={onClick}
-      className={`${baseStyle} ${variants[variant]} ${className}`}
-    >
-      {children}
-    </button>
-  );
-};
+// --- IMPORTS UI KIT (NETTOYAGE 🧹) ---
+import Card from '@/app/components/ui/Card';
+import Button from '@/app/components/ui/Button';
+import Badge from '@/app/components/ui/Badge';
+import ProgressBar from '@/app/components/ui/ProgressBar';
 
 // --- PAGE PRINCIPALE ---
 
@@ -77,7 +48,7 @@ export default function HistoryPage() {
     return { total, accepted, rejected, amountTotal };
   }, [sortedHistory]);
 
-  const formatDate = (dateString) => {
+  const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('fr-FR', {
       day: 'numeric',
       month: 'short',
@@ -86,28 +57,32 @@ export default function HistoryPage() {
     });
   };
 
-  const getTheme = (verdict) => {
+  // Helper pour le style des cartes d'historique
+  const getTheme = (verdict: string) => {
     switch (verdict) {
       case 'green':
         return {
           icon: CheckCircle,
-          color: 'text-emerald-500',
+          color: 'text-emerald-600',
           bg: 'bg-emerald-50',
           border: 'border-emerald-100',
+          badge: 'bg-emerald-100 text-emerald-700'
         };
       case 'orange':
         return {
           icon: AlertTriangle,
-          color: 'text-amber-500',
+          color: 'text-amber-600',
           bg: 'bg-amber-50',
           border: 'border-amber-100',
+          badge: 'bg-amber-100 text-amber-700'
         };
       case 'red':
         return {
           icon: XCircle,
-          color: 'text-rose-500',
+          color: 'text-rose-600',
           bg: 'bg-rose-50',
           border: 'border-rose-100',
+          badge: 'bg-rose-100 text-rose-700'
         };
       default:
         return {
@@ -115,6 +90,7 @@ export default function HistoryPage() {
           color: 'text-slate-500',
           bg: 'bg-slate-50',
           border: 'border-slate-100',
+          badge: 'bg-slate-100 text-slate-600'
         };
     }
   };
@@ -127,21 +103,22 @@ export default function HistoryPage() {
     );
 
   return (
-    // On retourne directement la grille (Layout s'occupe du cadre)
-    <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start animate-fade-in">
+    <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start animate-fade-in pb-12">
       
-      {/* LISTE DES DÉCISIONS (GAUCHE) */}
+      {/* --- COLONNE GAUCHE (LISTE DES DÉCISIONS) --- */}
       <div className="lg:col-span-7 xl:col-span-8 space-y-4">
         {sortedHistory.length === 0 ? (
-          <div className="text-center py-20 opacity-50">
-            <History size={48} className="mx-auto mb-4 text-slate-300" />
-            <p>Aucune décision enregistrée pour le moment.</p>
+          <div className="text-center py-20 opacity-60">
+            <div className="bg-slate-50 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6">
+                <History size={32} className="text-slate-400" />
+            </div>
+            <h3 className="text-xl font-bold text-slate-800 mb-2">C&apos;est encore vide ici</h3>
+            <p className="text-slate-500 max-w-xs mx-auto mb-8">Tes futures simulations et décisions s&apos;afficheront ici.</p>
             <Button
-              variant="ghost"
+              variant="primary"
               onClick={() => router.push('/simulator')}
-              className="mt-2"
             >
-              Faire une première simulation
+              Faire une première simulation <ArrowRight size={18} />
             </Button>
           </div>
         ) : (
@@ -152,50 +129,49 @@ export default function HistoryPage() {
             return (
               <Card
                 key={item.id}
-                className={`p-5 flex flex-col sm:flex-row gap-4 sm:items-center transition-all hover:shadow-md ${theme.border} border-l-4`}
+                className={`p-5 flex flex-col sm:flex-row gap-4 sm:items-center transition-all hover:shadow-md border-l-4 ${theme.border.replace('border', 'border-l')}`}
               >
-                <div className="flex items-center gap-3 sm:w-1/4">
-                  <div
-                    className={`p-2 rounded-full ${theme.bg} ${theme.color}`}
-                  >
-                    <Icon size={20} />
+                {/* Date et Icône */}
+                <div className="flex items-center gap-4 sm:w-1/4">
+                  <div className={`p-3 rounded-xl ${theme.bg} ${theme.color}`}>
+                    <Icon size={24} />
                   </div>
-                  <div className="text-xs text-slate-400 font-medium flex flex-col">
-                    <span className="flex items-center gap-1">
-                      <Calendar size={10} /> {formatDate(item.date)}
+                  <div className="flex flex-col">
+                    <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Date</span>
+                    <span className="text-sm font-bold text-slate-700 flex items-center gap-1">
+                       {formatDate(item.date)}
                     </span>
                   </div>
                 </div>
 
+                {/* Détails Achat */}
                 <div className="flex-1">
-                  <h3 className="font-bold text-slate-800 text-lg">
+                  <h3 className="font-bold text-slate-800 text-lg mb-1">
                     {item.purchase.name}
                   </h3>
-                  <div className="text-sm text-slate-500">
-                    {item.purchase.type === 'need'
-                      ? 'Besoin'
-                      : item.purchase.type === 'useful'
-                      ? 'Utile'
-                      : 'Envie'}{' '}
-                    • Paiement:{' '}
-                    {item.purchase.paymentMode === 'CASH_SAVINGS'
-                      ? 'Épargne'
-                      : 'Compte courant'}
+                  <div className="flex flex-wrap gap-2">
+                    <Badge color="bg-slate-100 text-slate-600">
+                        {item.purchase.type === 'need' ? 'Besoin' : item.purchase.type === 'useful' ? 'Utile' : 'Envie'}
+                    </Badge>
+                    <Badge color="bg-slate-100 text-slate-600">
+                        {item.purchase.paymentMode === 'CASH_SAVINGS' ? 'Épargne' : 'Compte courant'}
+                    </Badge>
                   </div>
                 </div>
 
-                <div className="text-right">
-                  <div className="font-bold text-slate-900 text-xl">
+                {/* Montant et Verdict */}
+                <div className="text-right flex flex-col items-end gap-1">
+                  <div className="font-black text-slate-900 text-xl tracking-tight">
                     {formatCurrency(item.purchase.amount)}
                   </div>
                   {item.result.issues.length > 0 ? (
-                    <span className="text-xs text-orange-500 font-medium">
+                    <Badge color={theme.badge}>
                       {item.result.issues.length} alerte(s)
-                    </span>
+                    </Badge>
                   ) : (
-                    <span className="text-xs text-emerald-500 font-medium">
-                      RAS
-                    </span>
+                    <Badge color="bg-emerald-100 text-emerald-700">
+                      RAS - Sain
+                    </Badge>
                   )}
                 </div>
               </Card>
@@ -204,53 +180,65 @@ export default function HistoryPage() {
         )}
       </div>
 
-      {/* SIDEBAR STATS (DROITE) */}
+      {/* --- COLONNE DROITE (SIDEBAR STATS) --- */}
       <div className="lg:col-span-5 xl:col-span-4 lg:sticky lg:top-24 space-y-6">
-        <Card className="p-6 border-indigo-100 bg-indigo-50/50">
-          <h3 className="font-bold text-indigo-900 mb-4 flex items-center gap-2">
-            <TrendingDown size={20} /> Résumé
+        <Card className="p-6 border-indigo-100 bg-indigo-50/30">
+          <h3 className="font-bold text-indigo-900 mb-6 flex items-center gap-2 text-lg">
+            <TrendingDown size={20} /> Résumé Global
           </h3>
 
-          <div className="grid grid-cols-2 gap-4 mb-6">
-            <div className="bg-white p-3 rounded-lg shadow-sm border border-indigo-50">
-              <div className="text-xs text-slate-500 uppercase font-bold">
+          <div className="grid grid-cols-2 gap-4 mb-8">
+            <div className="bg-white p-4 rounded-2xl shadow-sm border border-indigo-50">
+              <div className="text-[10px] text-slate-400 uppercase font-bold mb-1">
                 Total Projets
               </div>
-              <div className="text-2xl font-bold text-slate-800">
+              <div className="text-3xl font-black text-slate-800">
                 {stats.total}
               </div>
             </div>
-            <div className="bg-white p-3 rounded-lg shadow-sm border border-indigo-50">
-              <div className="text-xs text-slate-500 uppercase font-bold">
-                Montant cumulé
+            <div className="bg-white p-4 rounded-2xl shadow-sm border border-indigo-50">
+              <div className="text-[10px] text-slate-400 uppercase font-bold mb-1">
+                Volume Cumulé
               </div>
-              <div className="text-xl font-bold text-indigo-600">
+              <div className="text-xl font-black text-indigo-600 break-words">
                 {formatCurrency(stats.amountTotal)}
               </div>
             </div>
           </div>
 
-          <div className="space-y-2">
-            <div className="flex justify-between text-sm">
-              <span className="text-emerald-600 font-medium flex items-center gap-1">
-                <CheckCircle size={14} /> Feux verts
-              </span>
-              <span className="font-bold text-slate-700">
-                {stats.accepted}
-              </span>
+          <div className="space-y-4">
+            <div>
+                <div className="flex justify-between text-sm mb-2">
+                    <span className="text-emerald-700 font-bold flex items-center gap-1">
+                        <CheckCircle size={14} /> Feux verts
+                    </span>
+                    <span className="font-bold text-slate-700">
+                        {stats.accepted} <span className="text-slate-400 font-normal">/ {stats.total}</span>
+                    </span>
+                </div>
+                {/* Utilisation de ProgressBar du UI Kit */}
+                <ProgressBar 
+                    value={stats.accepted} 
+                    max={stats.total || 1} 
+                    colorClass="bg-emerald-500" 
+                />
             </div>
-            <div className="w-full bg-slate-200 rounded-full h-2 overflow-hidden">
-              <div
-                className="bg-emerald-500 h-full rounded-full"
-                style={{
-                  width: `${
-                    stats.total > 0
-                      ? (stats.accepted / stats.total) * 100
-                      : 0
-                  }%`,
-                }}
-              ></div>
-            </div>
+            
+            {stats.rejected > 0 && (
+                <div className="pt-4 border-t border-indigo-100">
+                    <div className="flex justify-between text-sm mb-1">
+                        <span className="text-rose-700 font-bold flex items-center gap-1">
+                            <XCircle size={14} /> Projets risqués
+                        </span>
+                        <span className="font-bold text-rose-600">
+                            {stats.rejected}
+                        </span>
+                    </div>
+                    <p className="text-xs text-slate-500 mt-1">
+                        Ces projets ont été marqués comme "Pas maintenant" par le coach.
+                    </p>
+                </div>
+            )}
           </div>
         </Card>
       </div>
