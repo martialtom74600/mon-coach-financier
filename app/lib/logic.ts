@@ -1,3 +1,20 @@
+import {
+  Briefcase,
+  GraduationCap,
+  Target,
+  Armchair,
+  Search,
+} from 'lucide-react';
+
+// --- IMPORT DATE-FNS (Nécessaire pour le calendrier) ---
+import { 
+  addDays, 
+  startOfDay, 
+  getDate, 
+  isLastDayOfMonth, 
+  getDaysInMonth 
+} from 'date-fns';
+
 export const STORAGE_KEY = 'financial_coach_data_v1';
 
 // --- CONSTANTES GLOBALES ---
@@ -9,7 +26,7 @@ export const CONSTANTS = {
   WEALTHY_THRESHOLD: 12,
 };
 
-// --- 1. LES 5 PROFILS TYPES (EXCLUSIFS) ---
+// --- 1. LES 5 PROFILS TYPES ---
 export const PERSONA_PRESETS = {
   STUDENT: {
     id: 'student',
@@ -39,10 +56,11 @@ export const PERSONA_PRESETS = {
     id: 'unemployed',
     label: 'En recherche / Transition',
     description: 'Revenus précaires, prudence maximale.',
-    rules: { safetyMonths: 6, maxDebt: 0, minLiving: 200 } // Zéro dette tolérée
+    rules: { safetyMonths: 6, maxDebt: 0, minLiving: 200 }
   }
 };
 
+// --- INITIAL STATE (Mis à jour pour le Calendrier) ---
 export const INITIAL_PROFILE = {
   firstName: '',
   persona: 'salaried',
@@ -51,6 +69,8 @@ export const INITIAL_PROFILE = {
     children: 0
   },
   savings: 0,
+  currentBalance: 0, // <-- AJOUTÉ pour le calendrier
+  variableCosts: 0,  // <-- AJOUTÉ pour le lissage
   incomes: [],
   fixedCosts: [],
   subscriptions: [],
@@ -59,13 +79,13 @@ export const INITIAL_PROFILE = {
   annualExpenses: [],
 };
 
-export const PURCHASE_TYPES = {
+export const PURCHASE_TYPES: any = {
   NEED: { id: 'need', label: 'Besoin Vital', description: 'Nourriture, Santé, Réparation indispensable', color: 'bg-blue-100 text-blue-700 border-blue-200' },
   USEFUL: { id: 'useful', label: 'Confort / Utile', description: 'Gain de temps, Travail, Sport', color: 'bg-emerald-100 text-emerald-700 border-emerald-200' },
   DESIRE: { id: 'desire', label: 'Envie / Plaisir', description: 'Gadget, Mode, Sortie, Déco', color: 'bg-purple-100 text-purple-700 border-purple-200' },
 };
 
-export const PAYMENT_MODES = {
+export const PAYMENT_MODES: any = {
   CASH_SAVINGS: 'Épargne (Je tape dans le stock)',
   CASH_ACCOUNT: 'Compte Courant (Je paie avec le salaire)',
   SPLIT: 'Paiement 3x/4x (Dette court terme)',
@@ -90,7 +110,7 @@ const calculateFutureValue = (principal: number, rate: number, years: number) =>
   return principal * Math.pow((1 + rate), years);
 };
 
-// --- ANALYSE DU PROFIL (V6) ---
+// --- ANALYSE DU PROFIL (V6 - TA LOGIQUE) ---
 export const calculateFinancials = (profile: any) => {
   const getMonthlyTotal = (items: any[]) =>
     (items || []).reduce((acc, item) => {
@@ -105,8 +125,13 @@ export const calculateFinancials = (profile: any) => {
   const monthlyCredits = getMonthlyTotal(profile.credits);
   const monthlySavingsContrib = getMonthlyTotal(profile.savingsContributions);
 
+  // Récupération du budget variable (Nouveau)
+  const variableCosts = Math.abs(parseFloat(profile.variableCosts) || 0);
+
   const essentialExpenses = monthlyFixed; 
   const totalRecurring = essentialExpenses + monthlySubs + monthlyCredits + monthlySavingsContrib;
+  
+  // Reste à vivre Théorique
   const remainingToLive = monthlyIncome - totalRecurring;
   
   let engagementRate = 0;
@@ -118,16 +143,14 @@ export const calculateFinancials = (profile: any) => {
 
   const matelas = Math.abs(parseFloat(profile.savings) || 0);
   
-  // 2. Calcul Dynamique des Règles (FAMILLE + PERSONA)
+  // Calcul Dynamique des Règles
   const currentPersonaKey = (profile.persona || 'salaried').toUpperCase();
   // @ts-ignore
   const baseRules = PERSONA_PRESETS[currentPersonaKey]?.rules || PERSONA_PRESETS.SALARIED.rules;
 
-  // Ajustement du Seuil de Survie selon la Famille
   const adults = Math.max(1, parseInt(profile.household?.adults) || 1);
   const children = Math.max(0, parseInt(profile.household?.children) || 0);
   
-  // Formule : Base + 150€/adulte supp + 120€/enfant
   const adjustedMinLiving = baseRules.minLiving + ((adults - 1) * 150) + (children * 120);
 
   const userRules = {
@@ -152,6 +175,7 @@ export const calculateFinancials = (profile: any) => {
     monthlySavingsContrib,
     totalRecurring,
     remainingToLive,
+    variableCosts, // EXPORTÉ pour l'affichage
     engagementRate,
     matelas,
     safetyMonths,
@@ -162,7 +186,7 @@ export const calculateFinancials = (profile: any) => {
   };
 };
 
-// --- LE CERVEAU V6 (ADAPTATIF) ---
+// --- LE CERVEAU V6 (TA LOGIQUE ADAPTATIVE) ---
 
 export const analyzePurchaseImpact = (currentStats: any, purchase: any) => {
   const amount = Math.abs(parseFloat(purchase.amount) || 0);
@@ -178,7 +202,7 @@ export const analyzePurchaseImpact = (currentStats: any, purchase: any) => {
   let timeToWork = 0;
   let realCost = amount;
 
-  // --- 1. CALCULS PHYSIQUES ---
+  // 1. CALCULS PHYSIQUES
   if (purchase.paymentMode === 'CASH_SAVINGS') {
     newMatelas = Math.max(0, currentStats.matelas - amount);
     opportunityCost = calculateFutureValue(amount, CONSTANTS.INVESTMENT_RATE, 10) - amount;
@@ -195,6 +219,7 @@ export const analyzePurchaseImpact = (currentStats: any, purchase: any) => {
     realCost = amount * 12; 
   }
   else {
+    // Gestion CREDIT ou SPLIT
     const months = Math.max(1, parseInt(purchase.duration) || 3);
     if (purchase.paymentMode === 'CREDIT') {
       const rate = Math.abs(parseFloat(purchase.rate) || 0);
@@ -209,7 +234,7 @@ export const analyzePurchaseImpact = (currentStats: any, purchase: any) => {
     opportunityCost = calculateFutureValue(amount, CONSTANTS.INVESTMENT_RATE, 10) - amount;
   }
 
-  // --- 2. AJUSTEMENTS CONTEXTE ---
+  // 2. AJUSTEMENTS CONTEXTE
   if (isReimbursable) {
     realCost = 0; creditCost = 0; opportunityCost = 0; timeToWork = 0;
   } else if (isPro) {
@@ -221,7 +246,7 @@ export const analyzePurchaseImpact = (currentStats: any, purchase: any) => {
     timeToWork = costToCompare / currentStats.dailyIncome;
   }
 
-  // --- 3. RECALCUL RATIOS ---
+  // 3. RECALCUL RATIOS
   const newMonthlyExpenses = currentStats.essentialExpenses + (monthlyCost > 0 ? monthlyCost : 0);
   let newSafetyMonths = 0;
   if (newMonthlyExpenses > 0) newSafetyMonths = newMatelas / newMonthlyExpenses;
@@ -234,7 +259,7 @@ export const analyzePurchaseImpact = (currentStats: any, purchase: any) => {
     newEngagementRate = 100;
   }
 
-  // --- 4. MOTEUR DE RÈGLES ADAPTATIF ---
+  // 4. MOTEUR DE RÈGLES
   const issues = [];
   const tips = [];
   let score = 100;
@@ -346,4 +371,86 @@ export const analyzePurchaseImpact = (currentStats: any, purchase: any) => {
   }
 
   return { verdict, score, issues, tips, newMatelas, newRV, newSafetyMonths, newEngagementRate, realCost, creditCost, opportunityCost, timeToWork, smartTip };
+};
+
+// --- 🔥 MOTEUR TEMPOREL DATE-FNS (NOUVEAU POUR CALENDRIER) ---
+
+export const generateTimeline = (profile: any, history: any[], daysToProject = 730) => {
+  const timeline = [];
+  
+  // 1. DATE DE DÉPART NORMALISÉE
+  const today = startOfDay(new Date());
+  
+  let currentBalance = parseFloat(profile.currentBalance) || 0;
+  
+  // 2. PRÉPARATION DES ÉVÉNEMENTS RÉCURRENTS
+  const recurringEvents = [
+    ...(profile.incomes || []).map((i: any) => ({ ...i, type: 'income', day: i.dayOfMonth || 1 })),
+    ...(profile.fixedCosts || []).map((i: any) => ({ ...i, type: 'expense', day: i.dayOfMonth || 5 })),
+    ...(profile.subscriptions || []).map((i: any) => ({ ...i, type: 'expense', day: i.dayOfMonth || 10 })),
+    ...(profile.credits || []).map((i: any) => ({ ...i, type: 'expense', day: i.dayOfMonth || 15 })),
+    ...(profile.savingsContributions || []).map((i: any) => ({ ...i, type: 'expense', day: i.dayOfMonth || 20, name: `Épargne: ${i.name}` })),
+  ];
+
+  // 3. LISSAGE VIE QUOTIDIENNE (Variable)
+  const dailyVariableCost = (parseFloat(profile.variableCosts) || 0) / 30;
+
+  // 4. BOUCLE DE PROJECTION
+  for (let i = 0; i < daysToProject; i++) {
+    
+    // Utilisation de date-fns pour avancer jour après jour proprement
+    const currentDate = addDays(today, i);
+    const currentDayOfMonth = getDate(currentDate);
+    const isMonthEnd = isLastDayOfMonth(currentDate);
+    const daysInCurrentMonth = getDaysInMonth(currentDate);
+
+    let dailyImpact = 0;
+    const events = [];
+
+    // A. On scanne les événements prévus
+    recurringEvents.forEach((e: any) => {
+      let shouldTrigger = false;
+      const targetDay = e.day;
+
+      if (targetDay === currentDayOfMonth) {
+        shouldTrigger = true;
+      } 
+      else if (targetDay > daysInCurrentMonth && isMonthEnd) {
+        // Cas Fin de Mois (ex: le 31 tombe le 28)
+        shouldTrigger = true;
+      }
+
+      if (shouldTrigger) {
+        const amount = parseFloat(e.amount);
+        if (e.type === 'income') {
+          dailyImpact += amount;
+          events.push({ name: e.name, amount: amount, type: 'income' });
+        } else {
+          dailyImpact -= amount;
+          events.push({ name: e.name, amount: -amount, type: 'expense' });
+        }
+      }
+    });
+
+    // B. Lissage Vie Quotidienne (Seulement si solde positif pour réalisme visuel)
+    if (dailyVariableCost > 0 && currentBalance > 0) {
+      dailyImpact -= dailyVariableCost;
+    }
+
+    currentBalance += dailyImpact;
+
+    // Statut du jour
+    let status = 'safe';
+    if (currentBalance < 0) status = 'danger';
+    else if (currentBalance < 200) status = 'warning';
+
+    timeline.push({
+      date: currentDate.toISOString(),
+      balance: Math.round(currentBalance),
+      events,
+      status
+    });
+  }
+
+  return timeline;
 };
