@@ -15,21 +15,6 @@ export const metadata: Metadata = {
     statusBarStyle: 'default',
     title: 'Coach Fi',
   },
-  openGraph: {
-    images: [
-      {
-        url: 'https://bolt.new/static/og_default.png',
-      },
-    ],
-  },
-  twitter: {
-    card: 'summary_large_image',
-    images: [
-      {
-        url: 'https://bolt.new/static/og_default.png',
-      },
-    ],
-  },
 };
 
 export const viewport: Viewport = {
@@ -52,20 +37,25 @@ export default function RootLayout({
       </head>
       <body className={`${inter.className} bg-slate-50 text-slate-900`}>
         
-        {/* 2. NAVIGATION GLOBALE (Menu) */}
+        {/* 1. NAVIGATION (Barre latérale ou inférieure) */}
         <Navigation />
 
-        {/* 3. WRAPPER INTELLIGENT (Marges pour le menu) */}
+        {/* 2. WRAPPER PRINCIPAL */}
+        {/* md:pl-64 : Laisse l'espace pour la sidebar à gauche sur Desktop */}
+        {/* pb-24 : Laisse l'espace pour la bottom-bar en bas sur Mobile */}
         <main className="min-h-screen transition-all duration-300 md:pl-64 pb-24 md:pb-0">
           
-          {/* 4. CONTENEUR GLOBAL (Centrage et padding du contenu) */}
+          {/* 3. CONTENEUR CENTRÉ (Limite la largeur pour la lisibilité) */}
           <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 md:pt-10">
             
-            {/* 5. HEADER AUTOMATIQUE (Change selon la page) */}
+            {/* 4. HEADER AUTOMATIQUE (Titre de la page + Date) */}
             <Header />
 
-            {/* Le contenu spécifique de chaque page s'insère ici */}
-            {children}
+            {/* 5. CONTENU DE LA PAGE COURANTE (Injecté ici) */}
+            <div className="mt-6">
+              {children}
+            </div>
+
           </div>
 
         </main>

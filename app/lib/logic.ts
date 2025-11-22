@@ -1,16 +1,55 @@
 export const STORAGE_KEY = 'financial_coach_data_v1';
 
-// --- CONSTANTES SCIENTIFIQUES & FINANCIÈRES ---
+// --- CONSTANTES GLOBALES ---
 export const CONSTANTS = {
   AVG_WORK_DAYS_MONTH: 21.6, 
-  SAFE_SAVINGS_RATE: 0.03,   // 3% (Livret A / Fonds Euro)
-  INVESTMENT_RATE: 0.07,     // 7% (Bourse / ETF Monde lissé sur 15 ans)
-  INFLATION_RATE: 0.02,      // 2% Cible BCE
-  MAX_DEBT_RATIO: 35,        // 35% Norme HCSF
-  MIN_LIVING_REMAINDER: 200, // Seuil de survie absolue
+  SAFE_SAVINGS_RATE: 0.03,
+  INVESTMENT_RATE: 0.07,
+  INFLATION_RATE: 0.02,
+  WEALTHY_THRESHOLD: 12,
+};
+
+// --- 1. LES 5 PROFILS TYPES (EXCLUSIFS) ---
+export const PERSONA_PRESETS = {
+  STUDENT: {
+    id: 'student',
+    label: 'Étudiant(e)',
+    description: 'Budget serré, études, besoins flexibles.',
+    rules: { safetyMonths: 1, maxDebt: 40, minLiving: 100 } 
+  },
+  SALARIED: {
+    id: 'salaried',
+    label: 'Salarié / Stable',
+    description: 'Revenus réguliers (CDI, Fonctionnaire).',
+    rules: { safetyMonths: 3, maxDebt: 35, minLiving: 300 }
+  },
+  FREELANCE: {
+    id: 'freelance',
+    label: 'Indépendant / Freelance',
+    description: 'Revenus variables, risque plus élevé.',
+    rules: { safetyMonths: 6, maxDebt: 30, minLiving: 500 }
+  },
+  RETIRED: {
+    id: 'retired',
+    label: 'Retraité(e)',
+    description: 'Revenus fixes, préservation du capital.',
+    rules: { safetyMonths: 6, maxDebt: 25, minLiving: 400 }
+  },
+  UNEMPLOYED: {
+    id: 'unemployed',
+    label: 'En recherche / Transition',
+    description: 'Revenus précaires, prudence maximale.',
+    rules: { safetyMonths: 6, maxDebt: 0, minLiving: 200 } // Zéro dette tolérée
+  }
 };
 
 export const INITIAL_PROFILE = {
+  firstName: '',
+  persona: 'salaried',
+  household: {
+    adults: 1,
+    children: 0
+  },
   savings: 0,
   incomes: [],
   fixedCosts: [],
@@ -21,24 +60,9 @@ export const INITIAL_PROFILE = {
 };
 
 export const PURCHASE_TYPES = {
-  NEED: {
-    id: 'need',
-    label: 'Besoin Vital',
-    description: 'Nourriture, Santé, Réparation indispensable',
-    color: 'bg-blue-100 text-blue-700 border-blue-200',
-  },
-  USEFUL: {
-    id: 'useful',
-    label: 'Confort / Utile',
-    description: 'Gain de temps, Travail, Sport',
-    color: 'bg-emerald-100 text-emerald-700 border-emerald-200',
-  },
-  DESIRE: {
-    id: 'desire',
-    label: 'Envie / Plaisir',
-    description: 'Gadget, Mode, Sortie, Déco',
-    color: 'bg-purple-100 text-purple-700 border-purple-200',
-  },
+  NEED: { id: 'need', label: 'Besoin Vital', description: 'Nourriture, Santé, Réparation indispensable', color: 'bg-blue-100 text-blue-700 border-blue-200' },
+  USEFUL: { id: 'useful', label: 'Confort / Utile', description: 'Gain de temps, Travail, Sport', color: 'bg-emerald-100 text-emerald-700 border-emerald-200' },
+  DESIRE: { id: 'desire', label: 'Envie / Plaisir', description: 'Gadget, Mode, Sortie, Déco', color: 'bg-purple-100 text-purple-700 border-purple-200' },
 };
 
 export const PAYMENT_MODES = {
@@ -66,36 +90,56 @@ const calculateFutureValue = (principal: number, rate: number, years: number) =>
   return principal * Math.pow((1 + rate), years);
 };
 
-// --- ANALYSE DU PROFIL ---
+// --- ANALYSE DU PROFIL (V6) ---
 export const calculateFinancials = (profile: any) => {
-  const getMonthly = (items: any[]) =>
-    items.reduce((acc, item) => {
+  const getMonthlyTotal = (items: any[]) =>
+    (items || []).reduce((acc, item) => {
       let amount = Math.abs(parseFloat(item.amount) || 0);
       if (item.frequency === 'annuel') amount = amount / 12;
       return acc + amount;
     }, 0);
 
-  const monthlyIncome = getMonthly(profile.incomes);
-  const monthlyFixed = getMonthly(profile.fixedCosts) + getMonthly(profile.annualExpenses);
-  const monthlySubs = getMonthly(profile.subscriptions);
-  const monthlyCredits = getMonthly(profile.credits);
-  const monthlySavingsContrib = getMonthly(profile.savingsContributions);
+  const monthlyIncome = getMonthlyTotal(profile.incomes);
+  const monthlyFixed = getMonthlyTotal(profile.fixedCosts) + getMonthlyTotal(profile.annualExpenses);
+  const monthlySubs = getMonthlyTotal(profile.subscriptions);
+  const monthlyCredits = getMonthlyTotal(profile.credits);
+  const monthlySavingsContrib = getMonthlyTotal(profile.savingsContributions);
 
   const essentialExpenses = monthlyFixed; 
   const totalRecurring = essentialExpenses + monthlySubs + monthlyCredits + monthlySavingsContrib;
   const remainingToLive = monthlyIncome - totalRecurring;
   
-  const engagementRate = monthlyIncome > 0
-    ? ((essentialExpenses + monthlySubs + monthlyCredits) / monthlyIncome) * 100
-    : 0;
+  let engagementRate = 0;
+  if (monthlyIncome > 0) {
+    engagementRate = ((essentialExpenses + monthlySubs + monthlyCredits) / monthlyIncome) * 100;
+  } else if (essentialExpenses + monthlySubs + monthlyCredits > 0) {
+    engagementRate = 100;
+  }
 
   const matelas = Math.abs(parseFloat(profile.savings) || 0);
   
+  // 2. Calcul Dynamique des Règles (FAMILLE + PERSONA)
+  const currentPersonaKey = (profile.persona || 'salaried').toUpperCase();
+  // @ts-ignore
+  const baseRules = PERSONA_PRESETS[currentPersonaKey]?.rules || PERSONA_PRESETS.SALARIED.rules;
+
+  // Ajustement du Seuil de Survie selon la Famille
+  const adults = Math.max(1, parseInt(profile.household?.adults) || 1);
+  const children = Math.max(0, parseInt(profile.household?.children) || 0);
+  
+  // Formule : Base + 150€/adulte supp + 120€/enfant
+  const adjustedMinLiving = baseRules.minLiving + ((adults - 1) * 150) + (children * 120);
+
+  const userRules = {
+    ...baseRules,
+    minLiving: adjustedMinLiving
+  };
+
   let safetyMonths = 0;
   if (essentialExpenses > 0) {
     safetyMonths = matelas / essentialExpenses;
   } else if (matelas > 0) {
-    safetyMonths = 99; 
+    safetyMonths = 99;
   }
   
   const dailyIncome = monthlyIncome > 0 ? monthlyIncome / CONSTANTS.AVG_WORK_DAYS_MONTH : 0;
@@ -112,14 +156,18 @@ export const calculateFinancials = (profile: any) => {
     matelas,
     safetyMonths,
     dailyIncome,
+    rules: userRules, 
+    firstName: profile.firstName || 'Utilisateur',
+    persona: profile.persona || 'salaried'
   };
 };
 
-// --- LE CERVEAU V4 (ANALYSE MULTI-DIMENSIONNELLE) ---
+// --- LE CERVEAU V6 (ADAPTATIF) ---
 
 export const analyzePurchaseImpact = (currentStats: any, purchase: any) => {
   const amount = Math.abs(parseFloat(purchase.amount) || 0);
   const { isReimbursable = false, isPro = false } = purchase;
+  const rules = currentStats.rules;
 
   let newMatelas = currentStats.matelas;
   let newRV = currentStats.remainingToLive;
@@ -131,7 +179,6 @@ export const analyzePurchaseImpact = (currentStats: any, purchase: any) => {
   let realCost = amount;
 
   // --- 1. CALCULS PHYSIQUES ---
-
   if (purchase.paymentMode === 'CASH_SAVINGS') {
     newMatelas = Math.max(0, currentStats.matelas - amount);
     opportunityCost = calculateFutureValue(amount, CONSTANTS.INVESTMENT_RATE, 10) - amount;
@@ -143,14 +190,12 @@ export const analyzePurchaseImpact = (currentStats: any, purchase: any) => {
   else if (purchase.paymentMode === 'SUBSCRIPTION') {
     monthlyCost = amount;
     newRV = currentStats.remainingToLive - monthlyCost;
-    
     const totalPaid5Years = amount * 12 * 5;
     opportunityCost = calculateFutureValue(totalPaid5Years, CONSTANTS.INVESTMENT_RATE, 5) - totalPaid5Years;
     realCost = amount * 12; 
   }
   else {
     const months = Math.max(1, parseInt(purchase.duration) || 3);
-    
     if (purchase.paymentMode === 'CREDIT') {
       const rate = Math.abs(parseFloat(purchase.rate) || 0);
       const totalPaid = amount * (1 + (rate / 100) * (months / 12)); 
@@ -160,20 +205,14 @@ export const analyzePurchaseImpact = (currentStats: any, purchase: any) => {
     } else {
       monthlyCost = amount / months;
     }
-    
     newRV = currentStats.remainingToLive - monthlyCost;
     opportunityCost = calculateFutureValue(amount, CONSTANTS.INVESTMENT_RATE, 10) - amount;
   }
 
   // --- 2. AJUSTEMENTS CONTEXTE ---
-  
   if (isReimbursable) {
-    realCost = 0;
-    creditCost = 0;
-    opportunityCost = 0;
-    timeToWork = 0;
-  } 
-  else if (isPro) {
+    realCost = 0; creditCost = 0; opportunityCost = 0; timeToWork = 0;
+  } else if (isPro) {
     opportunityCost = 0;
   }
 
@@ -183,146 +222,128 @@ export const analyzePurchaseImpact = (currentStats: any, purchase: any) => {
   }
 
   // --- 3. RECALCUL RATIOS ---
-
   const newMonthlyExpenses = currentStats.essentialExpenses + (monthlyCost > 0 ? monthlyCost : 0);
-  
   let newSafetyMonths = 0;
-  if (newMonthlyExpenses > 0) {
-    newSafetyMonths = newMatelas / newMonthlyExpenses;
-  } else if (newMatelas > 0) {
-    newSafetyMonths = 99;
+  if (newMonthlyExpenses > 0) newSafetyMonths = newMatelas / newMonthlyExpenses;
+  else if (newMatelas > 0) newSafetyMonths = 99;
+
+  let newEngagementRate = 0;
+  if (currentStats.monthlyIncome > 0) {
+    newEngagementRate = ((currentStats.essentialExpenses + currentStats.monthlySubs + currentStats.monthlyCredits + monthlyCost) / currentStats.monthlyIncome) * 100;
+  } else if ((currentStats.essentialExpenses + monthlyCost) > 0) {
+    newEngagementRate = 100;
   }
 
-  const newEngagementRate = currentStats.monthlyIncome > 0
-      ? ((currentStats.essentialExpenses +
-          currentStats.monthlySubs +
-          currentStats.monthlyCredits +
-          monthlyCost) /
-          currentStats.monthlyIncome) * 100
-      : 0;
-
-
-  // --- 4. MOTEUR DE RÈGLES & CONSEILS MULTIPLES ---
+  // --- 4. MOTEUR DE RÈGLES ADAPTATIF ---
   const issues = [];
-  const tips = []; // Liste des conseils structurés
+  const tips = [];
   let score = 100;
 
-  const isCashFlowBridge = purchase.paymentMode === 'CASH_ACCOUNT' && newRV < 0 && currentStats.matelas > Math.abs(newRV);
+  if (purchase.paymentMode === 'CASH_SAVINGS' && amount > currentStats.matelas) {
+      issues.push({ level: 'red', text: `FONDS INSUFFISANTS : Tu n'as que ${formatCurrency(currentStats.matelas)} d'épargne.` });
+      tips.push({ type: 'stop', title: "Achat Impossible", text: "Tu ne peux pas dépenser l'argent que tu n'as pas." });
+      score -= 100;
+  }
 
-  // --- RÈGLES BLOQUANTES ---
-  if (newRV < 0) {
-    if (isCashFlowBridge) {
-        issues.push({ level: 'orange', text: `Trésorerie : Manque ${formatCurrency(Math.abs(newRV))} sur le compte courant.` });
-        tips.push({ type: 'action', title: "Mouvement Logistique", text: `Tu as l'épargne nécessaire. Transfère ${formatCurrency(Math.abs(newRV))} de ton livret vers ton compte courant AVANT d'acheter.` });
-        score -= 20; 
-    } else if (isReimbursable) {
-        issues.push({ level: 'orange', text: `Avance de trésorerie risquée.` });
-        tips.push({ type: 'warning', title: "Surveille ta tréso", text: "C'est remboursable, mais assure-toi d'avoir assez de cash pour tenir jusqu'au remboursement." });
-        score -= 30;
-    } else {
-        issues.push({ level: 'red', text: `MUR FINANCIER : Ton budget explose.` });
-        tips.push({ type: 'stop', title: "Impossible en l'état", text: `Il te manque ${formatCurrency(Math.abs(newRV))}. Tu ne peux pas faire cet achat sans t'endetter dangereusement.` });
-        score -= 100;
-    }
+  const missingCash = rules.minLiving - newRV; 
+  const isLiquidityIssue = purchase.paymentMode === 'CASH_ACCOUNT' && missingCash > 0;
+  
+  if (isLiquidityIssue) {
+      if (newMatelas > missingCash) {
+          issues.push({ level: 'orange', text: `Trésorerie : Compte courant sous le seuil de confort (${formatCurrency(rules.minLiving)}).` });
+          tips.push({ type: 'action', title: "Virement nécessaire", text: `Fais un virement de ${formatCurrency(missingCash)} depuis ton épargne.` });
+          score -= 20;
+      } else {
+          if (!isReimbursable) {
+              issues.push({ level: 'red', text: `DANGER VITAL : Il ne te restera que ${formatCurrency(newRV)} pour vivre.` });
+              score -= 100;
+          } else {
+              issues.push({ level: 'orange', text: `Trésorerie tendue en attendant le remboursement.` });
+              score -= 30;
+          }
+      }
   }
   
-  // --- SÉCURITÉ ---
   if (!isReimbursable) {
       if (newSafetyMonths < 1) {
-        issues.push({ level: 'red', text: `Épargne épuisée (${newSafetyMonths.toFixed(1)} mois).` });
-        tips.push({ type: 'stop', title: "Danger Sécurité", text: "Tu vides complètement ton matelas de sécurité. Au moindre pépin (voiture, santé), tu es à la rue." });
-        score -= 40;
-      } else if (newSafetyMonths < 3) {
-        issues.push({ level: 'orange', text: `Matelas faible (< 3 mois).` });
-        tips.push({ type: 'warning', title: "Reconstitue ton épargne", text: "Cet achat fragilise ta sécurité. Engage-toi à remettre de l'argent de côté le mois prochain." });
-        score -= 20;
+          if (currentStats.safetyMonths > 0) {
+             issues.push({ level: 'red', text: `Épargne épuisée (${newSafetyMonths.toFixed(1)} mois).` });
+             score -= 40;
+          }
+      } else if (newSafetyMonths < rules.safetyMonths) {
+          issues.push({ level: 'orange', text: `Fragilité : Ton objectif est de ${rules.safetyMonths} mois d'avance.` });
+          score -= 20;
       }
   }
 
-  // --- ENDETTEMENT ---
+  const isWealthy = newSafetyMonths > CONSTANTS.WEALTHY_THRESHOLD;
+
   if (newEngagementRate > 45 && !isReimbursable) {
     if (monthlyCost > 0) {
         issues.push({ level: 'red', text: `SURENDETTEMENT : Charges à ${newEngagementRate.toFixed(0)}%.` });
-        tips.push({ type: 'stop', title: "Stop aux charges", text: "Tes charges fixes sont trop lourdes. N'ajoute surtout pas un nouveau crédit ou abonnement." });
         score -= 40;
-    } else {
+    } else if (!isWealthy) {
         issues.push({ level: 'orange', text: `Charges structurelles élevées (${newEngagementRate.toFixed(0)}%).` });
-        // Pas de tip bloquant ici car c'est du cash, juste un warning structurel
         score -= 15;
     }
+  } else if (newEngagementRate > rules.maxDebt && monthlyCost > 0) {
+      issues.push({ level: 'orange', text: `Attention : Tu dépasses ton seuil d'endettement (${rules.maxDebt}%).` });
+      score -= 15;
   }
 
-  // --- PSYCHOLOGIE & COMPORTEMENT ---
   const checkPsychology = !isPro && !isReimbursable;
   const isSmallPleasure = amount < (currentStats.monthlyIncome * 0.02);
 
   if (checkPsychology) {
-    // Investisseur (Coût d'opportunité)
     if (opportunityCost > amount && !isSmallPleasure && purchase.type !== 'need') {
-        tips.push({ 
-            type: 'investor', 
-            title: "Perspective Investisseur", 
-            text: `Le coût caché est énorme : si tu plaçais ces ${formatCurrency(amount)} à 7% au lieu de les dépenser, tu aurais ${formatCurrency(amount + opportunityCost)} dans 10 ans.` 
-        });
+        tips.push({ type: 'investor', title: "Coût d'opportunité", text: `Placé à 7%, cet argent vaudrait ${formatCurrency(amount + opportunityCost)} dans 10 ans.` });
     }
-
-    // Travailleur (Temps de vie)
     if (timeToWork > 3 && purchase.type === 'desire') {
-        tips.push({ 
-            type: 'time', 
-            title: "Perspective Temporelle", 
-            text: `Cet objet te coûte ${Math.ceil(timeToWork)} jours de travail complets assis au bureau. Est-ce que ça les vaut vraiment ?` 
-        });
+        tips.push({ type: 'time', title: "Temps de vie", text: `Cet objet représente ${Math.ceil(timeToWork)} jours de travail.` });
     }
-
-    // Règle des 7 jours
-    if (purchase.type === 'desire' && !isSmallPleasure && amount > 300 && newSafetyMonths < 6) {
-        issues.push({ level: 'orange', text: "Grosse somme pour une envie." });
-        tips.push({ 
-            type: 'psychology', 
-            title: "Biais Cognitif", 
-            text: "C'est une grosse somme pour un plaisir. Attends 7 jours. Si tu en as toujours envie la semaine prochaine, reviens l'acheter." 
-        });
-        score -= 10;
-    }
-
-    // Crédit Toxique
+    
     const isLuxuryUseful = purchase.type === 'useful' && amount > (currentStats.monthlyIncome * 3);
     if ((purchase.type === 'desire' || isLuxuryUseful) && (purchase.paymentMode === 'CREDIT' || purchase.paymentMode === 'SPLIT')) {
         issues.push({ level: 'red', text: "Crédit Conso sur un Passif." });
-        tips.push({ type: 'stop', title: "Règle d'Or", text: "On ne s'endette JAMAIS pour du plaisir ou du luxe. Si tu n'as pas le cash, tu n'as pas les moyens." });
+        tips.push({ type: 'stop', title: "Règle d'Or", text: "On ne s'endette jamais pour du plaisir." });
         score -= 30;
     }
   }
 
-  // Conseil par défaut si la liste est vide
-  if (tips.length === 0) {
-      if (isPro) tips.push({ type: 'success', title: "Investissement Pro", text: "C'est un outil de travail. Si cela augmente ta productivité, c'est un excellent choix." });
-      else if (isReimbursable) tips.push({ type: 'info', title: "Avance de frais", text: "Pense à bien scanner ton justificatif tout de suite pour ne pas oublier le remboursement." });
-      else tips.push({ type: 'success', title: "Feu vert", text: "Tu as les moyens, la sécurité et le budget. Profite de ton achat sans culpabilité !" });
+  // --- VERDICT ---
+  let verdict = 'green';
+  if (score < 50 || issues.some((i: any) => i.level === 'red')) verdict = 'red';
+  else if (score < 80 || issues.some((i: any) => i.level === 'orange')) verdict = 'orange';
+
+  let smartTip = "";
+  const liquidityTip: any = tips.find((t: any) => t.title === "Virement nécessaire");
+
+  if (verdict === 'red') {
+      const stopTip: any = tips.find((t: any) => t.type === 'stop');
+      smartTip = stopTip ? stopTip.text : "Stop 🛑 Cet achat est dangereux pour tes finances.";
+  }
+  else if (liquidityTip) {
+      smartTip = `⚠️ Attention Logistique : ${liquidityTip.text}`;
+  }
+  else if (isReimbursable) {
+      smartTip = "Opération neutre 🔄 C'est une avance. Note-le bien.";
+  }
+  else if (verdict === 'orange') {
+      if (timeToWork > 5 && purchase.type === 'desire') {
+          smartTip = `⚠️ C'est risqué. Travailler ${Math.ceil(timeToWork)} jours pour ce plaisir alors que ta situation est fragile ?`;
+      } else {
+          smartTip = "⚠️ Attention. Ta situation est fragile. Assure-toi que c'est indispensable.";
+      }
+  }
+  else {
+      if (opportunityCost > amount && !isSmallPleasure && purchase.type !== 'need') {
+        smartTip = `💡 Info Investisseur : Placé à 7%, cet argent vaudrait ${formatCurrency(amount + opportunityCost)} dans 10 ans.`;
+      } else if (timeToWork > 3 && purchase.type === 'desire') {
+        smartTip = `💡 Info Temps : Cet objet représente ${Math.ceil(timeToWork)} jours de travail.`;
+      } else {
+        smartTip = `✅ Feu vert ${currentStats.firstName} ! Tout est au vert, profite.`;
+      }
   }
 
-  // VERDICT FINAL
-  let verdict = 'green';
-  if (score < 50 || issues.some((i) => i.level === 'red')) verdict = 'red';
-  else if (score < 80 || issues.some((i) => i.level === 'orange')) verdict = 'orange';
-
-  // SmartTip de secours pour la compatibilité (ne devrait plus être utilisé par l'UI)
-  const smartTip = tips.length > 0 ? tips[0].text : "Analyse terminée.";
-
-  return { 
-    verdict, 
-    score, 
-    issues, 
-    tips, // C'est ce tableau qui contient toute la richesse
-    newMatelas, 
-    newRV, 
-    newSafetyMonths, 
-    newEngagementRate,
-    realCost, 
-    creditCost, 
-    opportunityCost, 
-    timeToWork,
-    smartTip
-  };
+  return { verdict, score, issues, tips, newMatelas, newRV, newSafetyMonths, newEngagementRate, realCost, creditCost, opportunityCost, timeToWork, smartTip };
 };
