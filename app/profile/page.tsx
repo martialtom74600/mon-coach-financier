@@ -10,266 +10,53 @@ import {
   PERSONA_PRESETS
 } from '@/app/lib/logic';
 
+// --- NOUVEL IMPORT ---
+import AccordionSection from '@/app/components/AccordionSection';
+
 // Imports Icones
 import {
-  Trash2,
-  Plus,
-  Shield,
-  Save,
-  Wallet,
-  Home,
-  Tv,
-  Landmark,
-  Calendar,
-  TrendingUp,
-  User,
-  Briefcase,
-  GraduationCap,
-  Armchair,
-  Baby,
-  Target,
-  Minus,
-  CheckCircle,
-  AlertTriangle,
-  Search,
-  Info,
-  CreditCard,
-  ShoppingCart,
-  PiggyBank,
-  ChevronDown,
+  Save, Wallet, Home, Tv, Landmark, Calendar,
+  User, Briefcase, GraduationCap, Armchair, Baby, Target, Minus, CheckCircle,
+  Search, Info, CreditCard, PiggyBank, ArrowRight, ChevronLeft,
+  Zap, Shield, Plus
 } from 'lucide-react';
 
 // --- IMPORTS UI KIT ---
 import Card from '@/app/components/ui/Card';
 import Button from '@/app/components/ui/Button';
 import InputGroup from '@/app/components/ui/InputGroup';
-import Badge from '@/app/components/ui/Badge';
 import Tooltip from '@/app/components/ui/Tooltip';
 
-// --- NOUVEAU COMPOSANT : SÉLECTEUR DE NIVEAU (INTEGRÉ AU FORMULAIRE) ---
-const LevelSelector = ({ mode, onChange }: any) => {
-  return (
-    <div className="space-y-3 animate-fade-in">
-        <label className="block text-sm font-medium text-slate-600">
-            Ton mode de pilotage
-        </label>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            
-            {/* OPTION 1 : ESSENTIEL */}
-            <button 
-                type="button"
-                onClick={() => onChange('simple')}
-                className={`p-4 rounded-xl border text-left transition-all relative overflow-hidden group ${
-                    mode === 'simple' 
-                    ? 'border-emerald-500 bg-emerald-50 ring-1 ring-emerald-500' 
-                    : 'border-slate-200 bg-white hover:border-emerald-200 hover:bg-slate-50'
-                }`}
-            >
-                <div className="flex items-center gap-3 mb-1">
-                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-lg transition-colors ${
-                        mode === 'simple' ? 'bg-emerald-200 text-emerald-700' : 'bg-slate-100 text-slate-400 group-hover:text-emerald-500'
-                    }`}>
-                        🌱
-                    </div>
-                    <div className={`font-bold text-sm ${mode === 'simple' ? 'text-emerald-900' : 'text-slate-700'}`}>
-                        Aller à l'essentiel
-                    </div>
-                </div>
-                <p className={`text-xs ml-11 ${mode === 'simple' ? 'text-emerald-700/80' : 'text-slate-400'}`}>
-                    Je laisse le coach gérer les dates et taux par défaut.
-                </p>
-            </button>
+// --- CONFIGURATION DES 5 ÉTAPES ---
+const STEPS = [
+  { id: 1, label: "Identité", icon: User },
+  { id: 2, label: "Patrimoine", icon: Shield },
+  { id: 3, label: "Budget Vital", icon: Wallet },
+  { id: 4, label: "Détails", icon: Tv },
+  { id: 5, label: "Train de Vie", icon: Zap },
+];
 
-            {/* OPTION 2 : EXPERT */}
-            <button 
-                type="button"
-                onClick={() => onChange('expert')}
-                className={`p-4 rounded-xl border text-left transition-all relative overflow-hidden group ${
-                    mode === 'expert' 
-                    ? 'border-indigo-500 bg-indigo-50 ring-1 ring-indigo-500' 
-                    : 'border-slate-200 bg-white hover:border-indigo-200 hover:bg-slate-50'
-                }`}
-            >
-                <div className="flex items-center gap-3 mb-1">
-                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-lg transition-colors ${
-                        mode === 'expert' ? 'bg-indigo-200 text-indigo-700' : 'bg-slate-100 text-slate-400 group-hover:text-indigo-500'
-                    }`}>
-                        🦁
-                    </div>
-                    <div className={`font-bold text-sm ${mode === 'expert' ? 'text-indigo-900' : 'text-slate-700'}`}>
-                        Mode Expert
-                    </div>
-                </div>
-                <p className={`text-xs ml-11 ${mode === 'expert' ? 'text-indigo-700/80' : 'text-slate-400'}`}>
-                    Je veux définir mes dates de prélèvement et rendements précis.
-                </p>
-            </button>
+// --- COMPOSANT INFO BOX ---
+// (Conservé ici car utilisé dans les étapes 1, 2 et 5 hors accordéons)
+const InfoBox = ({ children, className = "mb-6" }: { children: React.ReactNode, className?: string }) => (
+  <div className={`bg-indigo-50/50 border border-indigo-100 rounded-xl p-3 flex gap-3 text-xs text-indigo-800 ${className}`}>
+    <Info size={16} className="shrink-0 mt-0.5 text-indigo-500" />
+    <div className="leading-relaxed opacity-90 font-medium">{children}</div>
+  </div>
+);
 
-        </div>
+// --- COMPOSANTS HELPERS LOCAUX ---
+
+const HouseholdCounter = ({ label, value, onChange, icon: Icon }: any) => (
+  <div className="flex items-center justify-between p-2 bg-white rounded-xl border border-slate-200">
+    <div className="flex items-center gap-2 ml-2"><Icon size={16} className="text-slate-400" /><span className="font-medium text-slate-700 text-sm">{label}</span></div>
+    <div className="flex items-center gap-2">
+      <button onClick={() => onChange(Math.max(0, value - 1))} className="w-7 h-7 flex items-center justify-center rounded-lg bg-slate-100 text-slate-500 hover:bg-slate-200"><Minus size={12} /></button>
+      <span className="font-bold text-slate-800 w-4 text-center text-sm">{value}</span>
+      <button onClick={() => onChange(value + 1)} className="w-7 h-7 flex items-center justify-center rounded-lg bg-slate-100 text-slate-500 hover:bg-slate-200"><Plus size={12} /></button>
     </div>
-  );
-};
-
-// --- COMPOSANT ACCORDÉON (MISE À JOUR UX) ---
-
-const AccordionSection = ({ 
-  title, 
-  icon: Icon, 
-  items = [], 
-  onItemChange, 
-  onItemAdd, 
-  onItemRemove, 
-  type = 'standard', 
-  colorClass = 'text-slate-800', 
-  defaultOpen = false,
-  mode = 'simple', // Nouveau
-  canBeDisabled = false // Nouveau
-}: any) => {
-  
-  // Si on a des items, la section est active, sinon elle dépend de l'action utilisateur
-  const [isEnabled, setIsEnabled] = useState(!canBeDisabled || items.length > 0);
-  const [isOpen, setIsOpen] = useState(defaultOpen);
-
-  const subTotal = items.reduce((acc: number, item: any) => {
-    let val = parseFloat(item.amount) || 0;
-    if (item.frequency === 'annuel') val = val / 12;
-    return acc + val;
-  }, 0);
-
-  // --- ÉTAT DÉSACTIVÉ (GHOST) ---
-  if (canBeDisabled && !isEnabled) {
-    return (
-      <div className="bg-white rounded-2xl border border-slate-200 p-4 flex items-center justify-between opacity-60 hover:opacity-100 transition-all group">
-        <div className="flex items-center gap-4">
-          <div className={`p-2.5 rounded-xl bg-slate-50 text-slate-400 group-hover:text-slate-600 grayscale transition-all`}>
-            {Icon && <Icon size={20} />}
-          </div>
-          <div className="text-left">
-            <div className="font-bold text-slate-600 text-base">{title}</div>
-            <div className="text-xs text-slate-400">Non concerné</div>
-          </div>
-        </div>
-        <button 
-          onClick={() => { setIsEnabled(true); setIsOpen(true); onItemAdd(); }} 
-          className="text-xs font-bold text-indigo-600 bg-indigo-50 px-4 py-2 rounded-lg hover:bg-indigo-100 transition-colors"
-        >
-          + Ajouter
-        </button>
-      </div>
-    );
-  }
-
-  // --- ÉTAT ACTIVÉ ---
-  return (
-    <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden transition-all duration-300 shadow-sm hover:shadow-md">
-      <div className="flex items-center justify-between pr-2 bg-white hover:bg-slate-50 transition-colors">
-        <button 
-            onClick={() => setIsOpen(!isOpen)}
-            className="flex-1 p-4 flex items-center justify-between"
-        >
-            <div className="flex items-center gap-4">
-            <div className={`p-2.5 rounded-xl bg-slate-50 ${colorClass}`}>
-                {Icon && <Icon size={20} />}
-            </div>
-            <div className="text-left">
-                <h3 className="font-bold text-slate-800 text-base">{title}</h3>
-                {!isOpen && (
-                    <div className="text-xs text-slate-500 mt-0.5">
-                        {items.length} ligne{items.length > 1 ? 's' : ''} • Total : <strong>{formatCurrency(subTotal)}</strong>
-                    </div>
-                )}
-            </div>
-            </div>
-            
-            <div className="flex items-center gap-4">
-                <div className={`text-sm font-bold ${isOpen ? 'opacity-100' : 'opacity-0 md:opacity-100'} transition-opacity text-right`}>
-                    {formatCurrency(subTotal)}<span className="text-[10px] font-normal text-slate-400 block">/mois</span>
-                </div>
-                <div className={`text-slate-400 transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}`}>
-                    <ChevronDown size={20} />
-                </div>
-            </div>
-        </button>
-        
-        {canBeDisabled && isOpen && (
-             <button onClick={() => setIsEnabled(false)} className="p-2 mr-2 text-slate-300 hover:text-slate-500" title="Je n'ai pas ça">
-                <Minus size={16} />
-            </button>
-        )}
-      </div>
-
-      {isOpen && (
-        <div className="p-4 bg-slate-50/50 border-t border-slate-100 space-y-3 animate-fade-in">
-            {items.length === 0 && (
-                <p className="text-center text-sm text-slate-400 py-4 italic">Aucune ligne ajoutée.</p>
-            )}
-            
-            {items.map((item: any) => (
-            <div key={item.id} className="flex flex-col sm:flex-row gap-2 items-start sm:items-center bg-white p-2 rounded-xl border border-slate-100 shadow-sm">
-                <div className="flex-1 w-full">
-                    <input 
-                        type="text" 
-                        placeholder="Nom (ex: Loyer)" 
-                        value={item.name} 
-                        onChange={(e) => onItemChange(item.id, 'name', e.target.value)} 
-                        className="w-full p-2 bg-transparent font-medium text-sm text-slate-700 placeholder:text-slate-300 outline-none" 
-                    />
-                </div>
-                
-                <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
-                    <div className="relative w-24">
-                        <input 
-                            type="number" 
-                            placeholder="0" 
-                            value={item.amount} 
-                            onChange={(e) => onItemChange(item.id, 'amount', e.target.value)} 
-                            className="w-full p-2 pl-3 pr-6 bg-slate-50 rounded-lg text-sm font-bold text-slate-800 text-right outline-none focus:ring-2 focus:ring-indigo-100" 
-                        />
-                        <span className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 text-xs pointer-events-none">€</span>
-                    </div>
-
-                    {/* UX : MASQUER LA COMPLEXITÉ EN MODE SIMPLE */}
-                    {mode === 'expert' && type !== 'annuel' && (
-                        <div className="relative w-16" title="Jour du prélèvement">
-                            <input 
-                                type="number" 
-                                min="1" max="31" placeholder="J" 
-                                value={item.dayOfMonth || ''} 
-                                onChange={(e) => onItemChange(item.id, 'dayOfMonth', Math.min(31, Math.max(1, parseInt(e.target.value))))} 
-                                className="w-full p-2 pl-2 pr-1 bg-slate-50 rounded-lg text-sm text-center text-slate-500 outline-none focus:ring-2 focus:ring-indigo-100" 
-                            />
-                        </div>
-                    )}
-
-                    {mode === 'expert' && type === 'standard' && (
-                        <select 
-                            value={item.frequency || 'mensuel'} 
-                            onChange={(e) => onItemChange(item.id, 'frequency', e.target.value)} 
-                            className="p-2 bg-slate-50 rounded-lg text-xs text-slate-500 outline-none"
-                        >
-                            <option value="mensuel">/mois</option>
-                            <option value="annuel">/an</option>
-                        </select>
-                    )}
-                    
-                    <button onClick={() => onItemRemove(item.id)} className="p-2 text-slate-300 hover:text-rose-500 transition-colors">
-                        <Trash2 size={16} />
-                    </button>
-                </div>
-            </div>
-            ))}
-            
-            <button 
-                onClick={onItemAdd} 
-                className="w-full py-3 mt-2 border-2 border-dashed border-slate-200 rounded-xl text-slate-400 text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 hover:border-indigo-300 hover:text-indigo-600 hover:bg-indigo-50 transition-all"
-            >
-                <Plus size={14} /> Ajouter une ligne
-            </button>
-        </div>
-      )}
-    </div>
-  );
-};
+  </div>
+);
 
 const PersonaSelector = ({ currentPersona, onChange }: any) => {
   const icons: any = { salaried: Briefcase, student: GraduationCap, freelance: Target, retired: Armchair, unemployed: Search };
@@ -289,28 +76,27 @@ const PersonaSelector = ({ currentPersona, onChange }: any) => {
   );
 };
 
-const HouseholdCounter = ({ label, value, onChange, icon: Icon }: any) => (
-  <div className="flex items-center justify-between p-2 bg-white rounded-xl border border-slate-200">
-    <div className="flex items-center gap-2 ml-2"><Icon size={16} className="text-slate-400" /><span className="font-medium text-slate-700 text-sm">{label}</span></div>
-    <div className="flex items-center gap-2">
-      <button onClick={() => onChange(Math.max(0, value - 1))} className="w-7 h-7 flex items-center justify-center rounded-lg bg-slate-100 text-slate-500 hover:bg-slate-200"><Minus size={12} /></button>
-      <span className="font-bold text-slate-800 w-4 text-center text-sm">{value}</span>
-      <button onClick={() => onChange(value + 1)} className="w-7 h-7 flex items-center justify-center rounded-lg bg-slate-100 text-slate-500 hover:bg-slate-200"><Plus size={12} /></button>
-    </div>
-  </div>
-);
-
 // --- PAGE PRINCIPALE ---
 
 export default function ProfilePage() {
   const { profile, saveProfile, isLoaded } = useFinancialData();
   const router = useRouter();
-  const [mode, setMode] = useState('simple'); // 'simple' | 'expert'
+  const [currentStep, setCurrentStep] = useState(1);
   const stats = useMemo(() => calculateFinancials(profile), [profile]);
 
   if (!isLoaded) return <div className="min-h-[50vh] flex items-center justify-center"><div className="animate-pulse h-12 w-12 bg-slate-200 rounded-full"></div></div>;
 
-  // Helpers de mise à jour
+  const mode = profile.mode || 'beginner';
+  const isExpert = mode === 'expert';
+  const toggleMode = () => saveProfile({ ...profile, mode: isExpert ? 'beginner' : 'expert' });
+
+  const goNext = () => {
+      if (currentStep < 5) setCurrentStep(currentStep + 1);
+      else router.push('/'); 
+  };
+  const goPrev = () => setCurrentStep(Math.max(1, currentStep - 1));
+
+  // Typage amélioré pour la compatibilité avec AccordionSection
   const updateItem = (listName: string, id: string, field: string, value: any) => {
     const list = (profile as any)[listName] || [];
     const newList = list.map((item: any) => item.id === id ? { ...item, [field]: value } : item);
@@ -318,8 +104,14 @@ export default function ProfilePage() {
   };
 
   const addItem = (listName: string) => {
-    // On insère des valeurs par défaut valides pour que les calculs fonctionnent même si masqués
-    const newItem = { id: generateId(), name: '', amount: '', frequency: 'mensuel', dayOfMonth: 5 };
+    const isAnnual = listName === 'annualExpenses';
+    const newItem = { 
+        id: generateId(), 
+        name: '', 
+        amount: '', 
+        frequency: isAnnual ? 'annuel' : 'mensuel', 
+        dayOfMonth: 5 
+    };
     const currentList = (profile as any)[listName] || [];
     saveProfile({ ...profile, [listName]: [...currentList, newItem] });
   };
@@ -333,246 +125,238 @@ export default function ProfilePage() {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start animate-fade-in pb-24">
       
-      {/* --- COLONNE DROITE (RÉSUMÉ STRATÉGIQUE) --- */}
-      <div className="lg:col-span-4 lg:sticky lg:top-24 space-y-6 order-first lg:order-last">
-        
-        {/* 1. CARTE SANTÉ MENSUELLE */}
+      {/* --- EN-TÊTE : STEPPER --- */}
+      <div className="lg:col-span-12 bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
+         <div className="flex flex-col sm:flex-row justify-between items-center mb-8 gap-6">
+            <div>
+                <h1 className="text-2xl font-black text-slate-900 tracking-tight">Configuration Profil</h1>
+                <p className="text-sm text-slate-500 font-medium">Étape {currentStep} sur 5</p>
+            </div>
+            <button onClick={toggleMode} className={`text-xs font-bold px-4 py-2 rounded-full border transition-all ${isExpert ? 'bg-purple-50 text-purple-700 border-purple-200' : 'bg-slate-100 text-slate-500 border-slate-200 hover:bg-slate-200'}`}>
+                {isExpert ? '🚀 Mode Expert' : '🐣 Mode Simple'}
+            </button>
+         </div>
+         <div className="flex items-center justify-between relative px-4 md:px-12">
+             <div className="absolute left-6 right-6 top-5 h-1 bg-slate-100 -z-0 rounded-full">
+                <div className="h-full bg-indigo-600 rounded-full transition-all duration-500 ease-out" style={{ width: `${((currentStep - 1) / 4) * 100}%` }}></div>
+             </div>
+             {STEPS.map((step) => {
+                 const isActive = step.id === currentStep;
+                 const isDone = step.id < currentStep;
+                 const StepIcon = step.icon;
+                 return (
+                    <button key={step.id} onClick={() => setCurrentStep(step.id)} className="relative z-10 flex flex-col items-center group focus:outline-none">
+                        <div className={`w-10 h-10 rounded-full flex items-center justify-center border-4 transition-all duration-300 ${isActive ? 'bg-indigo-600 border-white ring-4 ring-indigo-100 text-white shadow-lg scale-110' : isDone ? 'bg-indigo-600 border-white text-white' : 'bg-white border-slate-100 text-slate-300 hover:border-indigo-200'}`}>
+                            {isDone ? <CheckCircle size={16} /> : <StepIcon size={16} />}
+                        </div>
+                        <span className={`mt-3 text-[10px] md:text-xs font-bold uppercase tracking-wider transition-colors ${isActive ? 'text-indigo-600' : isDone ? 'text-indigo-600' : 'text-slate-300'}`}>{step.label}</span>
+                    </button>
+                 );
+             })}
+         </div>
+      </div>
+
+      {/* SIDEBAR DROITE (SYNTHÈSE) */}
+      <div className="lg:col-span-4 lg:sticky lg:top-24 space-y-6 order-first lg:order-last hidden md:block">
         <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm relative overflow-hidden">
-          <h2 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-6">Répartition Mensuelle</h2>
-          
+          <h2 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-6">Répartition</h2>
           <div className="space-y-4 relative z-10">
-            
-            {/* REVENUS */}
-            <div className="flex justify-between items-center mb-4">
-              <div className="flex items-center gap-2 text-emerald-600 text-sm font-bold"><Wallet size={18} /> Revenus</div>
-              <span className="font-bold text-lg text-emerald-600">{formatCurrency(stats.monthlyIncome)}</span>
-            </div>
-
+            <div className="flex justify-between items-center mb-4"><div className="flex items-center gap-2 text-emerald-600 text-sm font-bold"><Wallet size={18} /> Revenus</div><span className="font-bold text-lg text-emerald-600">{formatCurrency(stats.monthlyIncome)}</span></div>
             <div className="space-y-2 pl-2 border-l-2 border-slate-100">
-                {/* OBLIGATOIRE */}
-                <div className="flex justify-between items-center text-sm">
-                    <div className="flex items-center gap-2 text-slate-500">Charges Contraintes <Tooltip text="Loyer, factures, crédits..." /></div>
-                    <span className="font-medium text-slate-700">- {formatCurrency(stats.mandatoryExpenses)}</span>
-                </div>
-
-                {/* CHOIX (Variable) */}
-                <div className="flex justify-between items-center text-sm">
-                    <div className="flex items-center gap-2 text-slate-500">Dépenses Choisies <Tooltip text="Budget vie courante (courses, loisirs)." /></div>
-                    <span className="font-medium text-slate-700">- {formatCurrency(stats.discretionaryExpenses)}</span>
-                </div>
-
-                {/* RENTABLE (Investissements) */}
-                <div className="flex justify-between items-center text-sm">
-                    <div className="flex items-center gap-2 text-purple-600 font-bold">Épargne Active <Tooltip text="Argent investi pour l'avenir." /></div>
-                    <span className="font-bold text-purple-600">- {formatCurrency(stats.profitableExpenses)}</span>
-                </div>
+                <div className="flex justify-between items-center text-sm"><div className="flex items-center gap-2 text-slate-500">Charges Fixes</div><span className="font-medium text-slate-700">- {formatCurrency(stats.mandatoryExpenses)}</span></div>
+                <div className="flex justify-between items-center text-sm"><div className="flex items-center gap-2 text-slate-500">Vie Courante</div><span className="font-medium text-slate-700">- {formatCurrency(stats.discretionaryExpenses)}</span></div>
+                {(isExpert || stats.profitableExpenses > 0) && (<div className="flex justify-between items-center text-sm animate-fade-in"><div className="flex items-center gap-2 text-purple-600 font-bold">Épargne Active <Tooltip text="Argent investi (PEA, Immo...)" /></div><span className="font-bold text-purple-600">- {formatCurrency(stats.profitableExpenses)}</span></div>)}
             </div>
-
             <div className="h-px bg-slate-100 my-4"></div>
-            
-            {/* RÉSULTAT FINAL */}
-            <div className="flex justify-between items-end">
-                <div className="text-sm text-slate-400">Cashflow Réel</div>
-                <div className={`text-2xl font-black tracking-tight ${stats.realCashflow >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
-                    {stats.realCashflow > 0 ? '+' : ''}{formatCurrency(stats.realCashflow)}
-                </div>
-            </div>
-
-            {/* PROJECTION GAINS */}
-            {stats.projectedAnnualYield > 0 && (
-                <div className="mt-4 bg-purple-50 p-3 rounded-xl text-xs text-purple-800 flex gap-2 items-center">
-                    <TrendingUp size={16} className="shrink-0" />
-                    <span>
-                        Tes investissements mensuels pourraient te rapporter <strong>+{formatCurrency(stats.projectedAnnualYield)}</strong> / an.
-                    </span>
-                </div>
-            )}
+            <div className="flex justify-between items-end"><div className="text-sm text-slate-400">Cashflow Réel</div><div className={`text-2xl font-black tracking-tight ${stats.realCashflow >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>{stats.realCashflow > 0 ? '+' : ''}{formatCurrency(stats.realCashflow)}</div></div>
           </div>
         </div>
         
-        {/* 2. CARTE OBJECTIFS */}
         <Card className="p-6 border-l-4 border-l-indigo-500">
           <div className="flex items-center gap-2 mb-4"><div className="p-2 bg-indigo-50 text-indigo-600 rounded-lg"><Target size={20} /></div><h3 className="font-bold text-slate-800">Objectifs</h3></div>
           <div className="space-y-4 text-sm">
             <div className="flex justify-between items-center"><span className="text-slate-500">Sécurité visée</span><span className="font-bold text-indigo-700">{stats.rules.safetyMonths} mois</span></div>
             <div className="flex justify-between items-center"><span className="text-slate-500">Dette Max</span><span className="font-bold text-indigo-700">{stats.rules.maxDebt}%</span></div>
-            <div className="pt-3 border-t border-slate-100">
-                 {stats.safetyMonths >= stats.rules.safetyMonths ? (
-                    <Badge color="bg-emerald-50 text-emerald-700 border border-emerald-100 flex w-full justify-center gap-2"><CheckCircle size={14}/> {stats.safetyMonths.toFixed(1)} mois d&apos;avance</Badge>
-                 ) : (
-                    <Badge color="bg-amber-50 text-amber-700 border border-amber-100 flex w-full justify-center gap-2"><AlertTriangle size={14}/> {stats.safetyMonths.toFixed(1)} mois d&apos;avance</Badge>
-                 )}
-            </div>
           </div>
         </Card>
-
-        <div className="hidden lg:block"><Button onClick={() => router.push('/')} className="w-full"><Save size={18} /> Enregistrer et Terminer</Button></div>
+        <div className="hidden lg:block"><Button onClick={() => router.push('/')} className="w-full"><Save size={18} /> Enregistrer</Button></div>
       </div>
 
-      {/* --- COLONNE GAUCHE (FORMULAIRE) --- */}
-      <div className="lg:col-span-8 space-y-8">
+      {/* --- COLONNE GAUCHE (CONTENU PAR ÉTAPE) --- */}
+      <div className="lg:col-span-8 space-y-8 min-h-[50vh]">
         
-        {/* 1. IDENTITÉ */}
-        <section>
-            <h2 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2"><div className="w-6 h-6 rounded-full bg-slate-800 text-white flex items-center justify-center text-xs">1</div> Identité</h2>
-            <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-6">
-                
-                {/* Prénom */}
-                <InputGroup label="Ton Prénom" placeholder="Tom" value={profile.firstName || ''} onChange={(val: string) => saveProfile({ ...profile, firstName: val })} />
-                
-                {/* --- NOUVEAU SELECTEUR DE NIVEAU --- */}
-                <LevelSelector mode={mode} onChange={setMode} />
-                
-                <div className="w-full h-px bg-slate-100 my-2"></div>
-
-                {/* Situation */}
-                <div><label className="block text-sm font-medium text-slate-600 mb-2">Ta situation</label><PersonaSelector currentPersona={profile.persona || 'salaried'} onChange={(id: string) => saveProfile({ ...profile, persona: id })} /></div>
-                
-                {/* Foyer */}
-                <div><label className="block text-sm font-medium text-slate-600 mb-2">Ton foyer</label><div className="grid grid-cols-1 sm:grid-cols-2 gap-3"><HouseholdCounter label="Adultes" icon={User} value={parseInt(profile.household?.adults) || 1} onChange={(v: number) => saveProfile({ ...profile, household: { ...profile.household, adults: v } })} /><HouseholdCounter label="Enfants" icon={Baby} value={parseInt(profile.household?.children) || 0} onChange={(v: number) => saveProfile({ ...profile, household: { ...profile.household, children: v } })} /></div></div>
+        {/* ÉTAPE 1 : IDENTITÉ */}
+        {currentStep === 1 && (
+            <div className="space-y-6 animate-slide-up">
+                <h2 className="text-lg font-bold text-slate-800 mb-4">1. Commençons par les bases</h2>
+                <InfoBox>Le coach utilise ta situation pour calibrer ses alertes. Un freelance n&apos;a pas les mêmes risques qu&apos;un fonctionnaire !</InfoBox>
+                <Card className="p-6">
+                    <div className="space-y-6">
+                        <InputGroup label="Ton Prénom" placeholder="Tom" value={profile.firstName || ''} onChange={(val: string) => saveProfile({ ...profile, firstName: val })} />
+                        {/* TOUJOURS VISIBLE */}
+                        <div><label className="block text-sm font-medium text-slate-600 mb-2">Ta situation</label><PersonaSelector currentPersona={profile.persona || 'salaried'} onChange={(id: string) => saveProfile({ ...profile, persona: id })} /></div>
+                        <div><label className="block text-sm font-medium text-slate-600 mb-2">Ton foyer</label><div className="grid grid-cols-1 sm:grid-cols-2 gap-3"><HouseholdCounter label="Adultes" icon={User} value={parseInt(profile.household?.adults) || 1} onChange={(v: number) => saveProfile({ ...profile, household: { ...profile.household, adults: v } })} /><HouseholdCounter label="Enfants" icon={Baby} value={parseInt(profile.household?.children) || 0} onChange={(v: number) => saveProfile({ ...profile, household: { ...profile.household, children: v } })} /></div></div>
+                    </div>
+                </Card>
             </div>
-        </section>
+        )}
 
-        {/* 2. STOCKS (PATRIMOINE) */}
-        <section>
-            <h2 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2"><div className="w-6 h-6 rounded-full bg-indigo-600 text-white flex items-center justify-center text-xs">2</div> Tes Comptes (L'existant)</h2>
-            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+        {/* ÉTAPE 2 : PATRIMOINE */}
+        {currentStep === 2 && (
+            <div className="space-y-6 animate-slide-up">
+                <div className="flex justify-between items-end">
+                    <h2 className="text-lg font-bold text-slate-800">2. Photo à l&apos;instant T</h2>
+                </div>
+                <InfoBox>Renseigne les soldes de tes comptes <strong>aujourd&apos;hui</strong>. C&apos;est le point de départ GPS du calendrier.</InfoBox>
                 
-                {/* Compte Courant */}
-                <div className="p-4 flex items-center justify-between border-b border-slate-100 hover:bg-slate-50 transition-colors group">
-                    <div className="flex items-center gap-4">
-                        <div className="p-3 bg-indigo-100 text-indigo-600 rounded-xl"><CreditCard size={20} /></div>
-                        <div><div className="font-bold text-slate-800">Compte Courant</div><div className="text-xs text-slate-500">Trésorerie active</div></div>
-                    </div>
-                    <div className="relative w-32">
-                        <input type="number" value={profile.currentBalance || ''} onChange={(e) => saveProfile({ ...profile, currentBalance: parseFloat(e.target.value) || 0 })} className="w-full p-2 pl-3 pr-6 bg-slate-50 border border-slate-200 rounded-lg text-right font-bold text-indigo-900 focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="0" />
-                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs pointer-events-none">€</span>
-                    </div>
-                </div>
+                <div className={`grid grid-cols-1 md:grid-cols-2 gap-4`}>
+                    {/* Compte Courant */}
+                    <Card className="p-6 border-l-4 border-l-indigo-500">
+                        <div className="flex items-center gap-2 mb-4"><div className="p-2 bg-indigo-50 text-indigo-600 rounded-lg"><CreditCard size={20} /></div><h3 className="font-bold text-slate-800">Compte Courant</h3></div>
+                        <div className="relative"><input type="number" value={profile.currentBalance || ''} onChange={(e) => saveProfile({ ...profile, currentBalance: parseFloat(e.target.value) || 0 })} className="w-full text-2xl font-bold text-slate-800 bg-slate-50 border border-slate-200 rounded-xl p-3 pl-4 focus:border-indigo-500 outline-none transition-all" placeholder="0" /><span className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold">€</span></div>
+                        <InfoBox className="mt-4 mb-0 border-indigo-100 bg-indigo-50 text-indigo-800">Trésorerie active. Ce qui sert à payer les factures du mois.</InfoBox>
+                    </Card>
 
-                {/* Épargne Dispo */}
-                <div className="p-4 flex items-center justify-between border-b border-slate-100 hover:bg-slate-50 transition-colors group">
-                    <div className="flex items-center gap-4">
-                        <div className="p-3 bg-emerald-100 text-emerald-600 rounded-xl"><Shield size={20} /></div>
-                        <div><div className="font-bold text-slate-800">Épargne Dispo</div><div className="text-xs text-slate-500">Livret A, LDD (Sécurité)</div></div>
-                    </div>
-                    <div className="relative w-32">
-                        <input type="number" value={profile.savings} onChange={(e) => saveProfile({ ...profile, savings: e.target.value })} className="w-full p-2 pl-3 pr-6 bg-slate-50 border border-slate-200 rounded-lg text-right font-bold text-emerald-700 focus:ring-2 focus:ring-emerald-500 outline-none" placeholder="0" />
-                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs pointer-events-none">€</span>
-                    </div>
-                </div>
+                    {/* Épargne Dispo */}
+                    <Card className="p-6 border-l-4 border-l-emerald-500">
+                        <div className="flex items-center gap-2 mb-4"><div className="p-2 bg-emerald-50 text-emerald-600 rounded-lg"><Shield size={20} /></div><h3 className="font-bold text-slate-800">Épargne Dispo</h3></div>
+                        <div className="relative"><input type="number" value={profile.savings} onChange={(e) => saveProfile({ ...profile, savings: e.target.value })} className="w-full text-2xl font-bold text-slate-800 bg-slate-50 border border-slate-200 rounded-xl p-3 pl-4 focus:border-emerald-500 outline-none transition-all" placeholder="0" /><span className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold">€</span></div>
+                        <InfoBox className="mt-4 mb-0 border-emerald-100 bg-emerald-50 text-emerald-800">Livret A, LDD. L&apos;argent accessible en 24h en cas de coup dur.</InfoBox>
+                    </Card>
 
-                {/* Investissements (AVEC INPUT RENDEMENT CONDITIONNEL) */}
-                <div className="p-4 flex flex-col sm:flex-row sm:items-center justify-between hover:bg-slate-50 transition-colors group gap-4">
-                    <div className="flex items-center gap-4">
-                        <div className="p-3 bg-purple-100 text-purple-600 rounded-xl"><PiggyBank size={20} /></div>
-                        <div><div className="font-bold text-slate-800">Investissements</div><div className="text-xs text-slate-500">PEA, Crypto (Bloqué)</div></div>
-                    </div>
-                    
-                    <div className="flex gap-2 items-center w-full sm:w-auto justify-end">
-                        {/* Montant */}
-                        <div className="relative flex-1 sm:w-32">
-                            <input type="number" value={profile.investments || ''} onChange={(e) => saveProfile({ ...profile, investments: parseFloat(e.target.value) || 0 })} className="w-full p-2 pl-3 pr-6 bg-slate-50 border border-slate-200 rounded-lg text-right font-bold text-purple-700 focus:ring-2 focus:ring-purple-500 outline-none" placeholder="0" />
-                            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs pointer-events-none">€</span>
+                    {/* Investissements */}
+                    {isExpert && (
+                        <Card className="p-6 border-l-4 border-l-purple-500 md:col-span-2 animate-fade-in">
+                            <div className="flex items-center gap-2 mb-4"><div className="p-2 bg-purple-50 text-purple-600 rounded-lg"><PiggyBank size={20} /></div><h3 className="font-bold text-slate-800">Invest. Bloqué</h3></div>
+                            <div className="flex gap-4 items-center">
+                                <div className="relative flex-1"><input type="number" value={profile.investments || ''} onChange={(e) => saveProfile({ ...profile, investments: parseFloat(e.target.value) || 0 })} className="w-full text-2xl font-bold text-slate-800 bg-slate-50 border border-slate-200 rounded-xl p-3 pl-4 focus:border-purple-500 outline-none transition-all" placeholder="0" /><span className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold">€</span></div>
+                                <div className="relative w-24"><input type="number" value={profile.investmentYield || ''} onChange={(e) => saveProfile({ ...profile, investmentYield: parseFloat(e.target.value) || 0 })} className="w-full text-xl font-bold text-purple-700 bg-purple-50 border border-purple-100 rounded-xl p-3 text-center outline-none" placeholder="5" /><span className="absolute right-2 top-1/2 -translate-y-1/2 text-purple-300 text-xs font-bold">%</span></div>
+                            </div>
+                            <InfoBox className="mt-4 mb-0 border-purple-100 bg-purple-50 text-purple-800">Patrimoine Long Terme (PEA, Crypto, Immo). Argent que tu ne touches pas.</InfoBox>
+                        </Card>
+                    )}
+                </div>
+            </div>
+        )}
+
+        {/* ÉTAPE 3 : BUDGET (GROS FLUX) */}
+        {currentStep === 3 && (
+            <div className="space-y-6 animate-slide-up">
+                <h2 className="text-lg font-bold text-slate-800 mb-4">3. Tes Flux Mensuels</h2>
+                <InfoBox>Indique ici ce qui rentre et sort <strong>automatiquement</strong> chaque mois. Ne mets pas les petits abonnements ou les crédits ici, on verra ça à l&apos;étape suivante.</InfoBox>
+                
+                <AccordionSection 
+                    mode={mode} defaultOpen={true} title="Revenus (Net)" icon={Wallet} colorClass="text-emerald-600" 
+                    items={profile.incomes} 
+                    onItemChange={(id, f, v) => updateItem('incomes', id, f, v)} 
+                    onItemAdd={() => addItem('incomes')} 
+                    onItemRemove={(id) => removeItem('incomes', id)}
+                    description="✅ INCLUS : Salaire Net, Primes lissées, Aides CAF, Rentes. ❌ EXCLUS : Virements internes." 
+                />
+                
+                <AccordionSection 
+                    mode={mode} defaultOpen={true} title="Charges Fixes Vitales" icon={Home} colorClass="text-blue-600" 
+                    items={profile.fixedCosts} 
+                    onItemChange={(id, f, v) => updateItem('fixedCosts', id, f, v)} 
+                    onItemAdd={() => addItem('fixedCosts')} 
+                    onItemRemove={(id) => removeItem('fixedCosts', id)} 
+                    description="✅ INCLUS : Loyer, Électricité, Eau, Assurances, Pension alimentaire. ❌ EXCLUS : Netflix, Crédits, Courses."
+                />
+                
+                {isExpert && (
+                    <AccordionSection 
+                        mode={mode} title="Investissements Mensuels" icon={PiggyBank} colorClass="text-purple-600" 
+                        items={profile.savingsContributions} 
+                        onItemChange={(id, f, v) => updateItem('savingsContributions', id, f, v)} 
+                        onItemAdd={() => addItem('savingsContributions')} 
+                        onItemRemove={(id) => removeItem('savingsContributions', id)} 
+                        description="Virements automatiques vers tes comptes d'investissement. L'argent qui te paie toi en premier."
+                    />
+                )}
+            </div>
+        )}
+
+        {/* ÉTAPE 4 : DÉTAILS */}
+        {currentStep === 4 && (
+            <div className="space-y-6 animate-slide-up">
+                <h2 className="text-lg font-bold text-slate-800 mb-4">4. Les détails qui comptent</h2>
+                <InfoBox>C&apos;est ici qu&apos;on traque les fuites ! Abonnements, Crédits... tout ce qui grignote ton budget petit à petit.</InfoBox>
+                <div className="grid grid-cols-1 gap-4">
+                    <AccordionSection 
+                        defaultOpen={true} description="✅ INCLUS : Netflix, Spotify, Salle de sport, Forfait téléphone." mode={mode} title="Abonnements" icon={Tv} colorClass="text-purple-600" type="simple" 
+                        items={profile.subscriptions} 
+                        onItemChange={(id, f, v) => updateItem('subscriptions', id, f, v)} 
+                        onItemAdd={() => addItem('subscriptions')} 
+                        onItemRemove={(id) => removeItem('subscriptions', id)} 
+                    />
+                    <AccordionSection 
+                        description="✅ INCLUS : Mensualités de crédit Immo, Auto, ou paiement en 3x." mode={mode} title="Crédits en cours" icon={Landmark} colorClass="text-orange-600" type="simple" 
+                        items={profile.credits} 
+                        onItemChange={(id, f, v) => updateItem('credits', id, f, v)} 
+                        onItemAdd={() => addItem('credits')} 
+                        onItemRemove={(id) => removeItem('credits', id)} 
+                    />
+                    {isExpert && (
+                        <AccordionSection 
+                            unit="an" description="✅ INCLUS : Taxe Foncière, Impôts revenu, Vacances (total annuel)." mode={mode} title="Dépenses Annuelles" icon={Calendar} colorClass="text-pink-600" 
+                            items={profile.annualExpenses} 
+                            onItemChange={(id, f, v) => updateItem('annualExpenses', id, f, v)} 
+                            onItemAdd={() => addItem('annualExpenses')} 
+                            onItemRemove={(id) => removeItem('annualExpenses', id)} 
+                        />
+                    )}
+                </div>
+            </div>
+        )}
+
+        {/* ÉTAPE 5 : ARBITRAGE (LE TRAIN DE VIE) */}
+        {currentStep === 5 && (
+            <div className="space-y-8 animate-slide-up">
+                <h2 className="text-lg font-bold text-slate-800 mb-4">5. Ton choix de vie</h2>
+                
+                {/* GROS CALCULATEUR VISUEL */}
+                <div className="bg-gradient-to-br from-indigo-600 to-violet-700 rounded-3xl p-8 text-white shadow-xl">
+                    <div className="flex flex-col md:flex-row justify-between items-center gap-8">
+                        <div className="flex-1">
+                            <h3 className="text-2xl font-bold mb-2 flex items-center gap-2"><Zap className="text-yellow-300 fill-yellow-300" /> Le Verdict</h3>
+                            <p className="text-indigo-100 text-sm leading-relaxed mb-6">
+                                Une fois toutes tes charges payées (Étapes 3 & 4), il te reste théoriquement <strong>{formatCurrency(stats.remainingToLive)}</strong>.
+                                <br/><br/>
+                                Combien veux-tu dépenser pour tes <strong>Courses & Plaisirs</strong> (Vie courante) ?
+                            </p>
+                            
+                            <div className="relative max-w-xs">
+                                <input 
+                                    type="number" 
+                                    value={profile.variableCosts || ''} 
+                                    onChange={(e) => saveProfile({ ...profile, variableCosts: parseFloat(e.target.value) || 0 })} 
+                                    className="w-full p-4 pl-6 pr-12 bg-white/10 border border-white/20 rounded-2xl text-3xl font-bold text-white placeholder:text-white/30 focus:bg-white/20 outline-none backdrop-blur-sm transition-all" 
+                                    placeholder="0" 
+                                />
+                                <span className="absolute right-6 top-1/2 -translate-y-1/2 text-indigo-200 font-medium">€</span>
+                            </div>
                         </div>
                         
-                        {/* Rendement % (Visible uniquement en mode Expert) */}
-                        {mode === 'expert' && (
-                            <div className="relative w-20" title="Rendement moyen estimé">
-                                <input type="number" value={profile.investmentYield || ''} onChange={(e) => saveProfile({ ...profile, investmentYield: parseFloat(e.target.value) || 0 })} className="w-full p-2 pl-2 pr-5 bg-slate-50 border border-slate-200 rounded-lg text-right text-xs font-bold text-slate-600 focus:ring-2 focus:ring-purple-500 outline-none" placeholder="5" />
-                                <span className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 text-xs pointer-events-none">%</span>
-                            </div>
-                        )}
-                    </div>
-                </div>
-            </div>
-        </section>
-
-        {/* 3. FLUX (BUDGET) */}
-        <section className="space-y-4">
-            <div className="flex items-center gap-3 mb-2"><div className="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold">3</div><h2 className="text-xl font-bold text-slate-800">Tes Flux Mensuels</h2></div>
-            
-            {/* REVENUS - Toujours actifs */}
-            <AccordionSection 
-                mode={mode}
-                defaultOpen={true} 
-                title="Revenus (Net)" 
-                icon={Wallet} 
-                colorClass="text-emerald-600" 
-                items={profile.incomes} 
-                onItemChange={(id: any, f: any, v: any) => updateItem('incomes', id, f, v)} 
-                onItemAdd={() => addItem('incomes')} 
-                onItemRemove={(id: any) => removeItem('incomes', id)} 
-            />
-            
-            {/* CHARGES FIXES - Toujours actives */}
-            <AccordionSection 
-                mode={mode}
-                title="Charges Fixes (Obligatoire)" 
-                icon={Home} 
-                colorClass="text-blue-600" 
-                items={profile.fixedCosts} 
-                onItemChange={(id: any, f: any, v: any) => updateItem('fixedCosts', id, f, v)} 
-                onItemAdd={() => addItem('fixedCosts')} 
-                onItemRemove={(id: any) => removeItem('fixedCosts', id)} 
-            />
-            
-            {/* INVESTISSEMENTS - Désactivable (pour les débutants) */}
-            <AccordionSection 
-                mode={mode}
-                canBeDisabled={true}
-                title="Investissements Mensuels" 
-                icon={PiggyBank} 
-                colorClass="text-purple-600" 
-                items={profile.savingsContributions} 
-                onItemChange={(id: any, f: any, v: any) => updateItem('savingsContributions', id, f, v)} 
-                onItemAdd={() => addItem('savingsContributions')} 
-                onItemRemove={(id: any) => removeItem('savingsContributions', id)} 
-            />
-
-            {/* BUDGET VARIABLE */}
-            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 hover:shadow-md transition-all">
-                <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-4">
-                        <div className="p-3 bg-indigo-100 text-indigo-600 rounded-xl"><ShoppingCart size={20} /></div>
-                        <div className="text-left">
-                            <h3 className="font-bold text-slate-800 text-base">Budget Vie Courante</h3>
-                            <div className="text-xs text-slate-500 mt-0.5">Courses, Loisirs, Essence...</div>
+                        {/* Jauge Résultat */}
+                        <div className="flex flex-col items-center justify-center bg-white/10 rounded-2xl p-6 w-full md:w-48 backdrop-blur-md border border-white/10">
+                            <div className="text-xs font-bold text-indigo-200 uppercase tracking-widest mb-2">Épargne Réelle</div>
+                            <div className={`text-4xl font-black ${stats.capacityToSave > 0 ? 'text-emerald-300' : 'text-rose-300'}`}>{formatCurrency(stats.capacityToSave)}</div>
+                            <div className="text-xs text-white/60 mt-1">par mois</div>
                         </div>
                     </div>
-                    <div className="relative w-32">
-                        <input 
-                            type="number" 
-                            value={profile.variableCosts || ''} 
-                            onChange={(e) => saveProfile({ ...profile, variableCosts: parseFloat(e.target.value) || 0 })} 
-                            className="w-full p-2 pl-3 pr-6 bg-slate-50 border border-slate-200 rounded-lg text-right font-bold text-indigo-900 focus:ring-2 focus:ring-indigo-500 outline-none" 
-                            placeholder="0" 
-                        />
-                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs pointer-events-none">€</span>
-                    </div>
                 </div>
-                {mode === 'expert' && (
-                    <div className="mt-3 pt-3 border-t border-slate-100 flex items-center gap-2 text-xs text-slate-400 animate-fade-in">
-                        <Info size={14} className="text-indigo-400" />
-                        <span>Ce montant sera lissé jour après jour dans ton calendrier.</span>
-                    </div>
-                )}
-            </div>
 
-            <h3 className="text-xs font-bold text-slate-400 uppercase mt-6 mb-2 pl-2">Détails avancés</h3>
-            <div className="grid grid-cols-1 gap-4">
-                {/* CES SECTIONS SONT DÉSACTIVABLES ("J'ai pas") */}
-                <AccordionSection mode={mode} canBeDisabled={true} title="Abonnements" icon={Tv} colorClass="text-purple-600" type="simple" items={profile.subscriptions} onItemChange={(id: any, f: any, v: any) => updateItem('subscriptions', id, f, v)} onItemAdd={() => addItem('subscriptions')} onItemRemove={(id: any) => removeItem('subscriptions', id)} />
-                <AccordionSection mode={mode} canBeDisabled={true} title="Crédits en cours" icon={Landmark} colorClass="text-orange-600" type="simple" items={profile.credits} onItemChange={(id: any, f: any, v: any) => updateItem('credits', id, f, v)} onItemAdd={() => addItem('credits')} onItemRemove={(id: any) => removeItem('credits', id)} />
-                
-                {/* La section dépenses annuelles n'est affichée qu'en Expert pour ne pas surcharger */}
-                {mode === 'expert' && (
-                    <AccordionSection mode={mode} canBeDisabled={true} title="Dépenses Annuelles" icon={Calendar} colorClass="text-pink-600" items={profile.annualExpenses} onItemChange={(id: any, f: any, v: any) => updateItem('annualExpenses', id, f, v)} onItemAdd={() => addItem('annualExpenses')} onItemRemove={(id: any) => removeItem('annualExpenses', id)} />
-                )}
+                <InfoBox>
+                    <strong>Astuce :</strong> Ce montant &quot;Vie Courante&quot; sera déduit petit à petit chaque jour dans ton calendrier (Lissage). C&apos;est ce qui permet de suivre ton budget sans noter chaque café !
+                </InfoBox>
             </div>
-        </section>
+        )}
 
-        <div className="lg:hidden pb-8"><Button onClick={() => router.push('/')} className="w-full py-4 shadow-xl"><Save size={18} /> Enregistrer le Profil</Button></div>
+        {/* --- NAVIGATION DU BAS --- */}
+        <div className="flex justify-between items-center pt-8 mt-8 border-t border-slate-100">
+            <button onClick={goPrev} disabled={currentStep === 1} className={`px-6 py-3 font-bold rounded-xl transition-colors flex items-center gap-2 ${currentStep === 1 ? 'text-slate-300 cursor-not-allowed' : 'text-slate-500 hover:bg-slate-100'}`}><ChevronLeft size={20} /> Précédent</button>
+            <Button onClick={goNext} className="px-8 py-4 shadow-xl flex items-center gap-2 bg-slate-900 hover:bg-slate-800 text-white">{currentStep === 5 ? 'Terminer' : 'Continuer'} {currentStep < 5 && <ArrowRight size={20} />}</Button>
+        </div>
 
       </div>
     </div>

@@ -2,32 +2,43 @@
 
 import React, { useMemo } from 'react';
 import { useRouter } from 'next/navigation';
+
+// --- IMPORTS RÉELS (DATA & LOGIC) ---
 import { useFinancialData } from '@/app/hooks/useFinancialData';
 import { calculateFinancials, formatCurrency } from '@/app/lib/logic';
 
-// Imports Icones
-import {
-  TrendingDown,
-  Shield,
-  AlertTriangle,
-  Target,
-  Wallet,
-  Activity,
-  Settings,
-  CreditCard,
-  ArrowRight,
-  Info,
-} from 'lucide-react';
-
-// --- IMPORTS UI KIT (Le nettoyage est ici !) ---
+// --- IMPORTS UI (Existants) ---
 import Card from '@/app/components/ui/Card';
 import Button from '@/app/components/ui/Button';
-import ProgressBar from '@/app/components/ui/ProgressBar';
 import Badge from '@/app/components/ui/Badge';
-import Tooltip from '@/app/components/ui/Tooltip';
 
-// --- LOGIQUE MÉTIER (NIVEAUX) ---
+import {
+  TrendingUp,
+  TrendingDown,
+  Shield,
+  Activity,
+  Settings,
+  ArrowRight,
+  Zap,
+  PiggyBank,
+  Layers,
+  Wallet,
+  CreditCard,
+  ShoppingCart,
+} from 'lucide-react';
 
+// --- COMPOSANTS UI SPÉCIFIQUES AU DASHBOARD ---
+
+const ProgressBar = ({ value, max, colorClass }: { value: number, max: number, colorClass: string }) => {
+  const percent = Math.min(100, Math.max(0, (value / max) * 100));
+  return (
+    <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
+      <div className={`h-full ${colorClass} transition-all duration-500`} style={{ width: `${percent}%` }}></div>
+    </div>
+  );
+};
+
+// --- LOGIQUE MÉTIER VISUELLE (NIVEAUX) ---
 const LEVELS = [
   { min: 0, max: 40, label: "Survie", color: "text-rose-500", bg: "bg-rose-500", border: "border-rose-100" },
   { min: 40, max: 70, label: "Construction", color: "text-amber-500", bg: "bg-amber-500", border: "border-amber-100" },
@@ -37,9 +48,8 @@ const LEVELS = [
 
 const getLevel = (score: number) => LEVELS.find(l => score >= l.min && score < l.max) || LEVELS[0];
 
-// Ce composant reste ici car il est très spécifique au Dashboard (SVG complexe)
 const LevelGauge = ({ score, level }: any) => {
-  const size = 180;
+  const size = 160;
   const strokeWidth = 12;
   const radius = (size - strokeWidth) / 2;
   const circumference = radius * 2 * Math.PI;
@@ -53,25 +63,50 @@ const LevelGauge = ({ score, level }: any) => {
   };
 
   return (
-    <div className="relative flex items-center justify-center" style={{ width: size, height: size }}>
-      <svg className="transform -rotate-90 w-full h-full">
+    <div className="relative flex items-center justify-center mx-auto" style={{ width: size, height: size }}>
+      <svg className="transform -rotate-90 w-full h-full drop-shadow-sm">
         <circle cx={size/2} cy={size/2} r={radius} stroke="#f1f5f9" strokeWidth={strokeWidth} fill="transparent" />
         <circle cx={size/2} cy={size/2} r={radius} stroke={getColor(level.color)} strokeWidth={strokeWidth} fill="transparent" strokeDasharray={circumference} strokeDashoffset={offset} strokeLinecap="round" className="transition-all duration-1000 ease-out" />
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center z-10">
-        <div className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Niveau</div>
-        <div className={`text-3xl font-black tracking-tight ${level.color}`}>{level.label}</div>
-        <div className="mt-2 px-2 py-0.5 bg-slate-100 rounded text-[10px] font-bold text-slate-500">Score : {score}/100</div>
+        <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Score</div>
+        <div className={`text-4xl font-black tracking-tighter ${level.color}`}>{score}</div>
       </div>
     </div>
   );
 };
 
-// --- PAGE D'ACCUEIL ---
+const BudgetRow = ({ label, icon: Icon, amount, total, color, subtext = null }: any) => {
+    const percent = total > 0 ? Math.round((amount / total) * 100) : 0;
+    
+    return (
+        <div className="flex items-center gap-4 p-3 hover:bg-slate-50 rounded-xl transition-colors cursor-default group">
+            <div className={`p-2.5 rounded-xl ${color.bg} ${color.text} group-hover:scale-110 transition-transform`}>
+                <Icon size={20} />
+            </div>
+            <div className="flex-1">
+                <div className="flex justify-between items-center mb-1">
+                    <span className="font-bold text-slate-700 text-sm">{label}</span>
+                    <span className="font-bold text-slate-800">{formatCurrency(amount)}</span>
+                </div>
+                <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden flex items-center">
+                    <div className={`h-full ${color.bar}`} style={{ width: `${percent}%` }}></div>
+                </div>
+                <div className="flex justify-between mt-1">
+                    <span className="text-[10px] text-slate-400 font-medium">{percent}% du revenu</span>
+                    {subtext && <span className="text-[10px] text-slate-500 font-medium">{subtext}</span>}
+                </div>
+            </div>
+        </div>
+    );
+};
+
+// --- PAGE D'ACCUEIL PRINCIPALE ---
 
 export default function HomePage() {
   const router = useRouter();
-  const { profile, isLoaded } = useFinancialData();
+  
+  const { profile, saveProfile, isLoaded } = useFinancialData();
   const stats = useMemo(() => calculateFinancials(profile), [profile]);
 
   if (!isLoaded) return <div className="min-h-[50vh] flex items-center justify-center"><div className="animate-pulse h-12 w-12 bg-slate-200 rounded-full"></div></div>;
@@ -79,9 +114,10 @@ export default function HomePage() {
   // --- ONBOARDING ---
   if (stats.monthlyIncome === 0 && stats.matelas === 0) {
     return (
-      <div className="p-8 flex flex-col items-center justify-center min-h-[70vh] text-center animate-fade-in">
-        <div className="p-6 bg-indigo-50 rounded-full text-indigo-600 mb-6 shadow-sm"><Settings size={64} /></div>
+      <div className="p-8 flex flex-col items-center justify-center min-h-[70vh] text-center animate-fade-in bg-slate-50">
+        <div className="p-6 bg-indigo-50 rounded-full text-indigo-600 mb-6 shadow-sm animate-bounce-slow"><Settings size={64} /></div>
         <h2 className="text-3xl font-bold text-slate-800 mb-3">Bienvenue !</h2>
+        <p className="text-slate-500 mb-8 max-w-md">Configure ton profil pour débloquer ton tableau de bord financier.</p>
         <Button onClick={() => router.push('/profile')} className="shadow-xl">
           Configurer mon profil <ArrowRight size={20} />
         </Button>
@@ -89,199 +125,252 @@ export default function HomePage() {
     );
   }
 
-  // --- CALCULS ---
-  const safetyRatio = Math.min(1, stats.safetyMonths / stats.rules.safetyMonths);
-  const debtRatio = stats.engagementRate / stats.rules.maxDebt;
-  const debtScore = Math.max(0, 40 * (1 - (debtRatio * 0.5)));
-  const livingRatio = Math.min(1, stats.remainingToLive / (stats.rules.minLiving * 2));
+  // GESTION DU MODE
+  const isExpert = profile.mode === 'expert';
+  const toggleMode = (newMode: 'beginner' | 'expert') => {
+    saveProfile({ ...profile, mode: newMode });
+  };
+
+  // --- SCORE ---
+  const safetyRatio = Math.min(1, stats.safetyMonths / (stats.rules.safetyMonths || 3));
+  const debtRatio = stats.engagementRate / (stats.rules.maxDebt || 33);
   
-  const finalScore = Math.round((safetyRatio * 40) + debtScore + (livingRatio * 20));
+  let finalScore = 0;
+  let debtScore = 0;
+
+  if (isExpert) {
+    debtScore = Math.max(0, 40 * (1 - (debtRatio * 0.5)));
+    const investRatio = (stats.investments / (stats.monthlyIncome * 12 * 0.2)) || 0;
+    const investScore = Math.min(1, investRatio) * 20; 
+    finalScore = Math.round((safetyRatio * 40) + debtScore + investScore);
+  } else {
+    debtScore = Math.max(0, 50 * (1 - (debtRatio * 0.5)));
+    finalScore = Math.round((safetyRatio * 50) + debtScore);
+  }
+
   const currentLevel = getLevel(finalScore);
-
-  // Définition des statuts pour les Badges
-  const safetyStatus = stats.safetyMonths >= stats.rules.safetyMonths 
-    ? { label: "Blindé", color: "bg-emerald-100 text-emerald-700" } 
-    : stats.safetyMonths >= 1 
-        ? { label: "En cours", color: "bg-amber-100 text-amber-700" } 
-        : { label: "Fragile", color: "bg-rose-100 text-rose-700" };
-
-  const debtStatus = stats.engagementRate <= 30
-    ? { label: "Excellent", color: "bg-emerald-100 text-emerald-700" }
-    : stats.engagementRate <= stats.rules.maxDebt
-        ? { label: "Normal", color: "bg-amber-100 text-amber-700" }
-        : { label: "Surcharge", color: "bg-rose-100 text-rose-700" };
-
-  // Conseil global
-  let nextStep = { text: "Continue comme ça !", subtext: "Tout est au vert." };
-  if (stats.engagementRate > stats.rules.maxDebt) nextStep = { text: "Réduire les charges fixes", subtext: "Elles mangent trop de revenus." };
-  else if (stats.safetyMonths < 1) nextStep = { text: "Créer un fond d'urgence", subtext: "Vise 1 mois de côté." };
-  else if (stats.safetyMonths < stats.rules.safetyMonths) nextStep = { text: "Renforcer la sécurité", subtext: `Vise ${stats.rules.safetyMonths} mois d'avance.` };
-  else if (finalScore < 90) nextStep = { text: "Optimiser le budget", subtext: "Essaie d'investir plus." };
+  const userName = profile.firstName || "Utilisateur";
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start animate-fade-in pb-12">
-      
-      {/* --- COLONNE GAUCHE --- */}
-      <div className="lg:col-span-4 space-y-6 lg:sticky lg:top-24">
-        <Card className={`p-8 flex flex-col items-center justify-center text-center relative overflow-hidden ${currentLevel.border} border-t-4`}>
-            <div className="mb-6 relative z-10"><LevelGauge score={finalScore} level={currentLevel} /></div>
-            
-            {/* CONSEIL DU COACH */}
-            <div className="w-full bg-slate-50 rounded-xl p-4 text-left border border-slate-100 relative z-10">
-                <div className="flex items-center gap-2 mb-1">
-                    <div className={`p-1 rounded-full ${currentLevel.bg} text-white`}><Info size={12} /></div>
-                    <span className="text-xs font-bold text-slate-500 uppercase">Conseil du Coach</span>
-                </div>
-                <div className="text-slate-800 font-bold text-sm leading-snug">{nextStep.text}</div>
-                <div className="text-slate-500 text-xs mt-0.5">{nextStep.subtext}</div>
-            </div>
-
-            {/* DÉTAILS GRID */}
-            <div className="w-full pt-6 mt-6 border-t border-slate-100 grid grid-cols-3 gap-2 text-center relative z-10">
-                <div>
-                    <div className="text-[10px] text-slate-400 uppercase font-bold flex justify-center items-center gap-1">Sécu <Tooltip text="Ton épargne de précaution." /></div>
-                    <div className={`font-bold text-slate-700`}>{Math.round(safetyRatio*100)}%</div>
-                </div>
-                <div>
-                    <div className="text-[10px] text-slate-400 uppercase font-bold flex justify-center items-center gap-1">Dette <Tooltip text="Poids de tes charges fixes." /></div>
-                    <div className={`font-bold text-slate-700`}>{Math.round(debtScore/40*100)}%</div>
-                </div>
-                <div>
-                    <div className="text-[10px] text-slate-400 uppercase font-bold flex justify-center items-center gap-1">Vie <Tooltip text="Ce qu'il reste pour vivre." /></div>
-                    <div className={`font-bold text-slate-700`}>{Math.round(livingRatio*100)}%</div>
-                </div>
-            </div>
-        </Card>
-
-        <div className="grid grid-cols-1 gap-3">
-            <Button onClick={() => router.push('/simulator')}><Activity size={20} /> Simuler un achat</Button>
-            <Button variant="outline" onClick={() => router.push('/profile')}><Settings size={18} /> Ajuster mon Profil</Button>
+    <div className="min-h-screen bg-slate-50 p-4 md:p-8 font-sans text-slate-600">
+        
+      {/* HEADER */}
+      <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
+        <div>
+          <h1 className="text-2xl font-black text-slate-800">Tableau de Bord</h1>
+          <p className="text-slate-500 text-sm">Bon retour, {userName}</p>
+        </div>
+        
+        {/* SWITCHER DE MODE */}
+        <div className="bg-white p-1 rounded-xl shadow-sm border border-slate-200 flex">
+            <button 
+                onClick={() => toggleMode('beginner')} 
+                className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${!isExpert ? 'bg-slate-800 text-white shadow-md' : 'text-slate-500 hover:bg-slate-50'}`}
+            >
+                Standard
+            </button>
+            <button 
+                onClick={() => toggleMode('expert')} 
+                className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${isExpert ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-500 hover:bg-slate-50'}`}
+            >
+                Expert
+            </button>
         </div>
       </div>
 
-      {/* --- COLONNE DROITE --- */}
-      <div className="lg:col-span-8 space-y-6">
+      <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 items-start animate-fade-in pb-12">
         
-        {/* GRILLE KPI */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {/* REVENUS */}
-            <Card className="p-5 flex flex-col justify-between h-32">
-                <div className="flex justify-between items-start">
-                    <div className="flex items-center gap-2 text-sm font-bold text-slate-500 uppercase">
-                        Revenus <Tooltip text="Total de tes entrées d'argent nettes avant impôts." />
-                    </div>
-                    <div className="p-2 bg-emerald-50 text-emerald-600 rounded-lg"><Wallet size={20} /></div>
-                </div>
-                <div className="text-3xl font-black text-slate-900 tracking-tight">{formatCurrency(stats.monthlyIncome)}</div>
-            </Card>
-
-            {/* RESTE A VIVRE */}
-            <Card className="p-5 flex flex-col justify-between h-32 bg-gradient-to-br from-indigo-50 to-white border-indigo-100">
-                <div className="flex justify-between items-start">
-                    <div className="flex items-center gap-2 text-sm font-bold text-indigo-500 uppercase">
-                        Reste à Vivre <Tooltip text="L'argent qu'il te reste pour les courses, les loisirs et l'épargne une fois tout payé." />
-                    </div>
-                    <div className="p-2 bg-indigo-100 text-indigo-600 rounded-lg"><Activity size={20} /></div>
-                </div>
-                <div>
-                    <div className="text-3xl font-black text-indigo-900 tracking-tight">{formatCurrency(stats.remainingToLive)}</div>
-                    <div className="text-xs font-medium text-indigo-400 mt-1 flex items-center gap-1">
-                         Cible confort : {formatCurrency(stats.rules.minLiving * 2)}
-                    </div>
-                </div>
-            </Card>
-
-            {/* CHARGES FIXES */}
-            <Card className="p-5 flex flex-col justify-between h-32">
-                <div className="flex justify-between items-start">
-                    <div className="flex items-center gap-2 text-sm font-bold text-slate-500 uppercase">
-                        Charges Fixes <Tooltip text="Loyers, crédits, assurances, abonnements : tout ce qui part automatiquement." />
-                    </div>
-                    <div className="p-2 bg-rose-50 text-rose-600 rounded-lg"><TrendingDown size={20} /></div>
-                </div>
-                <div>
-                    <div className="text-3xl font-black text-slate-900 tracking-tight">{formatCurrency(stats.totalRecurring)}</div>
-                    <div className="mt-1">
-                      <Badge color={debtStatus.color}>{debtStatus.label}</Badge>
-                    </div>
-                </div>
-            </Card>
+        {/* --- COLONNE GAUCHE (SCORE & PATRIMOINE) --- */}
+        <div className="lg:col-span-4 space-y-6 lg:sticky lg:top-8">
             
-            {/* MATELAS */}
-             <Card className="p-5 flex flex-col justify-between h-32">
-                <div className="flex justify-between items-start">
-                     <div className="flex items-center gap-2 text-sm font-bold text-slate-500 uppercase">
-                        Matelas <Tooltip text="Argent disponible immédiatement en cas de coup dur." />
-                    </div>
-                    <div className="p-2 bg-amber-50 text-amber-600 rounded-lg"><Shield size={20} /></div>
+            {/* CARTE SCORE MASTER */}
+            <Card className={`p-6 flex flex-col items-center justify-center text-center relative ${currentLevel.border} border-t-4`}>
+                <div className="flex justify-between w-full items-center mb-4 px-2">
+                    <h3 className="font-bold text-slate-800 flex items-center gap-2"><Activity size={18} className="text-slate-400"/> Santé</h3>
+                    <Badge color={`${currentLevel.bg.replace('bg-', 'bg-opacity-20 text-')} border-none`}>{currentLevel.label}</Badge>
                 </div>
-                <div>
-                    <div className="text-3xl font-black text-slate-900 tracking-tight">{formatCurrency(stats.matelas)}</div>
-                    <div className="mt-1">
-                      <Badge color={safetyStatus.color}>{safetyStatus.label}</Badge>
+                
+                <div className="mb-6 relative z-10"><LevelGauge score={finalScore} level={currentLevel} /></div>
+                
+                <div className={`grid ${isExpert ? 'grid-cols-3' : 'grid-cols-2'} gap-2 w-full text-center`}>
+                    <div className="bg-slate-50 rounded-lg p-2">
+                        <div className="text-[10px] text-slate-400 uppercase font-bold">Sécurité</div>
+                        <div className="font-bold text-slate-700">{Math.round(safetyRatio * (isExpert ? 40 : 50))}/{isExpert ? 40 : 50}</div>
                     </div>
+                    <div className="bg-slate-50 rounded-lg p-2">
+                        <div className="text-[10px] text-slate-400 uppercase font-bold">Dette</div>
+                        <div className="font-bold text-slate-700">{Math.round(debtScore)}/{isExpert ? 40 : 50}</div>
+                    </div>
+                    {isExpert && (
+                        <div className="bg-slate-50 rounded-lg p-2">
+                            <div className="text-[10px] text-slate-400 uppercase font-bold">Invest</div>
+                            <div className="font-bold text-slate-700">{Math.round(finalScore - (safetyRatio * 40) - debtScore)}/20</div>
+                        </div>
+                    )}
+                </div>
+            </Card>
+
+            {/* ACTIONS RAPIDES */}
+            <div className="grid grid-cols-1 gap-3">
+                <Button onClick={() => router.push('/simulator')} className="w-full shadow-lg"><Zap size={20} /> Simuler un achat</Button>
+                <Button variant="outline" onClick={() => router.push('/profile')}><Settings size={18} /> Ajuster mon Profil</Button>
+            </div>
+
+            {/* SYNTHÈSE PATRIMOINE */}
+            <Card className="p-6 bg-slate-900 text-white border-none relative overflow-hidden">
+                <div className="absolute top-0 right-0 p-32 bg-indigo-500 rounded-full opacity-10 blur-3xl transform translate-x-10 -translate-y-10"></div>
+                <div className="relative z-10">
+                    <div className="flex items-center gap-3 mb-4 text-slate-400">
+                        <Layers size={20} /> <span className="text-sm font-bold uppercase tracking-wider">Patrimoine Total</span>
+                    </div>
+                    <div className="text-4xl font-black tracking-tight mb-1">{formatCurrency(stats.totalWealth)}</div>
+                    
+                    {/* CONDITION STRICTE ICI : SEULEMENT SI EXPERT */}
+                    {isExpert && (
+                        <div className="text-xs text-slate-400 flex justify-between items-center mt-4 pt-4 border-t border-slate-700">
+                            <span>Dont Investi (Bloqué)</span>
+                            <span className="text-white font-bold">{formatCurrency(stats.investments)}</span>
+                        </div>
+                    )}
                 </div>
             </Card>
         </div>
 
-        {/* DÉTAILS SÉCURITÉ */}
-        <Card className="p-6 border-t-4 border-t-amber-500">
-            <div className="flex items-center justify-between mb-4">
-                <h3 className="font-bold text-slate-800 flex items-center gap-2"><Shield className="text-amber-500" size={20} /> Sécurité</h3>
-                <Badge color={safetyStatus.color}>{safetyStatus.label}</Badge>
-            </div>
-            <ProgressBar value={stats.safetyMonths} max={stats.rules.safetyMonths} colorClass="bg-amber-500" />
-            <div className="flex justify-between mt-2 text-sm font-medium mb-4">
-                <span className="text-slate-900 font-bold">{stats.safetyMonths.toFixed(1)} mois d&apos;avance</span>
-                <span className="text-slate-400">Obj : {stats.rules.safetyMonths} mois</span>
-            </div>
-            <div className="p-3 bg-slate-50 rounded-xl text-xs text-slate-600 leading-relaxed border border-slate-100 flex gap-3">
-                <Info className="shrink-0 text-amber-500" size={16} />
-                <div>
-                    <span className="font-bold block mb-1 text-slate-700">Pourquoi c&apos;est important ?</span>
-                    Avoir {stats.rules.safetyMonths} mois de dépenses devant soi permet d&apos;encaisser une perte d&apos;emploi ou une grosse panne sans s&apos;endetter.
-                    {stats.safetyMonths < stats.rules.safetyMonths && <div className="mt-1 text-amber-600 font-bold">Il te manque encore {formatCurrency((stats.rules.safetyMonths * stats.essentialExpenses) - stats.matelas)}.</div>}
-                </div>
-            </div>
-        </Card>
+        {/* --- COLONNE DROITE --- */}
+        <div className="lg:col-span-8 space-y-6">
+            
+            {/* 1. TABLEAU BUDGET MENSUEL */}
+            <Card className="p-6 md:p-8">
+                <h2 className="text-lg font-bold text-slate-800 mb-6 flex items-center gap-2">
+                    <Wallet className="text-indigo-600" /> Ton Budget Mensuel
+                </h2>
 
-        {/* DÉTAILS PRESSION */}
-        <Card className="p-6 border-t-4 border-t-rose-500">
-            <div className="flex items-center justify-between mb-4">
-                <h3 className="font-bold text-slate-800 flex items-center gap-2"><CreditCard className="text-rose-500" size={20} /> Pression des charges</h3>
-                <Badge color={debtStatus.color}>{debtStatus.label}</Badge>
-            </div>
-            <ProgressBar value={stats.engagementRate} max={60} colorClass={stats.engagementRate > stats.rules.maxDebt ? 'bg-rose-500' : 'bg-emerald-500'} />
-            <div className="flex justify-between mt-2 text-sm font-medium mb-4">
-                <span className="text-slate-900 font-bold">{stats.engagementRate.toFixed(0)}% utilisé</span>
-                <span className="text-slate-400">Max conseillé : {stats.rules.maxDebt}%</span>
-            </div>
-            <div className="p-3 bg-slate-50 rounded-xl text-xs text-slate-600 leading-relaxed border border-slate-100 flex gap-3">
-                <Info className="shrink-0 text-rose-500" size={16} />
-                <div>
-                    <span className="font-bold block mb-1 text-slate-700">L&apos;analyse du coach</span>
-                    C&apos;est la part de tes revenus qui est mangée avant même que le mois commence.
-                    {stats.engagementRate > stats.rules.maxDebt 
-                        ? <span className="block mt-1 text-rose-600 font-bold">Attention, tu as peu de marge de manœuvre en cas d&apos;imprévu.</span>
-                        : <span className="block mt-1 text-emerald-600 font-bold">C&apos;est sain ! Tu gardes la maîtrise de ton budget.</span>
-                    }
-                </div>
-            </div>
-        </Card>
+                <div className="space-y-1">
+                    {/* ENTRÉES */}
+                    <BudgetRow 
+                        label="Revenus Nets" 
+                        icon={Wallet} 
+                        amount={stats.monthlyIncome} 
+                        total={stats.monthlyIncome} 
+                        color={{ bg: 'bg-emerald-100', text: 'text-emerald-600', bar: 'bg-emerald-500' }}
+                    />
 
-        {/* PROJECTION */}
-        <Card className="p-8 bg-slate-900 text-white border-none relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-600 rounded-full blur-3xl opacity-20 -mr-20 -mt-20 pointer-events-none"></div>
-            <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-6">
-                <div>
-                    <h3 className="font-bold text-xl mb-2 flex items-center gap-2 text-indigo-300"><Target className="text-indigo-400" /> Projection 12 mois</h3>
-                    <p className="text-slate-300 text-sm max-w-sm leading-relaxed">En épargnant <strong className="text-white">10%</strong> de votre Reste à Vivre :</p>
+                    <div className="h-px bg-slate-100 my-4 mx-4"></div>
+
+                    {/* SORTIES OBLIGATOIRES */}
+                    <BudgetRow 
+                        label="Charges Fixes" 
+                        icon={CreditCard} 
+                        amount={stats.mandatoryExpenses} 
+                        total={stats.monthlyIncome} 
+                        color={{ bg: 'bg-slate-100', text: 'text-slate-600', bar: 'bg-slate-500' }}
+                        subtext="Loyer, factures, abonnements..."
+                    />
+
+                    {/* SORTIES INVESTISSEMENT (CONDITION STRICTE : SEULEMENT SI EXPERT) */}
+                    {isExpert && (
+                        <BudgetRow 
+                            label="Investissements" 
+                            icon={PiggyBank} 
+                            amount={stats.profitableExpenses} 
+                            total={stats.monthlyIncome} 
+                            color={{ bg: 'bg-purple-100', text: 'text-purple-600', bar: 'bg-purple-500' }}
+                            subtext={`Proj. +${formatCurrency(stats.projectedAnnualYield)}/an`}
+                        />
+                    )}
+
+                    {/* SORTIES VIE COURANTE */}
+                    <BudgetRow 
+                        label="Vie Courante" 
+                        icon={ShoppingCart} 
+                        amount={stats.discretionaryExpenses} 
+                        total={stats.monthlyIncome} 
+                        color={{ bg: 'bg-indigo-100', text: 'text-indigo-600', bar: 'bg-indigo-500' }}
+                        subtext="Courses, plaisirs (lissé)"
+                    />
+
+                    <div className="h-px bg-slate-100 my-6 mx-4"></div>
+
+                    {/* LE RÉSULTAT */}
+                    <div className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-200">
+                        <div className="flex items-center gap-3">
+                            <div className={`p-2 rounded-full ${stats.capacityToSave > 0 ? 'bg-emerald-500 text-white' : 'bg-rose-500 text-white'}`}>
+                                {stats.capacityToSave > 0 ? <TrendingUp size={20} /> : <TrendingDown size={20} />}
+                            </div>
+                            <div>
+                                <div className="font-bold text-slate-800 text-sm">Capacité d&apos;Épargne</div>
+                                <div className="text-[10px] text-slate-500 font-medium uppercase">Cashflow Net</div>
+                            </div>
+                        </div>
+                        <div className={`text-2xl font-black ${stats.capacityToSave > 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                            {formatCurrency(stats.capacityToSave)}
+                        </div>
+                    </div>
                 </div>
-                <div className="bg-white/10 backdrop-blur-sm border border-white/10 rounded-2xl p-4 text-center min-w-[180px]">
-                    <div className="text-3xl font-black text-white tracking-tight">+{formatCurrency(stats.remainingToLive * 0.1 * 12)}</div>
-                </div>
+            </Card>
+
+            {/* 2. SECTION ANALYSE DÉTAILLÉE */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 h-auto">
+                {/* CARTE 1 : Sécurité */}
+                <Card className="p-6 border-t-4 border-t-amber-500 h-full">
+                    <div className="flex items-center justify-between mb-4">
+                        <h3 className="font-bold text-slate-800 flex items-center gap-2"><Shield className="text-amber-500" size={20} /> Sécurité</h3>
+                        <Badge color={stats.safetyMonths >= stats.rules.safetyMonths ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}>
+                            {stats.safetyMonths >= stats.rules.safetyMonths ? "Objectif Atteint" : "En construction"}
+                        </Badge>
+                    </div>
+                    <div className="flex justify-between items-end mb-2">
+                      <div className="text-xs text-slate-500">Matelas de sécu.</div>
+                      <div className="font-bold text-slate-700">{stats.safetyMonths.toFixed(1)} mois</div>
+                    </div>
+                    <ProgressBar value={stats.safetyMonths} max={stats.rules.safetyMonths} colorClass="bg-amber-500" />
+                    <p className="mt-4 text-xs text-slate-500 leading-relaxed">
+                        {stats.safetyMonths >= stats.rules.safetyMonths 
+                            ? "Bravo ! Ton épargne couvre largement les imprévus." 
+                            : <>Il te manque encore <strong>{formatCurrency(Math.max(0, (stats.rules.safetyMonths * stats.mandatoryExpenses) - stats.matelas))}</strong> pour être serein.</>}
+                    </p>
+                </Card>
+
+                {/* CARTE 2 ADAPTATIVE */}
+                {isExpert ? (
+                    <Card className="p-6 border-t-4 border-t-purple-500 h-full">
+                        <div className="flex items-center justify-between mb-4">
+                            <h3 className="font-bold text-slate-800 flex items-center gap-2"><TrendingUp className="text-purple-500" size={20} /> Croissance</h3>
+                            <Badge color="bg-purple-100 text-purple-700">Long terme</Badge>
+                        </div>
+                        <div className="flex justify-between items-end mb-2">
+                            <div className="text-xs text-slate-500">Capital Investi</div>
+                            <div className="font-bold text-purple-700">{formatCurrency(stats.investments)}</div>
+                        </div>
+                        <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden mb-4">
+                            <div className="h-full bg-purple-500 rounded-full" style={{ width: `${Math.min(100, (stats.investments / (stats.totalWealth || 1)) * 100)}%` }}></div>
+                        </div>
+                        <p className="text-xs text-slate-500 leading-relaxed">
+                            Tes investissements représentent <strong>{Math.round((stats.investments / (stats.totalWealth || 1)) * 100)}%</strong> de ton patrimoine.
+                        </p>
+                    </Card>
+                ) : (
+                    <Card className="p-6 border-t-4 border-t-rose-500 h-full">
+                        <div className="flex items-center justify-between mb-4">
+                            <h3 className="font-bold text-slate-800 flex items-center gap-2"><CreditCard className="text-rose-500" size={20} /> Pression</h3>
+                            <Badge color={stats.engagementRate > stats.rules.maxDebt ? "bg-rose-100 text-rose-700" : "bg-emerald-100 text-emerald-700"}>
+                                {stats.engagementRate > stats.rules.maxDebt ? "Élevée" : "Saine"}
+                            </Badge>
+                        </div>
+                        <div className="flex justify-between items-end mb-2">
+                            <div className="text-xs text-slate-500">Revenus engagés</div>
+                            <div className="font-bold text-slate-700">{stats.engagementRate.toFixed(0)}%</div>
+                        </div>
+                        <ProgressBar value={stats.engagementRate} max={60} colorClass={stats.engagementRate > stats.rules.maxDebt ? 'bg-rose-500' : 'bg-emerald-500'} />
+                        <p className="mt-4 text-xs text-slate-500 leading-relaxed">
+                            {stats.engagementRate > stats.rules.maxDebt 
+                                ? "Attention, tes charges fixes sont trop hautes." 
+                                : "C'est bien ! Tu gardes une bonne marge de manœuvre."}
+                        </p>
+                    </Card>
+                )}
             </div>
-        </Card>
+        </div>
       </div>
     </div>
   );
