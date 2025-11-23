@@ -21,7 +21,6 @@ import {
   Tv,
   Landmark,
   Calendar,
-  TrendingDown,
   TrendingUp,
   User,
   Briefcase,
@@ -37,10 +36,7 @@ import {
   CreditCard,
   ShoppingCart,
   PiggyBank,
-  ArrowRight,
   ChevronDown,
-  ChevronUp,
-  Percent
 } from 'lucide-react';
 
 // --- IMPORTS UI KIT ---
@@ -50,9 +46,88 @@ import InputGroup from '@/app/components/ui/InputGroup';
 import Badge from '@/app/components/ui/Badge';
 import Tooltip from '@/app/components/ui/Tooltip';
 
-// --- COMPOSANT ACCORDÉON ---
+// --- NOUVEAU COMPOSANT : SÉLECTEUR DE NIVEAU (INTEGRÉ AU FORMULAIRE) ---
+const LevelSelector = ({ mode, onChange }: any) => {
+  return (
+    <div className="space-y-3 animate-fade-in">
+        <label className="block text-sm font-medium text-slate-600">
+            Ton mode de pilotage
+        </label>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            
+            {/* OPTION 1 : ESSENTIEL */}
+            <button 
+                type="button"
+                onClick={() => onChange('simple')}
+                className={`p-4 rounded-xl border text-left transition-all relative overflow-hidden group ${
+                    mode === 'simple' 
+                    ? 'border-emerald-500 bg-emerald-50 ring-1 ring-emerald-500' 
+                    : 'border-slate-200 bg-white hover:border-emerald-200 hover:bg-slate-50'
+                }`}
+            >
+                <div className="flex items-center gap-3 mb-1">
+                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-lg transition-colors ${
+                        mode === 'simple' ? 'bg-emerald-200 text-emerald-700' : 'bg-slate-100 text-slate-400 group-hover:text-emerald-500'
+                    }`}>
+                        🌱
+                    </div>
+                    <div className={`font-bold text-sm ${mode === 'simple' ? 'text-emerald-900' : 'text-slate-700'}`}>
+                        Aller à l'essentiel
+                    </div>
+                </div>
+                <p className={`text-xs ml-11 ${mode === 'simple' ? 'text-emerald-700/80' : 'text-slate-400'}`}>
+                    Je laisse le coach gérer les dates et taux par défaut.
+                </p>
+            </button>
 
-const AccordionSection = ({ title, icon: Icon, items = [], onItemChange, onItemAdd, onItemRemove, type = 'standard', colorClass = 'text-slate-800', defaultOpen = false }: any) => {
+            {/* OPTION 2 : EXPERT */}
+            <button 
+                type="button"
+                onClick={() => onChange('expert')}
+                className={`p-4 rounded-xl border text-left transition-all relative overflow-hidden group ${
+                    mode === 'expert' 
+                    ? 'border-indigo-500 bg-indigo-50 ring-1 ring-indigo-500' 
+                    : 'border-slate-200 bg-white hover:border-indigo-200 hover:bg-slate-50'
+                }`}
+            >
+                <div className="flex items-center gap-3 mb-1">
+                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-lg transition-colors ${
+                        mode === 'expert' ? 'bg-indigo-200 text-indigo-700' : 'bg-slate-100 text-slate-400 group-hover:text-indigo-500'
+                    }`}>
+                        🦁
+                    </div>
+                    <div className={`font-bold text-sm ${mode === 'expert' ? 'text-indigo-900' : 'text-slate-700'}`}>
+                        Mode Expert
+                    </div>
+                </div>
+                <p className={`text-xs ml-11 ${mode === 'expert' ? 'text-indigo-700/80' : 'text-slate-400'}`}>
+                    Je veux définir mes dates de prélèvement et rendements précis.
+                </p>
+            </button>
+
+        </div>
+    </div>
+  );
+};
+
+// --- COMPOSANT ACCORDÉON (MISE À JOUR UX) ---
+
+const AccordionSection = ({ 
+  title, 
+  icon: Icon, 
+  items = [], 
+  onItemChange, 
+  onItemAdd, 
+  onItemRemove, 
+  type = 'standard', 
+  colorClass = 'text-slate-800', 
+  defaultOpen = false,
+  mode = 'simple', // Nouveau
+  canBeDisabled = false // Nouveau
+}: any) => {
+  
+  // Si on a des items, la section est active, sinon elle dépend de l'action utilisateur
+  const [isEnabled, setIsEnabled] = useState(!canBeDisabled || items.length > 0);
   const [isOpen, setIsOpen] = useState(defaultOpen);
 
   const subTotal = items.reduce((acc: number, item: any) => {
@@ -61,35 +136,67 @@ const AccordionSection = ({ title, icon: Icon, items = [], onItemChange, onItemA
     return acc + val;
   }, 0);
 
-  return (
-    <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden transition-all duration-300 shadow-sm hover:shadow-md">
-      <button 
-        onClick={() => setIsOpen(!isOpen)}
-        className="w-full p-4 flex items-center justify-between bg-white hover:bg-slate-50 transition-colors"
-      >
+  // --- ÉTAT DÉSACTIVÉ (GHOST) ---
+  if (canBeDisabled && !isEnabled) {
+    return (
+      <div className="bg-white rounded-2xl border border-slate-200 p-4 flex items-center justify-between opacity-60 hover:opacity-100 transition-all group">
         <div className="flex items-center gap-4">
-          <div className={`p-2.5 rounded-xl bg-slate-50 ${colorClass}`}>
+          <div className={`p-2.5 rounded-xl bg-slate-50 text-slate-400 group-hover:text-slate-600 grayscale transition-all`}>
             {Icon && <Icon size={20} />}
           </div>
           <div className="text-left">
-            <h3 className="font-bold text-slate-800 text-base">{title}</h3>
-            {!isOpen && (
-                <div className="text-xs text-slate-500 mt-0.5">
-                    {items.length} ligne{items.length > 1 ? 's' : ''} • Total : <strong>{formatCurrency(subTotal)}</strong>
-                </div>
-            )}
+            <div className="font-bold text-slate-600 text-base">{title}</div>
+            <div className="text-xs text-slate-400">Non concerné</div>
           </div>
         </div>
+        <button 
+          onClick={() => { setIsEnabled(true); setIsOpen(true); onItemAdd(); }} 
+          className="text-xs font-bold text-indigo-600 bg-indigo-50 px-4 py-2 rounded-lg hover:bg-indigo-100 transition-colors"
+        >
+          + Ajouter
+        </button>
+      </div>
+    );
+  }
+
+  // --- ÉTAT ACTIVÉ ---
+  return (
+    <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden transition-all duration-300 shadow-sm hover:shadow-md">
+      <div className="flex items-center justify-between pr-2 bg-white hover:bg-slate-50 transition-colors">
+        <button 
+            onClick={() => setIsOpen(!isOpen)}
+            className="flex-1 p-4 flex items-center justify-between"
+        >
+            <div className="flex items-center gap-4">
+            <div className={`p-2.5 rounded-xl bg-slate-50 ${colorClass}`}>
+                {Icon && <Icon size={20} />}
+            </div>
+            <div className="text-left">
+                <h3 className="font-bold text-slate-800 text-base">{title}</h3>
+                {!isOpen && (
+                    <div className="text-xs text-slate-500 mt-0.5">
+                        {items.length} ligne{items.length > 1 ? 's' : ''} • Total : <strong>{formatCurrency(subTotal)}</strong>
+                    </div>
+                )}
+            </div>
+            </div>
+            
+            <div className="flex items-center gap-4">
+                <div className={`text-sm font-bold ${isOpen ? 'opacity-100' : 'opacity-0 md:opacity-100'} transition-opacity text-right`}>
+                    {formatCurrency(subTotal)}<span className="text-[10px] font-normal text-slate-400 block">/mois</span>
+                </div>
+                <div className={`text-slate-400 transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}`}>
+                    <ChevronDown size={20} />
+                </div>
+            </div>
+        </button>
         
-        <div className="flex items-center gap-4">
-            <div className={`text-sm font-bold ${isOpen ? 'opacity-100' : 'opacity-0 md:opacity-100'} transition-opacity text-right`}>
-                {formatCurrency(subTotal)}<span className="text-[10px] font-normal text-slate-400 block">/mois</span>
-            </div>
-            <div className={`text-slate-400 transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}`}>
-                <ChevronDown size={20} />
-            </div>
-        </div>
-      </button>
+        {canBeDisabled && isOpen && (
+             <button onClick={() => setIsEnabled(false)} className="p-2 mr-2 text-slate-300 hover:text-slate-500" title="Je n'ai pas ça">
+                <Minus size={16} />
+            </button>
+        )}
+      </div>
 
       {isOpen && (
         <div className="p-4 bg-slate-50/50 border-t border-slate-100 space-y-3 animate-fade-in">
@@ -102,14 +209,14 @@ const AccordionSection = ({ title, icon: Icon, items = [], onItemChange, onItemA
                 <div className="flex-1 w-full">
                     <input 
                         type="text" 
-                        placeholder="Nom (ex: Virement PEA)" 
+                        placeholder="Nom (ex: Loyer)" 
                         value={item.name} 
                         onChange={(e) => onItemChange(item.id, 'name', e.target.value)} 
                         className="w-full p-2 bg-transparent font-medium text-sm text-slate-700 placeholder:text-slate-300 outline-none" 
                     />
                 </div>
                 
-                <div className="flex items-center gap-2 w-full sm:w-auto">
+                <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
                     <div className="relative w-24">
                         <input 
                             type="number" 
@@ -121,7 +228,8 @@ const AccordionSection = ({ title, icon: Icon, items = [], onItemChange, onItemA
                         <span className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 text-xs pointer-events-none">€</span>
                     </div>
 
-                    {type !== 'annuel' && (
+                    {/* UX : MASQUER LA COMPLEXITÉ EN MODE SIMPLE */}
+                    {mode === 'expert' && type !== 'annuel' && (
                         <div className="relative w-16" title="Jour du prélèvement">
                             <input 
                                 type="number" 
@@ -133,7 +241,7 @@ const AccordionSection = ({ title, icon: Icon, items = [], onItemChange, onItemA
                         </div>
                     )}
 
-                    {type === 'standard' && (
+                    {mode === 'expert' && type === 'standard' && (
                         <select 
                             value={item.frequency || 'mensuel'} 
                             onChange={(e) => onItemChange(item.id, 'frequency', e.target.value)} 
@@ -197,6 +305,7 @@ const HouseholdCounter = ({ label, value, onChange, icon: Icon }: any) => (
 export default function ProfilePage() {
   const { profile, saveProfile, isLoaded } = useFinancialData();
   const router = useRouter();
+  const [mode, setMode] = useState('simple'); // 'simple' | 'expert'
   const stats = useMemo(() => calculateFinancials(profile), [profile]);
 
   if (!isLoaded) return <div className="min-h-[50vh] flex items-center justify-center"><div className="animate-pulse h-12 w-12 bg-slate-200 rounded-full"></div></div>;
@@ -207,11 +316,14 @@ export default function ProfilePage() {
     const newList = list.map((item: any) => item.id === id ? { ...item, [field]: value } : item);
     saveProfile({ ...profile, [listName]: newList });
   };
+
   const addItem = (listName: string) => {
+    // On insère des valeurs par défaut valides pour que les calculs fonctionnent même si masqués
     const newItem = { id: generateId(), name: '', amount: '', frequency: 'mensuel', dayOfMonth: 5 };
     const currentList = (profile as any)[listName] || [];
     saveProfile({ ...profile, [listName]: [...currentList, newItem] });
   };
+
   const removeItem = (listName: string, id: string) => {
     const list = (profile as any)[listName] || [];
     const newList = list.filter((item: any) => item.id !== id);
@@ -224,7 +336,7 @@ export default function ProfilePage() {
       {/* --- COLONNE DROITE (RÉSUMÉ STRATÉGIQUE) --- */}
       <div className="lg:col-span-4 lg:sticky lg:top-24 space-y-6 order-first lg:order-last">
         
-        {/* 1. CARTE SANTÉ MENSUELLE (REFONDUE AVEC RENDEMENT) */}
+        {/* 1. CARTE SANTÉ MENSUELLE */}
         <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm relative overflow-hidden">
           <h2 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-6">Répartition Mensuelle</h2>
           
@@ -297,15 +409,26 @@ export default function ProfilePage() {
         <div className="hidden lg:block"><Button onClick={() => router.push('/')} className="w-full"><Save size={18} /> Enregistrer et Terminer</Button></div>
       </div>
 
-      {/* --- COLONNE GAUCHE --- */}
+      {/* --- COLONNE GAUCHE (FORMULAIRE) --- */}
       <div className="lg:col-span-8 space-y-8">
         
         {/* 1. IDENTITÉ */}
         <section>
             <h2 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2"><div className="w-6 h-6 rounded-full bg-slate-800 text-white flex items-center justify-center text-xs">1</div> Identité</h2>
             <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-6">
+                
+                {/* Prénom */}
                 <InputGroup label="Ton Prénom" placeholder="Tom" value={profile.firstName || ''} onChange={(val: string) => saveProfile({ ...profile, firstName: val })} />
+                
+                {/* --- NOUVEAU SELECTEUR DE NIVEAU --- */}
+                <LevelSelector mode={mode} onChange={setMode} />
+                
+                <div className="w-full h-px bg-slate-100 my-2"></div>
+
+                {/* Situation */}
                 <div><label className="block text-sm font-medium text-slate-600 mb-2">Ta situation</label><PersonaSelector currentPersona={profile.persona || 'salaried'} onChange={(id: string) => saveProfile({ ...profile, persona: id })} /></div>
+                
+                {/* Foyer */}
                 <div><label className="block text-sm font-medium text-slate-600 mb-2">Ton foyer</label><div className="grid grid-cols-1 sm:grid-cols-2 gap-3"><HouseholdCounter label="Adultes" icon={User} value={parseInt(profile.household?.adults) || 1} onChange={(v: number) => saveProfile({ ...profile, household: { ...profile.household, adults: v } })} /><HouseholdCounter label="Enfants" icon={Baby} value={parseInt(profile.household?.children) || 0} onChange={(v: number) => saveProfile({ ...profile, household: { ...profile.household, children: v } })} /></div></div>
             </div>
         </section>
@@ -339,25 +462,27 @@ export default function ProfilePage() {
                     </div>
                 </div>
 
-                {/* Investissements (AVEC INPUT RENDEMENT) */}
+                {/* Investissements (AVEC INPUT RENDEMENT CONDITIONNEL) */}
                 <div className="p-4 flex flex-col sm:flex-row sm:items-center justify-between hover:bg-slate-50 transition-colors group gap-4">
                     <div className="flex items-center gap-4">
                         <div className="p-3 bg-purple-100 text-purple-600 rounded-xl"><PiggyBank size={20} /></div>
                         <div><div className="font-bold text-slate-800">Investissements</div><div className="text-xs text-slate-500">PEA, Crypto (Bloqué)</div></div>
                     </div>
                     
-                    <div className="flex gap-2 items-center w-full sm:w-auto">
+                    <div className="flex gap-2 items-center w-full sm:w-auto justify-end">
                         {/* Montant */}
                         <div className="relative flex-1 sm:w-32">
                             <input type="number" value={profile.investments || ''} onChange={(e) => saveProfile({ ...profile, investments: parseFloat(e.target.value) || 0 })} className="w-full p-2 pl-3 pr-6 bg-slate-50 border border-slate-200 rounded-lg text-right font-bold text-purple-700 focus:ring-2 focus:ring-purple-500 outline-none" placeholder="0" />
                             <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs pointer-events-none">€</span>
                         </div>
                         
-                        {/* Rendement % */}
-                        <div className="relative w-20" title="Rendement moyen estimé">
-                            <input type="number" value={profile.investmentYield || ''} onChange={(e) => saveProfile({ ...profile, investmentYield: parseFloat(e.target.value) || 0 })} className="w-full p-2 pl-2 pr-5 bg-slate-50 border border-slate-200 rounded-lg text-right text-xs font-bold text-slate-600 focus:ring-2 focus:ring-purple-500 outline-none" placeholder="5" />
-                            <span className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 text-xs pointer-events-none">%</span>
-                        </div>
+                        {/* Rendement % (Visible uniquement en mode Expert) */}
+                        {mode === 'expert' && (
+                            <div className="relative w-20" title="Rendement moyen estimé">
+                                <input type="number" value={profile.investmentYield || ''} onChange={(e) => saveProfile({ ...profile, investmentYield: parseFloat(e.target.value) || 0 })} className="w-full p-2 pl-2 pr-5 bg-slate-50 border border-slate-200 rounded-lg text-right text-xs font-bold text-slate-600 focus:ring-2 focus:ring-purple-500 outline-none" placeholder="5" />
+                                <span className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 text-xs pointer-events-none">%</span>
+                            </div>
+                        )}
                     </div>
                 </div>
             </div>
@@ -367,12 +492,35 @@ export default function ProfilePage() {
         <section className="space-y-4">
             <div className="flex items-center gap-3 mb-2"><div className="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold">3</div><h2 className="text-xl font-bold text-slate-800">Tes Flux Mensuels</h2></div>
             
-            <AccordionSection defaultOpen={true} title="Revenus (Net)" icon={Wallet} colorClass="text-emerald-600" items={profile.incomes} onItemChange={(id: any, f: any, v: any) => updateItem('incomes', id, f, v)} onItemAdd={() => addItem('incomes')} onItemRemove={(id: any) => removeItem('incomes', id)} />
-            
-            <AccordionSection title="Charges Fixes (Obligatoire)" icon={Home} colorClass="text-blue-600" items={profile.fixedCosts} onItemChange={(id: any, f: any, v: any) => updateItem('fixedCosts', id, f, v)} onItemAdd={() => addItem('fixedCosts')} onItemRemove={(id: any) => removeItem('fixedCosts', id)} />
-            
-            {/* --- INVESTISSEMENTS MENSUELS (NOUVEAU) --- */}
+            {/* REVENUS - Toujours actifs */}
             <AccordionSection 
+                mode={mode}
+                defaultOpen={true} 
+                title="Revenus (Net)" 
+                icon={Wallet} 
+                colorClass="text-emerald-600" 
+                items={profile.incomes} 
+                onItemChange={(id: any, f: any, v: any) => updateItem('incomes', id, f, v)} 
+                onItemAdd={() => addItem('incomes')} 
+                onItemRemove={(id: any) => removeItem('incomes', id)} 
+            />
+            
+            {/* CHARGES FIXES - Toujours actives */}
+            <AccordionSection 
+                mode={mode}
+                title="Charges Fixes (Obligatoire)" 
+                icon={Home} 
+                colorClass="text-blue-600" 
+                items={profile.fixedCosts} 
+                onItemChange={(id: any, f: any, v: any) => updateItem('fixedCosts', id, f, v)} 
+                onItemAdd={() => addItem('fixedCosts')} 
+                onItemRemove={(id: any) => removeItem('fixedCosts', id)} 
+            />
+            
+            {/* INVESTISSEMENTS - Désactivable (pour les débutants) */}
+            <AccordionSection 
+                mode={mode}
+                canBeDisabled={true}
                 title="Investissements Mensuels" 
                 icon={PiggyBank} 
                 colorClass="text-purple-600" 
@@ -403,17 +551,24 @@ export default function ProfilePage() {
                         <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs pointer-events-none">€</span>
                     </div>
                 </div>
-                <div className="mt-3 pt-3 border-t border-slate-100 flex items-center gap-2 text-xs text-slate-400">
-                    <Info size={14} className="text-indigo-400" />
-                    <span>Ce montant sera lissé jour après jour dans ton calendrier.</span>
-                </div>
+                {mode === 'expert' && (
+                    <div className="mt-3 pt-3 border-t border-slate-100 flex items-center gap-2 text-xs text-slate-400 animate-fade-in">
+                        <Info size={14} className="text-indigo-400" />
+                        <span>Ce montant sera lissé jour après jour dans ton calendrier.</span>
+                    </div>
+                )}
             </div>
 
             <h3 className="text-xs font-bold text-slate-400 uppercase mt-6 mb-2 pl-2">Détails avancés</h3>
             <div className="grid grid-cols-1 gap-4">
-                <AccordionSection title="Abonnements" icon={Tv} colorClass="text-purple-600" type="simple" items={profile.subscriptions} onItemChange={(id: any, f: any, v: any) => updateItem('subscriptions', id, f, v)} onItemAdd={() => addItem('subscriptions')} onItemRemove={(id: any) => removeItem('subscriptions', id)} />
-                <AccordionSection title="Crédits en cours" icon={Landmark} colorClass="text-orange-600" type="simple" items={profile.credits} onItemChange={(id: any, f: any, v: any) => updateItem('credits', id, f, v)} onItemAdd={() => addItem('credits')} onItemRemove={(id: any) => removeItem('credits', id)} />
-                <AccordionSection title="Dépenses Annuelles" icon={Calendar} colorClass="text-pink-600" items={profile.annualExpenses} onItemChange={(id: any, f: any, v: any) => updateItem('annualExpenses', id, f, v)} onItemAdd={() => addItem('annualExpenses')} onItemRemove={(id: any) => removeItem('annualExpenses', id)} />
+                {/* CES SECTIONS SONT DÉSACTIVABLES ("J'ai pas") */}
+                <AccordionSection mode={mode} canBeDisabled={true} title="Abonnements" icon={Tv} colorClass="text-purple-600" type="simple" items={profile.subscriptions} onItemChange={(id: any, f: any, v: any) => updateItem('subscriptions', id, f, v)} onItemAdd={() => addItem('subscriptions')} onItemRemove={(id: any) => removeItem('subscriptions', id)} />
+                <AccordionSection mode={mode} canBeDisabled={true} title="Crédits en cours" icon={Landmark} colorClass="text-orange-600" type="simple" items={profile.credits} onItemChange={(id: any, f: any, v: any) => updateItem('credits', id, f, v)} onItemAdd={() => addItem('credits')} onItemRemove={(id: any) => removeItem('credits', id)} />
+                
+                {/* La section dépenses annuelles n'est affichée qu'en Expert pour ne pas surcharger */}
+                {mode === 'expert' && (
+                    <AccordionSection mode={mode} canBeDisabled={true} title="Dépenses Annuelles" icon={Calendar} colorClass="text-pink-600" items={profile.annualExpenses} onItemChange={(id: any, f: any, v: any) => updateItem('annualExpenses', id, f, v)} onItemAdd={() => addItem('annualExpenses')} onItemRemove={(id: any) => removeItem('annualExpenses', id)} />
+                )}
             </div>
         </section>
 
