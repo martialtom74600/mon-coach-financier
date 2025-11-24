@@ -1,8 +1,12 @@
 import './globals.css';
 import type { Metadata, Viewport } from 'next';
-import { Inter } from 'next/font/google';
+import { Inter } from 'next/font/google'; // On garde la font Inter !
 import Navigation from '@/app/components/Navigation';
 import Header from '@/app/components/Header';
+
+// Imports de sécurité indispensables
+import { ClerkProvider, SignedIn, SignedOut, RedirectToSignIn } from '@clerk/nextjs';
+import { frFR } from "@clerk/localizations"; 
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -31,36 +35,36 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="fr">
-      <head>
-        <link rel="apple-touch-icon" href="/icon-192.png" />
-      </head>
-      <body className={`${inter.className} bg-slate-50 text-slate-900`}>
-        
-        {/* 1. NAVIGATION (Barre latérale ou inférieure) */}
-        <Navigation />
-
-        {/* 2. WRAPPER PRINCIPAL */}
-        {/* md:pl-64 : Laisse l'espace pour la sidebar à gauche sur Desktop */}
-        {/* pb-24 : Laisse l'espace pour la bottom-bar en bas sur Mobile */}
-        <main className="min-h-screen transition-all duration-300 md:pl-64 pb-24 md:pb-0">
+    // On garde le Provider Clerk pour que l'auth fonctionne
+    <ClerkProvider localization={frFR}>
+      <html lang="fr">
+        <head>
+          <link rel="apple-touch-icon" href="/icon-192.png" />
+        </head>
+        {/* On réapplique la classe inter.className ici pour toute l'app */}
+        <body className={`${inter.className} bg-slate-50 text-slate-900`}>
           
-          {/* 3. CONTENEUR CENTRÉ (Limite la largeur pour la lisibilité) */}
-          <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 md:pt-10">
-            
-            {/* 4. HEADER AUTOMATIQUE (Titre de la page + Date) */}
-            <Header />
+          {/* SI CONNECTÉ : On affiche ton layout complet avec la font Inter */}
+          <SignedIn>
+            <Navigation />
 
-            {/* 5. CONTENU DE LA PAGE COURANTE (Injecté ici) */}
-            <div className="mt-6">
-              {children}
-            </div>
+            <main className="min-h-screen transition-all duration-300 md:pl-64 pb-24 md:pb-0">
+              <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 md:pt-10">
+                <Header />
+                <div className="mt-6">
+                  {children}
+                </div>
+              </div>
+            </main>
+          </SignedIn>
 
-          </div>
+          {/* SI NON CONNECTÉ : On redirige (l'utilisateur ne voit rien de l'interface) */}
+          <SignedOut>
+            <RedirectToSignIn />
+          </SignedOut>
 
-        </main>
-        
-      </body>
-    </html>
+        </body>
+      </html>
+    </ClerkProvider>
   );
 }
