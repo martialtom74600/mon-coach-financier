@@ -1,0 +1,17 @@
+// Ce fichier est juste là pour que le projet ne plante pas au démarrage.
+// On définira tes vraies données (Dépenses, Revenus...) plus tard, à ton rythme !
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  // Même si tu n'as pas de base de données, ça permet de compiler le code
+  url      = env("DATABASE_URL")
+}
+
+// Un modèle vide juste pour que Prisma soit content techniquement
+model AttenteDefinition {
+  id String @id @default(uuid())
+}

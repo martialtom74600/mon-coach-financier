@@ -1,30 +1,32 @@
 /** @type {import('next').NextConfig} */
-const withPWA = require("@ducanh2912/next-pwa").default({
-  dest: "public", // Dossier de destination des fichiers PWA
-  cacheOnFrontEndNav: true, // Rend la navigation instantanée
-  aggressiveFrontEndNavCaching: true, // Cache agressif pour la vitesse
-  reloadOnOnline: true, // Recharge l'app si on retrouve la connexion
-  swcMinify: true, // Minification pour plus de performance
-  
-  // Mettre 'false' ici force le mode PWA même en localhost (pour tester)
-  // Une fois en production, tu pourras mettre : process.env.NODE_ENV === "development"
-  disable: false, 
-  
-  workboxOptions: {
-    disableDevLogs: true, // Garde la console propre
-  },
-});
 
+// Configuration de base propre
 const nextConfig = {
-  // C'EST ICI LA SOLUTION MAGIQUE POUR VERCEL :
+  // Optimisation des images pour Clerk (avatars)
+  images: {
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'img.clerk.com',
+      },
+    ],
+  },
+  // On évite que des petites erreurs de style bloquent le déploiement
   eslint: {
-    // Ignore les erreurs d'apostrophes pendant le déploiement
     ignoreDuringBuilds: true,
   },
-  // On fait pareil pour TypeScript pour être tranquille
   typescript: {
     ignoreBuildErrors: true,
   },
 };
+
+// Configuration PWA intelligente
+const withPWA = require("@ducanh2912/next-pwa").default({
+  dest: "public",
+  // IMPORTANT : On désactive le PWA en mode développement pour éviter les bugs de cache
+  disable: process.env.NODE_ENV === "development", 
+  register: true,
+  skipWaiting: true,
+});
 
 module.exports = withPWA(nextConfig);
