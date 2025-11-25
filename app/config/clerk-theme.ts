@@ -11,12 +11,12 @@ export const clerkAppearance = {
     // --- BOUTON PRINCIPAL (Continuer) ---
     formButtonPrimary: 
       "bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg shadow-indigo-200 " + 
-      "rounded-xl font-bold py-3.5 px-4 text-base transition-all duration-200 active:scale-95 w-full", // py-3.5 pour plus de hauteur tactile
+      "rounded-xl font-bold py-3.5 px-4 text-base transition-all duration-200 active:scale-95 w-full", 
     
     // --- BOUTON GOOGLE (Social) ---
     socialButtonsBlockButton: 
       "bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 " +
-      "rounded-xl py-3 px-4 font-medium shadow-sm transition-all duration-200 active:scale-95",
+      "rounded-xl py-3 px-4 font-medium shadow-sm transition-all duration-200 active:scale-95 w-full", // Ajout de w-full par sécurité
     
     // --- CHAMPS TEXTE ---
     formFieldInput: 
@@ -32,16 +32,16 @@ export const clerkAppearance = {
 };
 
 // Thème Hybride (Le secret du PWA)
-// -> Mobile : On force la transparence avec '!' pour que ça se fonde dans le fond gris
-// -> PC : On force la carte blanche avec '!'
+// -> Mobile : On met p-6 pour que ça respire (fini les boutons qui touchent les bords)
+// -> PC : On garde p-10 pour une grande carte aérée
 export const clerkAppearanceHybrid = {
   ...clerkAppearance,
   elements: {
     ...clerkAppearance.elements,
-    card: "shadow-none !bg-transparent border-0 p-0 md:!shadow-2xl md:border md:border-slate-200 md:!bg-white md:p-10", 
+    // CORRECTION ICI : Remplacement de 'p-0' par 'p-6'
+    card: "shadow-none !bg-transparent border-0 p-6 md:!shadow-2xl md:border md:border-slate-200 md:!bg-white md:p-10", 
     
     // Sur mobile, on cache le petit titre "S'identifier" car on a déjà ton gros titre "Mon Coach" au dessus
-    // Sur PC, on l'affiche
     headerTitle: "hidden md:block text-slate-900 font-bold text-xl",
     headerSubtitle: "hidden md:block text-slate-500",
   }
