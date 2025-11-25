@@ -1,6 +1,6 @@
 import './globals.css';
 import type { Metadata, Viewport } from 'next';
-import { Inter } from 'next/font/google'; // On garde la font Inter !
+import { Inter } from 'next/font/google';
 import Navigation from '@/app/components/Navigation';
 import Header from '@/app/components/Header';
 
@@ -9,6 +9,7 @@ import {
   ClerkProvider, 
   SignedIn, 
   SignedOut, 
+  RedirectToSignIn, // INDISPENSABLE pour les pages hébergées
   ClerkLoading,
   ClerkLoaded 
 } from '@clerk/nextjs';
@@ -41,27 +42,25 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    // On garde le Provider Clerk pour que l'auth fonctionne
     <ClerkProvider localization={frFR}>
       <html lang="fr">
         <head>
           <link rel="apple-touch-icon" href="/icon-192.png" />
         </head>
-        {/* On réapplique la classe inter.className ici pour toute l'app */}
         <body className={`${inter.className} bg-slate-50 text-slate-900`}>
           
-          {/* 1. PENDANT LE CHARGEMENT (Évite l'écran blanc sur mobile) */}
+          {/* 1. CHARGEMENT (Empêche l'écran blanc le temps de vérifier le compte) */}
           <ClerkLoading>
             <div className="flex flex-col items-center justify-center min-h-screen gap-4">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
-              <p className="text-slate-500 font-medium animate-pulse">Chargement de ton espace...</p>
+              <p className="text-slate-500 font-medium animate-pulse">Chargement sécurisé...</p>
             </div>
           </ClerkLoading>
 
-          {/* 2. UNE FOIS CHARGÉ (Affiche ton app) */}
+          {/* 2. APPLICATION CHARGÉE */}
           <ClerkLoaded>
             
-            {/* CAS A : CONNECTÉ -> On affiche l'application complète (Menu + Header + Contenu) */}
+            {/* CAS A : L'utilisateur est connecté -> On ouvre l'app */}
             <SignedIn>
               <Navigation />
               <main className="min-h-screen transition-all duration-300 md:pl-64 pb-24 md:pb-0">
@@ -74,10 +73,10 @@ export default function RootLayout({
               </main>
             </SignedIn>
 
-            {/* CAS B : PAS CONNECTÉ (Page Login) -> On affiche JUSTE le formulaire */}
-            {/* C'est ICI la correction vitale : on affiche {children} au lieu de rediriger */}
+            {/* CAS B : L'utilisateur n'est PAS connecté -> Ouste, chez Clerk ! */}
+            {/* C'est ça qui évite le bug 404 : on ne cherche pas une page locale, on part sur le serveur sécurisé */}
             <SignedOut>
-              {children}
+              <RedirectToSignIn />
             </SignedOut>
             
           </ClerkLoaded>
