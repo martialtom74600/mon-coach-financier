@@ -8,7 +8,6 @@ import Header from '@/app/components/Header';
 import { 
   ClerkProvider, 
   SignedIn, 
-  SignedOut, 
   ClerkLoading, 
   ClerkLoaded 
 } from '@clerk/nextjs';
@@ -28,12 +27,14 @@ export const metadata: Metadata = {
   },
 };
 
+// AJOUT IMPORTANT : viewportFit: 'cover' pour gérer le "Notch" et la barre du bas sur iPhone
 export const viewport: Viewport = {
   themeColor: '#4f46e5',
   width: 'device-width',
   initialScale: 1,
   maximumScale: 1,
   userScalable: false,
+  viewportFit: 'cover', 
 };
 
 export default function RootLayout({
@@ -48,20 +49,20 @@ export default function RootLayout({
 
   return (
     <ClerkProvider localization={frFR}>
-      <html lang="fr">
+      <html lang="fr" className="h-full">
         <head>
           <link rel="apple-touch-icon" href="/icon-192.png" />
         </head>
-        <body className={`${inter.className} bg-slate-50 text-slate-900`}>
+        <body className={`${inter.className} bg-slate-50 text-slate-900 h-full`}>
           
-          {/* 1. CHARGEMENT */}
+          {/* 1. CHARGEMENT (Spinner centré) */}
           <ClerkLoading>
             <div className="flex flex-col items-center justify-center min-h-screen gap-4">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
             </div>
           </ClerkLoading>
 
-          {/* 2. APPLICATION */}
+          {/* 2. APPLICATION CHARGÉE */}
           <ClerkLoaded>
             
             {/* MENU : Seulement si connecté */}
@@ -69,29 +70,29 @@ export default function RootLayout({
               <Navigation />
             </SignedIn>
 
-            {/* CONTENU PRINCIPAL (La correction est ici) */}
-            {/* Si connecté : on met la marge à gauche (md:pl-64) pour le menu */}
-            {/* Si PAS connecté : on met 0 marge pour le plein écran */}
-            <main className={`min-h-screen transition-all duration-300 ${isConnected ? 'md:pl-64 pb-24 md:pb-0' : 'p-0'}`}>
+            {/* CONTENU PRINCIPAL */}
+            {/* LOGIQUE DE MARGE :
+                - Mobile : pb-24 (padding bottom) pour ne pas être caché par la barre du bas
+                - Desktop : md:pl-64 (padding left) pour laisser la place à la sidebar
+                - Si pas connecté : p-0 pour le plein écran
+            */}
+            <main className={`min-h-screen transition-all duration-300 ${isConnected ? 'md:pl-64 pb-28 md:pb-0' : 'p-0'}`}>
               
-              {/* CONTENEUR : Idem, on contraint la largeur seulement si connecté */}
+              {/* CONTENEUR CENTRÉ : Largeur max contrainte seulement si connecté */}
               <div className={isConnected ? "max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 md:pt-10" : "w-full h-full"}>
                 
+                {/* HEADER (Titre, Profil...) uniquement si connecté */}
                 <SignedIn>
                   <Header />
                 </SignedIn>
 
-                {/* On retire aussi la marge du haut (mt-6) si on est sur le login */}
+                {/* Le contenu de la page (Dashboard ou Login) */}
                 <div className={isConnected ? "mt-6" : ""}>
                   {children}
                 </div>
 
               </div>
             </main>
-            
-            {/* CAS DÉCONNECTÉ : Plus besoin de logique spéciale ici, 
-                car le main ci-dessus gère l'affichage de {children} (qui contient la page de login)
-                en mode plein écran grâce à la condition isConnected */}
             
           </ClerkLoaded>
 

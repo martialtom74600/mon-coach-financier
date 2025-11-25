@@ -31,7 +31,7 @@ import {
 } from 'lucide-react';
 
 // ============================================================================
-// 1. COMPOSANTS UI DU DASHBOARD (Ton code existant)
+// 1. COMPOSANTS UI DU DASHBOARD (Helpers)
 // ============================================================================
 
 const ProgressBar = ({ value, max, colorClass }: { value: number, max: number, colorClass: string }) => {
@@ -105,7 +105,7 @@ const BudgetRow = ({ label, icon: Icon, amount, total, color, subtext = null }: 
 };
 
 // ============================================================================
-// 2. LE COMPOSANT DASHBOARD (Ton code existant encapsulé)
+// 2. LE COMPOSANT DASHBOARD (Privé)
 // ============================================================================
 
 function DashboardView() {
@@ -113,6 +113,7 @@ function DashboardView() {
   const { profile, saveProfile, isLoaded } = useFinancialData();
   const stats = useMemo(() => calculateFinancials(profile), [profile]);
 
+  // Ici, on garde un petit spinner local car c'est le chargement des données (pas de l'auth)
   if (!isLoaded) return <div className="min-h-[50vh] flex items-center justify-center"><div className="animate-pulse h-12 w-12 bg-slate-200 rounded-full"></div></div>;
 
   if (stats.monthlyIncome === 0 && stats.matelas === 0) {
@@ -307,16 +308,43 @@ function DashboardView() {
 }
 
 // ============================================================================
-// 3. LE COMPOSANT HOME PRINCIPAL (L'aiguilleur)
+// 3. LE COMPOSANT HOME PRINCIPAL (L'aiguilleur Public/Privé)
 // ============================================================================
 
 export default function Home() {
   const { isLoaded, isSignedIn } = useAuth();
 
+  // --------------------------------------------------------------------------
+  // OPTIMISATION SKELETON (Point C)
+  // On remplace le simple spinner par un squelette complet de la page
+  // pour une transition fluide et "native"
+  // --------------------------------------------------------------------------
   if (!isLoaded) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-indigo-600"></div>
+      <div className="min-h-screen bg-slate-50 p-4 md:p-8 animate-pulse">
+        {/* Header Skeleton */}
+        <div className="max-w-7xl mx-auto mb-8 flex flex-col md:flex-row gap-4 justify-between items-center">
+           <div className="h-8 w-48 bg-slate-200 rounded-xl"></div>
+           <div className="h-10 w-32 bg-slate-200 rounded-xl"></div>
+        </div>
+        
+        {/* Main Grid Skeleton */}
+        <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-6">
+           {/* Left Column Skeleton */}
+           <div className="lg:col-span-4 space-y-6">
+              <div className="h-96 bg-slate-200 rounded-3xl w-full"></div>
+              <div className="h-32 bg-slate-200 rounded-3xl w-full"></div>
+           </div>
+           
+           {/* Right Column Skeleton */}
+           <div className="lg:col-span-8 space-y-6">
+              <div className="h-64 bg-slate-200 rounded-3xl w-full"></div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                 <div className="h-48 bg-slate-200 rounded-3xl w-full"></div>
+                 <div className="h-48 bg-slate-200 rounded-3xl w-full"></div>
+              </div>
+           </div>
+        </div>
       </div>
     );
   }
@@ -376,7 +404,8 @@ export default function Home() {
              <SignIn 
                signUpUrl="/sign-up"
                routing="hash" 
-               appearance={clerkAppearanceHybrid} // Utilise le nouveau thème responsive
+               forceRedirectUrl="/" // ✅ CORRECTION POINT A (Redirection forcée)
+               appearance={clerkAppearanceHybrid} 
              />
           </div>
         </div>
