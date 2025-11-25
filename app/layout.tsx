@@ -4,12 +4,15 @@ import { Inter } from 'next/font/google';
 import Navigation from '@/app/components/Navigation';
 import Header from '@/app/components/Header';
 
+// Imports Clerk
 import { 
   ClerkProvider, 
   SignedIn, 
+  SignedOut, 
   ClerkLoading, 
   ClerkLoaded 
 } from '@clerk/nextjs';
+import { auth } from '@clerk/nextjs/server'; // Pour vérifier l'état côté serveur
 import { frFR } from "@clerk/localizations"; 
 
 const inter = Inter({ subsets: ['latin'] });
@@ -38,6 +41,11 @@ export default function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
+  // On vérifie si l'utilisateur est connecté côté serveur
+  // Cela nous permet d'adapter le CSS AVANT que la page ne s'affiche
+  const { userId } = auth();
+  const isConnected = !!userId;
+
   return (
     <ClerkProvider localization={frFR}>
       <html lang="fr">
@@ -46,7 +54,7 @@ export default function RootLayout({
         </head>
         <body className={`${inter.className} bg-slate-50 text-slate-900`}>
           
-          {/* 1. CHARGEMENT (Optionnel mais conseillé pour éviter le flash) */}
+          {/* 1. CHARGEMENT */}
           <ClerkLoading>
             <div className="flex flex-col items-center justify-center min-h-screen gap-4">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
@@ -56,31 +64,34 @@ export default function RootLayout({
           {/* 2. APPLICATION */}
           <ClerkLoaded>
             
-            {/* BARRE LATÉRALE : S'affiche UNIQUEMENT si connecté */}
+            {/* MENU : Seulement si connecté */}
             <SignedIn>
               <Navigation />
             </SignedIn>
 
-            {/* CONTENU PRINCIPAL */}
-            {/* On garde ta structure originale. 
-                Note : Sur PC, le formulaire de login sera légèrement décalé à droite 
-                à cause du 'md:pl-64', mais sur Mobile (ta priorité), ce sera parfait. */}
-            <main className="min-h-screen transition-all duration-300 md:pl-64 pb-24 md:pb-0">
-              <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 md:pt-10">
+            {/* CONTENU PRINCIPAL (La correction est ici) */}
+            {/* Si connecté : on met la marge à gauche (md:pl-64) pour le menu */}
+            {/* Si PAS connecté : on met 0 marge pour le plein écran */}
+            <main className={`min-h-screen transition-all duration-300 ${isConnected ? 'md:pl-64 pb-24 md:pb-0' : 'p-0'}`}>
+              
+              {/* CONTENEUR : Idem, on contraint la largeur seulement si connecté */}
+              <div className={isConnected ? "max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 md:pt-10" : "w-full h-full"}>
                 
-                {/* HEADER : S'affiche UNIQUEMENT si connecté */}
                 <SignedIn>
                   <Header />
                 </SignedIn>
 
-                {/* LE CONTENU (Login ou Dashboard) */}
-                {/* C'est app/page.tsx qui décide quoi afficher ici */}
-                <div className="mt-6">
+                {/* On retire aussi la marge du haut (mt-6) si on est sur le login */}
+                <div className={isConnected ? "mt-6" : ""}>
                   {children}
                 </div>
 
               </div>
             </main>
+            
+            {/* CAS DÉCONNECTÉ : Plus besoin de logique spéciale ici, 
+                car le main ci-dessus gère l'affichage de {children} (qui contient la page de login)
+                en mode plein écran grâce à la condition isConnected */}
             
           </ClerkLoaded>
 
