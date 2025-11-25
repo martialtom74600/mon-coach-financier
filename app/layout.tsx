@@ -4,12 +4,11 @@ import { Inter } from 'next/font/google'; // On garde la font Inter !
 import Navigation from '@/app/components/Navigation';
 import Header from '@/app/components/Header';
 
-// Imports de sécurité indispensables (Ajout de ClerkLoading et ClerkLoaded)
+// Imports de sécurité indispensables
 import { 
   ClerkProvider, 
   SignedIn, 
   SignedOut, 
-  RedirectToSignIn,
   ClerkLoading,
   ClerkLoaded 
 } from '@clerk/nextjs';
@@ -59,13 +58,12 @@ export default function RootLayout({
             </div>
           </ClerkLoading>
 
-          {/* 2. UNE FOIS CHARGÉ (Affiche ton app ou redirige) */}
+          {/* 2. UNE FOIS CHARGÉ (Affiche ton app) */}
           <ClerkLoaded>
             
-            {/* SI CONNECTÉ : On affiche ton layout complet avec la font Inter */}
+            {/* CAS A : CONNECTÉ -> On affiche l'application complète (Menu + Header + Contenu) */}
             <SignedIn>
               <Navigation />
-
               <main className="min-h-screen transition-all duration-300 md:pl-64 pb-24 md:pb-0">
                 <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 md:pt-10">
                   <Header />
@@ -76,9 +74,10 @@ export default function RootLayout({
               </main>
             </SignedIn>
 
-            {/* SI NON CONNECTÉ : On redirige (l'utilisateur ne voit rien de l'interface) */}
+            {/* CAS B : PAS CONNECTÉ (Page Login) -> On affiche JUSTE le formulaire */}
+            {/* C'est ICI la correction vitale : on affiche {children} au lieu de rediriger */}
             <SignedOut>
-              <RedirectToSignIn />
+              {children}
             </SignedOut>
             
           </ClerkLoaded>
