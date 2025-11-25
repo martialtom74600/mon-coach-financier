@@ -4,12 +4,10 @@ import { Inter } from 'next/font/google';
 import Navigation from '@/app/components/Navigation';
 import Header from '@/app/components/Header';
 
-// Imports de sécurité indispensables
 import { 
   ClerkProvider, 
   SignedIn, 
   SignedOut, 
-  RedirectToSignIn, // INDISPENSABLE pour les pages hébergées
   ClerkLoading,
   ClerkLoaded 
 } from '@clerk/nextjs';
@@ -49,18 +47,18 @@ export default function RootLayout({
         </head>
         <body className={`${inter.className} bg-slate-50 text-slate-900`}>
           
-          {/* 1. CHARGEMENT (Empêche l'écran blanc le temps de vérifier le compte) */}
+          {/* 1. ÉCRAN DE CHARGEMENT (Évite le blanc au démarrage) */}
           <ClerkLoading>
             <div className="flex flex-col items-center justify-center min-h-screen gap-4">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
-              <p className="text-slate-500 font-medium animate-pulse">Chargement sécurisé...</p>
+              <p className="text-slate-500 font-medium animate-pulse">Chargement...</p>
             </div>
           </ClerkLoading>
 
-          {/* 2. APPLICATION CHARGÉE */}
+          {/* 2. UNE FOIS L'AUTH VÉRIFIÉE */}
           <ClerkLoaded>
             
-            {/* CAS A : L'utilisateur est connecté -> On ouvre l'app */}
+            {/* CAS A : Connecté -> On affiche l'application complète */}
             <SignedIn>
               <Navigation />
               <main className="min-h-screen transition-all duration-300 md:pl-64 pb-24 md:pb-0">
@@ -73,10 +71,11 @@ export default function RootLayout({
               </main>
             </SignedIn>
 
-            {/* CAS B : L'utilisateur n'est PAS connecté -> Ouste, chez Clerk ! */}
-            {/* C'est ça qui évite le bug 404 : on ne cherche pas une page locale, on part sur le serveur sécurisé */}
+            {/* CAS B : Pas Connecté -> On affiche la page demandée (Login/Signup) */}
+            {/* C'est ICI la clé : on affiche {children} au lieu de rediriger */}
+            {/* Comme le Middleware force l'utilisateur à aller sur /sign-in, {children} sera ton formulaire */}
             <SignedOut>
-              <RedirectToSignIn />
+              {children}
             </SignedOut>
             
           </ClerkLoaded>
