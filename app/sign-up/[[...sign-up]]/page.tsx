@@ -4,6 +4,9 @@ export default function Page() {
   return (
     <div className="flex items-center justify-center min-h-screen w-full bg-slate-50 p-4">
       <SignUp
+        routing="path"
+        path="/sign-up"
+
         // IMPORTANT : On dit au composant où se trouve la page de connexion locale
         signInUrl="/sign-in"
 
