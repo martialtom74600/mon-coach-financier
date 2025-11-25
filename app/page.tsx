@@ -3,6 +3,7 @@
 import React, { useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth, SignIn } from '@clerk/nextjs'; // On utilise useAuth côté client
+import { clerkAppearanceGhost } from '@/app/config/clerk-theme'; // 👈 On importe le thème "Ghost"
 
 // --- IMPORTS RÉELS ---
 import { useFinancialData } from '@/app/hooks/useFinancialData';
@@ -330,21 +331,7 @@ export default function Home() {
         <SignIn
           signUpUrl="/sign-up"
           routing="hash" // Important pour le mode "in-page"
-          appearance={{
-            variables: {
-              colorPrimary: '#4f46e5',
-              colorText: '#0f172a',
-              colorBackground: '#ffffff',
-              borderRadius: '0.75rem',
-              fontFamily: 'inherit',
-            },
-            elements: {
-              card: "bg-white rounded-2xl shadow-xl border border-slate-100 p-8",
-              formButtonPrimary: "bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg shadow-indigo-200 rounded-xl font-bold py-3 px-4 active:scale-95",
-              formFieldInput: "rounded-xl border-slate-200 focus:border-indigo-600 focus:ring-indigo-600",
-              footerActionLink: "text-indigo-600 hover:text-indigo-700 font-medium",
-            }
-          }}
+          appearance={clerkAppearanceGhost} // 👈 L'intégration est parfaite ici
         />
       </div>
     );
