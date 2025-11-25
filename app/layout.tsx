@@ -7,8 +7,7 @@ import Header from '@/app/components/Header';
 import { 
   ClerkProvider, 
   SignedIn, 
-  SignedOut, 
-  ClerkLoading,
+  ClerkLoading, 
   ClerkLoaded 
 } from '@clerk/nextjs';
 import { frFR } from "@clerk/localizations"; 
@@ -47,36 +46,41 @@ export default function RootLayout({
         </head>
         <body className={`${inter.className} bg-slate-50 text-slate-900`}>
           
-          {/* 1. ÉCRAN DE CHARGEMENT (Évite le blanc au démarrage) */}
+          {/* 1. CHARGEMENT (Optionnel mais conseillé pour éviter le flash) */}
           <ClerkLoading>
             <div className="flex flex-col items-center justify-center min-h-screen gap-4">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
-              <p className="text-slate-500 font-medium animate-pulse">Chargement...</p>
             </div>
           </ClerkLoading>
 
-          {/* 2. UNE FOIS L'AUTH VÉRIFIÉE */}
+          {/* 2. APPLICATION */}
           <ClerkLoaded>
             
-            {/* CAS A : Connecté -> On affiche l'application complète */}
+            {/* BARRE LATÉRALE : S'affiche UNIQUEMENT si connecté */}
             <SignedIn>
               <Navigation />
-              <main className="min-h-screen transition-all duration-300 md:pl-64 pb-24 md:pb-0">
-                <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 md:pt-10">
-                  <Header />
-                  <div className="mt-6">
-                    {children}
-                  </div>
-                </div>
-              </main>
             </SignedIn>
 
-            {/* CAS B : Pas Connecté -> On affiche la page demandée (Login/Signup) */}
-            {/* C'est ICI la clé : on affiche {children} au lieu de rediriger */}
-            {/* Comme le Middleware force l'utilisateur à aller sur /sign-in, {children} sera ton formulaire */}
-            <SignedOut>
-              {children}
-            </SignedOut>
+            {/* CONTENU PRINCIPAL */}
+            {/* On garde ta structure originale. 
+                Note : Sur PC, le formulaire de login sera légèrement décalé à droite 
+                à cause du 'md:pl-64', mais sur Mobile (ta priorité), ce sera parfait. */}
+            <main className="min-h-screen transition-all duration-300 md:pl-64 pb-24 md:pb-0">
+              <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 md:pt-10">
+                
+                {/* HEADER : S'affiche UNIQUEMENT si connecté */}
+                <SignedIn>
+                  <Header />
+                </SignedIn>
+
+                {/* LE CONTENU (Login ou Dashboard) */}
+                {/* C'est app/page.tsx qui décide quoi afficher ici */}
+                <div className="mt-6">
+                  {children}
+                </div>
+
+              </div>
+            </main>
             
           </ClerkLoaded>
 

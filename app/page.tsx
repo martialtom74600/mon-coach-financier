@@ -2,12 +2,13 @@
 
 import React, { useMemo } from 'react';
 import { useRouter } from 'next/navigation';
+import { useAuth, SignIn } from '@clerk/nextjs'; // On utilise useAuth côté client
 
-// --- IMPORTS RÉELS (DATA & LOGIC) ---
+// --- IMPORTS RÉELS ---
 import { useFinancialData } from '@/app/hooks/useFinancialData';
 import { calculateFinancials, formatCurrency } from '@/app/lib/logic';
 
-// --- IMPORTS UI (Existants) ---
+// --- IMPORTS UI ---
 import Card from '@/app/components/ui/Card';
 import Button from '@/app/components/ui/Button';
 import Badge from '@/app/components/ui/Badge';
@@ -27,7 +28,9 @@ import {
   ShoppingCart,
 } from 'lucide-react';
 
-// --- COMPOSANTS UI SPÉCIFIQUES AU DASHBOARD ---
+// ============================================================================
+// 1. COMPOSANTS UI DU DASHBOARD (Ton code existant)
+// ============================================================================
 
 const ProgressBar = ({ value, max, colorClass }: { value: number, max: number, colorClass: string }) => {
   const percent = Math.min(100, Math.max(0, (value / max) * 100));
@@ -38,7 +41,6 @@ const ProgressBar = ({ value, max, colorClass }: { value: number, max: number, c
   );
 };
 
-// --- LOGIQUE MÉTIER VISUELLE (NIVEAUX) ---
 const LEVELS = [
   { min: 0, max: 40, label: "Survie", color: "text-rose-500", bg: "bg-rose-500", border: "border-rose-100" },
   { min: 40, max: 70, label: "Construction", color: "text-amber-500", bg: "bg-amber-500", border: "border-amber-100" },
@@ -78,7 +80,6 @@ const LevelGauge = ({ score, level }: any) => {
 
 const BudgetRow = ({ label, icon: Icon, amount, total, color, subtext = null }: any) => {
     const percent = total > 0 ? Math.round((amount / total) * 100) : 0;
-    
     return (
         <div className="flex items-center gap-4 p-3 hover:bg-slate-50 rounded-xl transition-colors cursor-default group">
             <div className={`p-2.5 rounded-xl ${color.bg} ${color.text} group-hover:scale-110 transition-transform`}>
@@ -101,17 +102,19 @@ const BudgetRow = ({ label, icon: Icon, amount, total, color, subtext = null }: 
     );
 };
 
-// --- PAGE D'ACCUEIL PRINCIPALE ---
+// ============================================================================
+// 2. LE COMPOSANT DASHBOARD (Ton ancienne page d'accueil encapsulée)
+// ============================================================================
 
-export default function HomePage() {
+function DashboardView() {
   const router = useRouter();
-  
   const { profile, saveProfile, isLoaded } = useFinancialData();
   const stats = useMemo(() => calculateFinancials(profile), [profile]);
 
+  // GESTION DU CHARGEMENT DES DONNÉES
   if (!isLoaded) return <div className="min-h-[50vh] flex items-center justify-center"><div className="animate-pulse h-12 w-12 bg-slate-200 rounded-full"></div></div>;
 
-  // --- ONBOARDING ---
+  // ONBOARDING (Si pas de données)
   if (stats.monthlyIncome === 0 && stats.matelas === 0) {
     return (
       <div className="p-8 flex flex-col items-center justify-center min-h-[70vh] text-center animate-fade-in bg-slate-50">
@@ -125,13 +128,12 @@ export default function HomePage() {
     );
   }
 
-  // GESTION DU MODE
+  // LOGIQUE DASHBOARD
   const isExpert = profile.mode === 'expert';
   const toggleMode = (newMode: 'beginner' | 'expert') => {
     saveProfile({ ...profile, mode: newMode });
   };
 
-  // --- SCORE ---
   const safetyRatio = Math.min(1, stats.safetyMonths / (stats.rules.safetyMonths || 3));
   const debtRatio = stats.engagementRate / (stats.rules.maxDebt || 33);
   
@@ -153,45 +155,30 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen bg-slate-50 p-4 md:p-8 font-sans text-slate-600">
-        
-      {/* HEADER */}
+      
+      {/* HEADER DASHBOARD */}
       <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
         <div>
           <h1 className="text-2xl font-black text-slate-800">Tableau de Bord</h1>
           <p className="text-slate-500 text-sm">Bon retour, {userName}</p>
         </div>
         
-        {/* SWITCHER DE MODE */}
         <div className="bg-white p-1 rounded-xl shadow-sm border border-slate-200 flex">
-            <button 
-                onClick={() => toggleMode('beginner')} 
-                className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${!isExpert ? 'bg-slate-800 text-white shadow-md' : 'text-slate-500 hover:bg-slate-50'}`}
-            >
-                Standard
-            </button>
-            <button 
-                onClick={() => toggleMode('expert')} 
-                className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${isExpert ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-500 hover:bg-slate-50'}`}
-            >
-                Expert
-            </button>
+            <button onClick={() => toggleMode('beginner')} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${!isExpert ? 'bg-slate-800 text-white shadow-md' : 'text-slate-500 hover:bg-slate-50'}`}>Standard</button>
+            <button onClick={() => toggleMode('expert')} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${isExpert ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-500 hover:bg-slate-50'}`}>Expert</button>
         </div>
       </div>
 
       <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 items-start animate-fade-in pb-12">
         
-        {/* --- COLONNE GAUCHE (SCORE & PATRIMOINE) --- */}
+        {/* COLONNE GAUCHE */}
         <div className="lg:col-span-4 space-y-6 lg:sticky lg:top-8">
-            
-            {/* CARTE SCORE MASTER */}
             <Card className={`p-6 flex flex-col items-center justify-center text-center relative ${currentLevel.border} border-t-4`}>
                 <div className="flex justify-between w-full items-center mb-4 px-2">
                     <h3 className="font-bold text-slate-800 flex items-center gap-2"><Activity size={18} className="text-slate-400"/> Santé</h3>
                     <Badge color={`${currentLevel.bg.replace('bg-', 'bg-opacity-20 text-')} border-none`}>{currentLevel.label}</Badge>
                 </div>
-                
                 <div className="mb-6 relative z-10"><LevelGauge score={finalScore} level={currentLevel} /></div>
-                
                 <div className={`grid ${isExpert ? 'grid-cols-3' : 'grid-cols-2'} gap-2 w-full text-center`}>
                     <div className="bg-slate-50 rounded-lg p-2">
                         <div className="text-[10px] text-slate-400 uppercase font-bold">Sécurité</div>
@@ -210,13 +197,11 @@ export default function HomePage() {
                 </div>
             </Card>
 
-            {/* ACTIONS RAPIDES */}
             <div className="grid grid-cols-1 gap-3">
                 <Button onClick={() => router.push('/simulator')} className="w-full shadow-lg"><Zap size={20} /> Simuler un achat</Button>
                 <Button variant="outline" onClick={() => router.push('/profile')}><Settings size={18} /> Ajuster mon Profil</Button>
             </div>
 
-            {/* SYNTHÈSE PATRIMOINE */}
             <Card className="p-6 bg-slate-900 text-white border-none relative overflow-hidden">
                 <div className="absolute top-0 right-0 p-32 bg-indigo-500 rounded-full opacity-10 blur-3xl transform translate-x-10 -translate-y-10"></div>
                 <div className="relative z-10">
@@ -224,8 +209,6 @@ export default function HomePage() {
                         <Layers size={20} /> <span className="text-sm font-bold uppercase tracking-wider">Patrimoine Total</span>
                     </div>
                     <div className="text-4xl font-black tracking-tight mb-1">{formatCurrency(stats.totalWealth)}</div>
-                    
-                    {/* CONDITION STRICTE ICI : SEULEMENT SI EXPERT */}
                     {isExpert && (
                         <div className="text-xs text-slate-400 flex justify-between items-center mt-4 pt-4 border-t border-slate-700">
                             <span>Dont Investi (Bloqué)</span>
@@ -236,62 +219,17 @@ export default function HomePage() {
             </Card>
         </div>
 
-        {/* --- COLONNE DROITE --- */}
+        {/* COLONNE DROITE */}
         <div className="lg:col-span-8 space-y-6">
-            
-            {/* 1. TABLEAU BUDGET MENSUEL */}
             <Card className="p-6 md:p-8">
-                <h2 className="text-lg font-bold text-slate-800 mb-6 flex items-center gap-2">
-                    <Wallet className="text-indigo-600" /> Ton Budget Mensuel
-                </h2>
-
+                <h2 className="text-lg font-bold text-slate-800 mb-6 flex items-center gap-2"><Wallet className="text-indigo-600" /> Ton Budget Mensuel</h2>
                 <div className="space-y-1">
-                    {/* ENTRÉES */}
-                    <BudgetRow 
-                        label="Revenus Nets" 
-                        icon={Wallet} 
-                        amount={stats.monthlyIncome} 
-                        total={stats.monthlyIncome} 
-                        color={{ bg: 'bg-emerald-100', text: 'text-emerald-600', bar: 'bg-emerald-500' }}
-                    />
-
+                    <BudgetRow label="Revenus Nets" icon={Wallet} amount={stats.monthlyIncome} total={stats.monthlyIncome} color={{ bg: 'bg-emerald-100', text: 'text-emerald-600', bar: 'bg-emerald-500' }} />
                     <div className="h-px bg-slate-100 my-4 mx-4"></div>
-
-                    {/* SORTIES OBLIGATOIRES */}
-                    <BudgetRow 
-                        label="Charges Fixes" 
-                        icon={CreditCard} 
-                        amount={stats.mandatoryExpenses} 
-                        total={stats.monthlyIncome} 
-                        color={{ bg: 'bg-slate-100', text: 'text-slate-600', bar: 'bg-slate-500' }}
-                        subtext="Loyer, factures, abonnements..."
-                    />
-
-                    {/* SORTIES INVESTISSEMENT (CONDITION STRICTE : SEULEMENT SI EXPERT) */}
-                    {isExpert && (
-                        <BudgetRow 
-                            label="Investissements" 
-                            icon={PiggyBank} 
-                            amount={stats.profitableExpenses} 
-                            total={stats.monthlyIncome} 
-                            color={{ bg: 'bg-purple-100', text: 'text-purple-600', bar: 'bg-purple-500' }}
-                            subtext={`Proj. +${formatCurrency(stats.projectedAnnualYield)}/an`}
-                        />
-                    )}
-
-                    {/* SORTIES VIE COURANTE */}
-                    <BudgetRow 
-                        label="Vie Courante" 
-                        icon={ShoppingCart} 
-                        amount={stats.discretionaryExpenses} 
-                        total={stats.monthlyIncome} 
-                        color={{ bg: 'bg-indigo-100', text: 'text-indigo-600', bar: 'bg-indigo-500' }}
-                        subtext="Courses, plaisirs (lissé)"
-                    />
-
+                    <BudgetRow label="Charges Fixes" icon={CreditCard} amount={stats.mandatoryExpenses} total={stats.monthlyIncome} color={{ bg: 'bg-slate-100', text: 'text-slate-600', bar: 'bg-slate-500' }} subtext="Loyer, factures, abonnements..." />
+                    {isExpert && (<BudgetRow label="Investissements" icon={PiggyBank} amount={stats.profitableExpenses} total={stats.monthlyIncome} color={{ bg: 'bg-purple-100', text: 'text-purple-600', bar: 'bg-purple-500' }} subtext={`Proj. +${formatCurrency(stats.projectedAnnualYield)}/an`} />)}
+                    <BudgetRow label="Vie Courante" icon={ShoppingCart} amount={stats.discretionaryExpenses} total={stats.monthlyIncome} color={{ bg: 'bg-indigo-100', text: 'text-indigo-600', bar: 'bg-indigo-500' }} subtext="Courses, plaisirs (lissé)" />
                     <div className="h-px bg-slate-100 my-6 mx-4"></div>
-
-                    {/* LE RÉSULTAT */}
                     <div className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-200">
                         <div className="flex items-center gap-3">
                             <div className={`p-2 rounded-full ${stats.capacityToSave > 0 ? 'bg-emerald-500 text-white' : 'bg-rose-500 text-white'}`}>
@@ -309,9 +247,7 @@ export default function HomePage() {
                 </div>
             </Card>
 
-            {/* 2. SECTION ANALYSE DÉTAILLÉE */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 h-auto">
-                {/* CARTE 1 : Sécurité */}
                 <Card className="p-6 border-t-4 border-t-amber-500 h-full">
                     <div className="flex items-center justify-between mb-4">
                         <h3 className="font-bold text-slate-800 flex items-center gap-2"><Shield className="text-amber-500" size={20} /> Sécurité</h3>
@@ -325,13 +261,10 @@ export default function HomePage() {
                     </div>
                     <ProgressBar value={stats.safetyMonths} max={stats.rules.safetyMonths} colorClass="bg-amber-500" />
                     <p className="mt-4 text-xs text-slate-500 leading-relaxed">
-                        {stats.safetyMonths >= stats.rules.safetyMonths 
-                            ? "Bravo ! Ton épargne couvre largement les imprévus." 
-                            : <>Il te manque encore <strong>{formatCurrency(Math.max(0, (stats.rules.safetyMonths * stats.mandatoryExpenses) - stats.matelas))}</strong> pour être serein.</>}
+                        {stats.safetyMonths >= stats.rules.safetyMonths ? "Bravo ! Ton épargne couvre largement les imprévus." : <>Il te manque encore <strong>{formatCurrency(Math.max(0, (stats.rules.safetyMonths * stats.mandatoryExpenses) - stats.matelas))}</strong> pour être serein.</>}
                     </p>
                 </Card>
 
-                {/* CARTE 2 ADAPTATIVE */}
                 {isExpert ? (
                     <Card className="p-6 border-t-4 border-t-purple-500 h-full">
                         <div className="flex items-center justify-between mb-4">
@@ -363,9 +296,7 @@ export default function HomePage() {
                         </div>
                         <ProgressBar value={stats.engagementRate} max={60} colorClass={stats.engagementRate > stats.rules.maxDebt ? 'bg-rose-500' : 'bg-emerald-500'} />
                         <p className="mt-4 text-xs text-slate-500 leading-relaxed">
-                            {stats.engagementRate > stats.rules.maxDebt 
-                                ? "Attention, tes charges fixes sont trop hautes." 
-                                : "C'est bien ! Tu gardes une bonne marge de manœuvre."}
+                            {stats.engagementRate > stats.rules.maxDebt ? "Attention, tes charges fixes sont trop hautes." : "C'est bien ! Tu gardes une bonne marge de manœuvre."}
                         </p>
                     </Card>
                 )}
@@ -374,4 +305,51 @@ export default function HomePage() {
       </div>
     </div>
   );
+}
+
+// ============================================================================
+// 3. LE COMPOSANT HOME PRINCIPAL (L'aiguilleur)
+// ============================================================================
+
+export default function Home() {
+  const { isLoaded, isSignedIn } = useAuth();
+
+  // A. CHARGEMENT
+  if (!isLoaded) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-indigo-600"></div>
+      </div>
+    );
+  }
+
+  // B. NON CONNECTÉ : Affiche le Login directement (PAS de redirection)
+  if (!isSignedIn) {
+    return (
+      <div className="flex items-center justify-center min-h-screen w-full bg-slate-50 p-4">
+        <SignIn
+          signUpUrl="/sign-up"
+          routing="hash" // Important pour le mode "in-page"
+          appearance={{
+            variables: {
+              colorPrimary: '#4f46e5',
+              colorText: '#0f172a',
+              colorBackground: '#ffffff',
+              borderRadius: '0.75rem',
+              fontFamily: 'inherit',
+            },
+            elements: {
+              card: "bg-white rounded-2xl shadow-xl border border-slate-100 p-8",
+              formButtonPrimary: "bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg shadow-indigo-200 rounded-xl font-bold py-3 px-4 active:scale-95",
+              formFieldInput: "rounded-xl border-slate-200 focus:border-indigo-600 focus:ring-indigo-600",
+              footerActionLink: "text-indigo-600 hover:text-indigo-700 font-medium",
+            }
+          }}
+        />
+      </div>
+    );
+  }
+
+  // C. CONNECTÉ : Affiche le Dashboard
+  return <DashboardView />;
 }
