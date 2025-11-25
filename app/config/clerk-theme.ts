@@ -1,3 +1,4 @@
+// Thème de base
 export const clerkAppearance = {
   variables: {
     colorPrimary: '#4f46e5', // Indigo-600
@@ -19,11 +20,13 @@ export const clerkAppearance = {
   }
 };
 
-// Une variante spéciale "Sans ombre" pour la page d'accueil (pour s'intégrer à fond)
-export const clerkAppearanceGhost = {
+// NOUVEAU : Thème Hybride (Magique pour PWA)
+// -> Sur Mobile : Transparent et sans bordure (se fond dans l'app)
+// -> Sur PC (md:) : Carte blanche avec ombre (ressort bien sur le fond)
+export const clerkAppearanceHybrid = {
   ...clerkAppearance,
   elements: {
     ...clerkAppearance.elements,
-    card: "shadow-none border-0 bg-transparent p-0", // On retire le cadre
+    card: "shadow-none border-0 bg-transparent p-0 md:shadow-2xl md:border md:border-slate-200 md:bg-white md:p-10", 
   }
 };

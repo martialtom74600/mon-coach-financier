@@ -2,8 +2,8 @@
 
 import React, { useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import { useAuth, SignIn } from '@clerk/nextjs'; // On utilise useAuth côté client
-import { clerkAppearanceGhost } from '@/app/config/clerk-theme'; // 👈 On importe le thème "Ghost"
+import { useAuth, SignIn } from '@clerk/nextjs'; 
+import { clerkAppearanceHybrid } from '@/app/config/clerk-theme'; // 👈 On utilise le thème Hybride
 
 // --- IMPORTS RÉELS ---
 import { useFinancialData } from '@/app/hooks/useFinancialData';
@@ -27,6 +27,7 @@ import {
   Wallet,
   CreditCard,
   ShoppingCart,
+  CheckCircle2 // Pour la liste des avantages sur PC
 } from 'lucide-react';
 
 // ============================================================================
@@ -104,7 +105,7 @@ const BudgetRow = ({ label, icon: Icon, amount, total, color, subtext = null }: 
 };
 
 // ============================================================================
-// 2. LE COMPOSANT DASHBOARD (Ton ancienne page d'accueil encapsulée)
+// 2. LE COMPOSANT DASHBOARD (Ton code existant encapsulé)
 // ============================================================================
 
 function DashboardView() {
@@ -112,10 +113,8 @@ function DashboardView() {
   const { profile, saveProfile, isLoaded } = useFinancialData();
   const stats = useMemo(() => calculateFinancials(profile), [profile]);
 
-  // GESTION DU CHARGEMENT DES DONNÉES
   if (!isLoaded) return <div className="min-h-[50vh] flex items-center justify-center"><div className="animate-pulse h-12 w-12 bg-slate-200 rounded-full"></div></div>;
 
-  // ONBOARDING (Si pas de données)
   if (stats.monthlyIncome === 0 && stats.matelas === 0) {
     return (
       <div className="p-8 flex flex-col items-center justify-center min-h-[70vh] text-center animate-fade-in bg-slate-50">
@@ -129,7 +128,6 @@ function DashboardView() {
     );
   }
 
-  // LOGIQUE DASHBOARD
   const isExpert = profile.mode === 'expert';
   const toggleMode = (newMode: 'beginner' | 'expert') => {
     saveProfile({ ...profile, mode: newMode });
@@ -315,7 +313,6 @@ function DashboardView() {
 export default function Home() {
   const { isLoaded, isSignedIn } = useAuth();
 
-  // A. CHARGEMENT
   if (!isLoaded) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen">
@@ -324,19 +321,69 @@ export default function Home() {
     );
   }
 
-  // B. NON CONNECTÉ : Affiche le Login directement (PAS de redirection)
+  // SCÉNARIO A : NON CONNECTÉ (Page de Login Améliorée)
+  // -> Mobile : Login pur et centré
+  // -> PC : Layout Split (Marketing à gauche, Login à droite)
   if (!isSignedIn) {
     return (
-      <div className="flex items-center justify-center min-h-screen w-full bg-slate-50 p-4">
-        <SignIn
-          signUpUrl="/sign-up"
-          routing="hash" // Important pour le mode "in-page"
-          appearance={clerkAppearanceGhost} // 👈 L'intégration est parfaite ici
-        />
+      <div className="min-h-screen w-full bg-slate-50 flex md:grid md:grid-cols-2">
+        
+        {/* COLONNE GAUCHE (Visible uniquement sur PC > 768px) */}
+        <div className="hidden md:flex flex-col justify-center p-12 lg:p-20 bg-indigo-600 text-white relative overflow-hidden">
+           {/* Décoration de fond */}
+           <div className="absolute top-0 right-0 p-40 bg-white opacity-5 rounded-full blur-3xl transform translate-x-20 -translate-y-20"></div>
+           <div className="absolute bottom-0 left-0 p-32 bg-black opacity-10 rounded-full blur-3xl transform -translate-x-10 translate-y-10"></div>
+
+           <div className="max-w-md mx-auto space-y-8 relative z-10">
+             <div className="h-14 w-14 bg-white/10 rounded-2xl flex items-center justify-center backdrop-blur-md border border-white/20 shadow-xl">
+               <TrendingUp size={32} className="text-white" />
+             </div>
+             
+             <h1 className="text-4xl lg:text-5xl font-black tracking-tight leading-tight">
+               Prenez le contrôle de votre argent.
+             </h1>
+             
+             <p className="text-indigo-100 text-lg leading-relaxed">
+               Fini le stress des fins de mois. Visualisez, planifiez et optimisez votre budget en temps réel avec Mon Coach Financier.
+             </p>
+             
+             <div className="space-y-4 pt-4">
+                <div className="flex items-center gap-3 text-indigo-100">
+                  <CheckCircle2 className="text-emerald-400" /> <span>100% Sécurisé & Privé</span>
+                </div>
+                <div className="flex items-center gap-3 text-indigo-100">
+                  <CheckCircle2 className="text-emerald-400" /> <span>Analyse automatique</span>
+                </div>
+                <div className="flex items-center gap-3 text-indigo-100">
+                  <CheckCircle2 className="text-emerald-400" /> <span>Accessible partout (PC & Mobile)</span>
+                </div>
+             </div>
+           </div>
+        </div>
+
+        {/* COLONNE DROITE (Formulaire Login) */}
+        <div className="flex-1 flex flex-col items-center justify-center p-4 md:p-12 bg-slate-50">
+          <div className="w-full max-w-md">
+             {/* En-tête visible uniquement sur Mobile */}
+             <div className="md:hidden text-center mb-8">
+               <div className="mx-auto h-12 w-12 bg-indigo-600 rounded-xl flex items-center justify-center shadow-lg mb-4">
+                 <TrendingUp size={24} className="text-white" />
+               </div>
+               <h1 className="text-2xl font-black text-slate-900">Mon Coach</h1>
+               <p className="text-slate-500">Connectez-vous pour accéder à votre espace.</p>
+             </div>
+
+             <SignIn 
+               signUpUrl="/sign-up"
+               routing="hash" 
+               appearance={clerkAppearanceHybrid} // Utilise le nouveau thème responsive
+             />
+          </div>
+        </div>
       </div>
     );
   }
 
-  // C. CONNECTÉ : Affiche le Dashboard
+  // SCÉNARIO B : CONNECTÉ (Dashboard)
   return <DashboardView />;
 }
