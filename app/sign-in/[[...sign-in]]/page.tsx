@@ -1,24 +1,30 @@
-import { SignUp } from "@clerk/nextjs";
+import { SignIn } from "@clerk/nextjs";
 
 export default function Page() {
   return (
-    // Centrage parfait sur mobile et PC
-    <div className="flex items-center justify-center min-h-screen w-full bg-slate-50">
-      <SignUp
+    <div className="flex items-center justify-center min-h-screen w-full bg-slate-50 p-4">
+      <SignIn
+        // IMPORTANT : On dit au composant où se trouve la page d'inscription locale
+        signUpUrl="/sign-up"
+        
         appearance={{
-          // 1. Les variables globales (Couleurs, Polices, Arrondis)
           variables: {
-            colorPrimary: '#4f46e5', // Le "Indigo-600" de ton thème Tailwind
-            colorText: '#0f172a',    // Le "Slate-900" (Texte sombre)
+            colorPrimary: '#4f46e5',
+            colorText: '#0f172a',
             colorBackground: '#ffffff',
-            borderRadius: '0.75rem', // Coins arrondis (rounded-xl)
-            fontFamily: 'inherit',   // Utilise la même police que ton site (Inter)
+            borderRadius: '0.75rem',
+            fontFamily: 'inherit',
           },
-          // 2. Le style des éléments précis (Si tu veux aller plus loin)
           elements: {
-            card: "shadow-xl border border-slate-200", // Une belle ombre
-            formButtonPrimary: "normal-case text-base font-medium hover:bg-indigo-700 transition-colors", // Bouton principal
-            footerActionLink: "text-indigo-600 hover:text-indigo-700", // Lien "Se connecter"
+            card: "bg-white rounded-2xl shadow-sm border border-slate-100 p-8",
+            formButtonPrimary: 
+              "bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg shadow-indigo-200 " + 
+              "rounded-xl font-bold py-3 px-4 transition-all duration-200 active:scale-95",
+            formFieldInput: 
+              "rounded-xl border-slate-200 focus:border-indigo-600 focus:ring-indigo-600 transition-all duration-200",
+            footerActionLink: "text-indigo-600 hover:text-indigo-700 font-medium",
+            headerTitle: "text-slate-900 font-bold",
+            headerSubtitle: "text-slate-500",
           }
         }}
       />
