@@ -121,12 +121,12 @@ export default function Navigation() {
           
           <Link href="/" className={getLinkClass('/')}>
             <LayoutDashboard size={20} />
-            <span>Mon Bilan</span>
+            <span>Mon bilan</span>
           </Link>
 
           <Link href="/simulator" className={getLinkClass('/simulator')}>
             <PlusCircle size={20} />
-            <span>Nouveau Projet</span>
+            <span>Nouveau projet</span>
           </Link>
 
           <Link href="/history" className={getLinkClass('/history')}>
@@ -140,7 +140,7 @@ export default function Navigation() {
              </div>
              <Link href="/profile" className={getLinkClass('/profile')}>
                 <User size={20} />
-                <span>Mon Profil</span>
+                <span>Mon profil</span>
              </Link>
           </div>
         </div>
