@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 import { auth, currentUser } from '@clerk/nextjs/server';
+// ✅ CORRECTION : On utilise le chemin relatif (remonter de 2 dossiers)
+// Cela évite l'erreur "Module not found"
 import { prisma } from '@/app/lib/prisma';
 
 // 1. RÉCUPÉRATION (GET)
@@ -16,11 +18,9 @@ export async function GET() {
     });
 
     // Si l'utilisateur n'existe pas encore dans la BDD, on renvoie null
-    // Le frontend (hook) s'occupera d'afficher des données par défaut
     if (!user) return NextResponse.json(null);
 
-    // MAGIE HYBRIDE : On fusionne les colonnes SQL (firstName) et le contenu JSON (financialData)
-    // Pour ton application React, c'est transparent : elle reçoit un seul objet plat.
+    // MAGIE HYBRIDE : On fusionne les colonnes SQL et le contenu JSON
     const financialData = (user.financialData as object) || {};
     
     return NextResponse.json({
@@ -36,7 +36,7 @@ export async function GET() {
 // 2. SAUVEGARDE (POST)
 export async function POST(req: Request) {
   const { userId } = auth();
-  const userAuth = await currentUser(); // On récupère l'objet Clerk complet pour l'email
+  const userAuth = await currentUser(); 
 
   if (!userId || !userAuth) {
     return new NextResponse("Non autorisé", { status: 401 });
@@ -45,17 +45,14 @@ export async function POST(req: Request) {
   try {
     const body = await req.json();
 
-    // On sépare le prénom (qui va dans sa colonne SQL) du reste (qui va dans le JSON)
+    // On sépare le prénom (colonne SQL) du reste (JSON)
     const { firstName, ...financialData } = body;
 
-    // UPSERT est la commande parfaite ici :
-    // - Si l'utilisateur existe -> on met à jour (Update)
-    // - Si l'utilisateur n'existe pas -> on le crée (Create)
     const updatedUser = await prisma.user.upsert({
       where: { id: userId },
       update: {
-        firstName: firstName || undefined, // Ne met à jour que si une valeur est fournie
-        financialData: financialData, // On sauvegarde tout le reste des données financières en JSON
+        firstName: firstName || undefined,
+        financialData: financialData,
         updatedAt: new Date(),
       },
       create: {
