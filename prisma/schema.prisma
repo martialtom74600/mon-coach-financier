@@ -1,5 +1,5 @@
-// Ce fichier est juste là pour que le projet ne plante pas au démarrage.
-// On définira tes vraies données (Dépenses, Revenus...) plus tard, à ton rythme !
+// Ce fichier définit la structure de ta vraie base de données Vercel
+// Il remplace le fichier temporaire que tu avais avant.
 
 generator client {
   provider = "prisma-client-js"
@@ -7,11 +7,24 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  // Même si tu n'as pas de base de données, ça permet de compiler le code
-  url      = env("DATABASE_URL")
+  // Vercel utilise ces noms de variables spécifiques pour Postgres
+  // Ces variables sont dans ton .env.local grâce à "npx vercel env pull"
+  url       = env("POSTGRES_PRISMA_URL")
+  directUrl = env("POSTGRES_URL_NON_POOLING")
 }
 
-// Un modèle vide juste pour que Prisma soit content techniquement
-model AttenteDefinition {
-  id String @id @default(uuid())
+model User {
+  // --- IDENTITÉ (Colonnes strictes SQL) ---
+  id        String  @id // On utilisera l'ID de Clerk ici (ex: user_2bX...)
+  email     String  @unique
+  firstName String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // --- DONNÉES FINANCIÈRES (Flexible JSON) ---
+  // C'est ici que toute la magie opère : on stocke tes objets JS (revenus, dépenses...)
+  // directement dans la base sans avoir besoin de créer 50 tables.
+  // Le type 'Json' est une spécificité puissante de Postgres.
+  financialData Json @default("{}")
 }
