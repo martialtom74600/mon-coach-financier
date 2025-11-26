@@ -1,9 +1,9 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useUser } from '@clerk/nextjs';
 
-// On définit la structure par défaut pour éviter les crashs
+// On définit la structure par défaut pour éviter les bugs d'affichage
 const DEFAULT_PROFILE = {
   firstName: '',
   monthlyIncome: 0,
@@ -18,12 +18,15 @@ const DEFAULT_PROFILE = {
 export function useFinancialData() {
   const { user, isLoaded: isClerkLoaded } = useUser();
   
-  // États locaux (Interface Optimiste)
+  // États locaux pour l'affichage immédiat (Optimistic UI)
   const [profile, setProfile] = useState<any>(DEFAULT_PROFILE);
-  const [history, setHistory] = useState<any[]>([]); // On ajoute l'historique ici
+  const [history, setHistory] = useState<any[]>([]); 
   const [isLoadingData, setIsLoadingData] = useState(true);
 
-  // 1. CHARGEMENT DES DONNÉES (Depuis l'API / BDD)
+  // REF pour le Debounce (C'est le minuteur invisible)
+  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // 1. CHARGEMENT DES DONNÉES (Depuis la Base de Données)
   const fetchData = useCallback(async () => {
     if (!user) return;
     try {
@@ -32,9 +35,8 @@ export function useFinancialData() {
         const data = await res.json();
         
         if (data) {
-          // On sépare l'historique du reste du profil s'il est présent dans le JSON
+          // On sépare l'historique du reste du profil
           const { history: savedHistory, ...savedProfile } = data;
-          
           setProfile({ ...DEFAULT_PROFILE, ...savedProfile });
           setHistory(Array.isArray(savedHistory) ? savedHistory : []);
         } else {
@@ -49,6 +51,7 @@ export function useFinancialData() {
     }
   }, [user]);
 
+  // On lance le chargement dès que Clerk est prêt
   useEffect(() => {
     if (!isClerkLoaded) return;
     if (!user) {
@@ -58,9 +61,10 @@ export function useFinancialData() {
     fetchData();
   }, [isClerkLoaded, user, fetchData]);
 
-  // FONCTION INTERNE POUR SAUVEGARDER GLOBALEMENT
+  // FONCTION INTERNE POUR ENVOYER À L'API
   const pushToDB = async (dataToSave: any) => {
     if (!user) return;
+    console.log("💾 Sauvegarde en cours vers Postgres..."); 
     try {
       await fetch('/api/user', {
         method: 'POST',
@@ -72,21 +76,35 @@ export function useFinancialData() {
     }
   };
 
-  // 2. SAUVEGARDER LE PROFIL
+  // 2. SAUVEGARDER LE PROFIL (AVEC TEMPORISATION)
+  // C'est ici que la magie opère : on attend 1 seconde avant d'envoyer
   const saveProfile = (newProfile: any) => {
+    // A. Mise à jour VISUELLE immédiate (Zéro latence pour l'utilisateur)
     const updatedProfile = { ...profile, ...newProfile };
-    setProfile(updatedProfile); // Mise à jour visuelle immédiate
-    
-    // On envoie tout (Profil + Historique actuel)
-    pushToDB({ ...updatedProfile, history });
+    setProfile(updatedProfile); 
+
+    // B. Gestion du Timer (Debounce)
+    // Si une sauvegarde était déjà prévue, on l'annule (car l'utilisateur tape encore)
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+    }
+
+    // On lance un nouveau compte à rebours de 1 seconde (1000ms)
+    saveTimeoutRef.current = setTimeout(() => {
+      // Si l'utilisateur n'a rien touché pendant 1s, on envoie à la BDD
+      pushToDB({ ...updatedProfile, history });
+    }, 1000);
   };
 
-  // 3. SAUVEGARDER UNE DÉCISION (HISTORIQUE)
+  // 3. SAUVEGARDER UNE DÉCISION (DIRECT)
+  // Pour l'historique (clic bouton), pas besoin d'attendre, on sauvegarde direct.
   const saveDecision = (decision: any) => {
     const newHistory = [...history, decision];
-    setHistory(newHistory); // Mise à jour visuelle immédiate
+    setHistory(newHistory);
     
-    // On envoie tout (Profil actuel + Nouvel Historique)
+    // On annule tout timer en cours pour être sûr d'avoir la dernière version
+    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+    
     pushToDB({ ...profile, history: newHistory });
   };
 

@@ -10,7 +10,8 @@ datasource db {
   // Vercel utilise ces noms de variables spécifiques pour Postgres
   // Ces variables sont dans ton .env.local grâce à "npx vercel env pull"
   url       = env("POSTGRES_PRISMA_URL")
-  directUrl = env("POSTGRES_URL_NON_POOLING")
+  // On utilise POSTGRES_URL pour la connexion directe (migrations/push)
+  directUrl = env("POSTGRES_URL")
 }
 
 model User {
