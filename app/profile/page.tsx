@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useFinancialData } from '@/app/hooks/useFinancialData';
 import {
@@ -12,20 +12,27 @@ import {
 
 import AccordionSection from '@/app/components/AccordionSection';
 
-// Imports Icones
 import {
   Save, Wallet, Tv, Landmark,
-  User, Briefcase, GraduationCap, Armchair, Baby, Target, Minus, CheckCircle,
+  User, Briefcase, GraduationCap, Armchair, Baby, Minus, CheckCircle,
   Search, Info, CreditCard, PiggyBank, ArrowRight, ChevronLeft,
-  Zap, Shield, Plus, XCircle, RotateCcw, AlertTriangle, Loader2,
-  TrendingUp
+  Zap, Shield, Plus, XCircle, AlertTriangle, Loader2,
+  TrendingUp, Target
 } from 'lucide-react';
 
 import Card from '@/app/components/ui/Card';
 import Button from '@/app/components/ui/Button';
 import InputGroup from '@/app/components/ui/InputGroup';
 
-// --- LES 4 ACTES ---
+// --- UTILITAIRE DE PARSING ROBUSTE ---
+const parseNumber = (value: any): number => {
+  if (!value) return 0;
+  const str = value.toString().replace(/\s/g, '').replace(',', '.');
+  const parsed = parseFloat(str);
+  return isNaN(parsed) ? 0 : parsed;
+};
+
+// --- CONFIGURATION ---
 const STEPS = [
   { id: 1, label: "Profil", icon: User },      
   { id: 2, label: "Budget", icon: Wallet },    
@@ -78,9 +85,9 @@ const ConfirmationModal = ({ isOpen, onClose, onConfirm }: { isOpen: boolean, on
       <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6 border border-slate-200">
         <div className="text-center space-y-4">
           <div className="mx-auto w-12 h-12 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center"><AlertTriangle size={24} /></div>
-          <div><h3 className="text-lg font-bold text-slate-900">Quitter ?</h3><p className="text-sm text-slate-500">Tes modifications seront perdues.</p></div>
+          <div><h3 className="text-lg font-bold text-slate-900">Quitter sans sauvegarder ?</h3><p className="text-sm text-slate-500">Tes modifications seront perdues.</p></div>
           <div className="grid grid-cols-2 gap-3">
-            <Button variant="outline" onClick={onClose} className="justify-center">Rester</Button>
+            <Button variant="outline" onClick={onClose} className="justify-center border-slate-200 text-slate-600 hover:bg-slate-50">Rester</Button>
             <Button onClick={onConfirm} className="justify-center bg-rose-600 hover:bg-rose-700 text-white">Quitter</Button>
           </div>
         </div>
@@ -89,31 +96,56 @@ const ConfirmationModal = ({ isOpen, onClose, onConfirm }: { isOpen: boolean, on
   );
 };
 
+// ============================================================================
+// PAGE PRINCIPALE
+// ============================================================================
+
 export default function ProfilePage() {
   const { profile, saveProfile, isLoaded } = useFinancialData();
   const router = useRouter();
   const [currentStep, setCurrentStep] = useState(1);
   
-  // ÉTATS LOCAUX (Draft Mode)
+  // ÉTATS
   const [formData, setFormData] = useState<any>(null);
   const [initialDataStr, setInitialDataStr] = useState<string>('');
   const [isSaving, setIsSaving] = useState(false);
   const [showExitModal, setShowExitModal] = useState(false);
   
-  // Switch intelligent pour investissements
+  // SWITCH
   const [showInvestments, setShowInvestments] = useState(false);
+  const isSavingRef = useRef(false); 
 
-  // INIT
+  // 1. INITIALISATION (CORRIGÉE : Priorité au Mode)
   useEffect(() => {
     if (isLoaded && profile && !formData) {
         const cleanProfile = JSON.parse(JSON.stringify(profile));
+        
+        // Sécurisation des tableaux
+        if (!cleanProfile.incomes) cleanProfile.incomes = [];
         if (!cleanProfile.fixedCosts) cleanProfile.fixedCosts = [];
+        if (!cleanProfile.credits) cleanProfile.credits = [];
+        if (!cleanProfile.subscriptions) cleanProfile.subscriptions = [];
+        if (!cleanProfile.annualExpenses) cleanProfile.annualExpenses = [];
+        if (!cleanProfile.savingsContributions) cleanProfile.savingsContributions = [];
+
+        // 🧠 INTELLIGENCE DE CHARGEMENT
+        // Si le mode est 'beginner', on force le nettoyage des fantômes
+        if (cleanProfile.mode === 'beginner') {
+             cleanProfile.investments = 0;
+             cleanProfile.investmentYield = 0;
+             cleanProfile.savingsContributions = [];
+             setShowInvestments(false);
+        } else if (cleanProfile.mode === 'expert') {
+             setShowInvestments(true);
+        } else {
+             // Fallback pour les vieux profils sans mode défini
+             const hasMoney = cleanProfile.investments > 0;
+             const hasContrib = cleanProfile.savingsContributions.length > 0;
+             setShowInvestments(hasMoney || hasContrib);
+        }
+
         setFormData(cleanProfile);
         setInitialDataStr(JSON.stringify(cleanProfile));
-        // Activation auto si investissements existants
-        if ((cleanProfile.investments && cleanProfile.investments > 0) || cleanProfile.mode === 'expert') {
-            setShowInvestments(true);
-        }
     }
   }, [isLoaded, profile]);
 
@@ -122,30 +154,80 @@ export default function ProfilePage() {
     return JSON.stringify(formData) !== initialDataStr;
   }, [formData, initialDataStr]);
 
-  // PROTECTION
+  // PROTECTION QUITTER
   useEffect(() => {
-    const handleBeforeUnload = (e: BeforeUnloadEvent) => { if (hasChanges) { e.preventDefault(); e.returnValue = ''; } };
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => { 
+        if (hasChanges && !isSavingRef.current) { 
+            e.preventDefault(); 
+            e.returnValue = ''; 
+        } 
+    };
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, [hasChanges]);
 
-  const stats = useMemo(() => formData ? calculateFinancials(formData) : null, [formData]);
+  // 2. STATS
+  const stats = useMemo(() => {
+    if (!formData) return null;
+    return calculateFinancials(formData);
+  }, [formData]);
 
   if (!isLoaded || !formData || !stats) return <div className="min-h-[50vh] flex items-center justify-center"><div className="animate-pulse h-12 w-12 bg-slate-200 rounded-full"></div></div>;
 
-  // ACTIONS
   const updateForm = (newData: any) => setFormData(newData);
   
-  const handleSaveAndExit = async () => {
+  // 3. SWITCH (Visuel)
+  const toggleInvestments = () => {
+      const willBeOn = !showInvestments;
+      setShowInvestments(willBeOn);
+      
+      setFormData((prev: any) => {
+          if (!willBeOn) {
+             // Nettoyage visuel immédiat si on éteint
+             return { ...prev, investments: 0, investmentYield: 0, savingsContributions: [] };
+          }
+          return prev; 
+      });
+  };
+
+  // 4. SAUVEGARDE (Fixée et Sécurisée)
+  const handleSaveAndExit = async (e?: any) => {
+    if (e && e.preventDefault) e.preventDefault();
+    
     if (isSaving) return;
     setIsSaving(true);
+    isSavingRef.current = true;
+
     try {
-      const dataToSave = { ...formData, mode: showInvestments ? 'expert' : 'beginner' };
-      await saveProfile(dataToSave);
-      setInitialDataStr(JSON.stringify(dataToSave)); 
-      router.refresh();
-      router.push('/');
-    } catch (error) { setIsSaving(false); alert("Erreur sauvegarde."); }
+      const finalData = { ...formData };
+
+      // LOGIQUE D'ARBITRAGE : ON vs OFF
+      if (showInvestments) {
+          finalData.mode = 'expert';
+          finalData.investments = parseNumber(finalData.investments);
+          finalData.investmentYield = parseNumber(finalData.investmentYield);
+      } else {
+          // OFF : On force le mode débutant et on écrase tout
+          finalData.mode = 'beginner';
+          finalData.investments = 0;
+          finalData.investmentYield = 0;
+          finalData.savingsContributions = [];
+      }
+
+      // 🔥 ICI EST LA CLÉ DU SUCCÈS 🔥
+      // On passe 'true' en 2e argument pour forcer l'envoi immédiat
+      // sans passer par le délai de 1 seconde (qui serait annulé par le rechargement de page)
+      await saveProfile(finalData, true);
+      
+      // On redirige avec rechargement forcé
+      window.location.href = '/'; 
+
+    } catch (error) { 
+        console.error("Erreur Save:", error);
+        setIsSaving(false); 
+        isSavingRef.current = false;
+        alert("Erreur de connexion lors de la sauvegarde."); 
+    }
   };
 
   const handleCancelRequest = () => { hasChanges ? setShowExitModal(true) : router.push('/'); };
@@ -229,10 +311,10 @@ export default function ProfilePage() {
             </div>
           </div>
           <div className="hidden lg:block space-y-3">
-            <Button onClick={handleSaveAndExit} disabled={isSaving} className={`w-full ${hasChanges ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-slate-900 hover:bg-slate-800'}`}>
+            <Button onClick={(e) => handleSaveAndExit(e)} disabled={isSaving} type="button" className={`w-full ${hasChanges ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-slate-900 hover:bg-slate-800'}`}>
               {isSaving ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />} {isSaving ? '...' : 'Sauvegarder'}
             </Button>
-            <Button variant="outline" onClick={handleCancelRequest} className="w-full bg-white text-slate-500 border-slate-200 hover:bg-slate-50 hover:text-rose-600 hover:border-rose-200"><XCircle size={18} /> Annuler</Button>
+            <Button variant="outline" onClick={handleCancelRequest} type="button" className="w-full bg-white text-slate-500 border-slate-200 hover:bg-slate-50 hover:text-rose-600 hover:border-rose-200"><XCircle size={18} /> Annuler</Button>
           </div>
         </div>
 
@@ -261,7 +343,7 @@ export default function ProfilePage() {
                   {/* REVENUS */}
                   <AccordionSection mode={formData.mode} defaultOpen={true} title="Revenus Mensuels (Net)" icon={Wallet} colorClass="text-emerald-600" items={formData.incomes} onItemChange={(id, f, v) => updateItem('incomes', id, f, v)} onItemAdd={() => addItem('incomes')} onItemRemove={(id) => removeItem('incomes', id)} description="Salaires, Primes, Aides, Rentes..." />
                   
-                  {/* CHARGES FIXES (Loyer inclus ici) */}
+                  {/* CHARGES FIXES */}
                   <AccordionSection mode={formData.mode} defaultOpen={false} title="Charges Fixes (Loyer, Factures...)" icon={CreditCard} colorClass="text-slate-600" items={formData.fixedCosts} onItemChange={(id, f, v) => updateItem('fixedCosts', id, f, v)} onItemAdd={() => addItem('fixedCosts')} onItemRemove={(id) => removeItem('fixedCosts', id)} description="Loyer, Crédit Immo, Électricité, Assurances..." />
                   
                   {/* DETTES */}
@@ -277,15 +359,16 @@ export default function ProfilePage() {
               <div className="space-y-6 animate-slide-up">
                   <div className="flex justify-between items-end"><h2 className="text-lg font-bold text-slate-800">Photo à l&apos;instant T</h2></div>
                   
-                  {/* 1. LE CASH (POUR TOUT LE MONDE) */}
+                  {/* 1. LE CASH */}
                   <div className={`grid grid-cols-1 md:grid-cols-2 gap-4`}>
                       <Card className="p-6 border-l-4 border-l-indigo-500">
                           <div className="flex items-center gap-2 mb-4"><div className="p-2 bg-indigo-50 text-indigo-600 rounded-lg"><CreditCard size={20} /></div><h3 className="font-bold text-slate-800">Compte Courant</h3></div>
-                          <div className="relative"><input type="number" value={formData.currentBalance} onChange={(e) => updateForm({ ...formData, currentBalance: parseFloat(e.target.value) || 0 })} className="w-full text-2xl font-bold text-slate-800 bg-slate-50 border border-slate-200 rounded-xl p-3 pl-4 focus:border-indigo-500 outline-none transition-all" placeholder="0" /><span className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold">€</span></div>
+                          {/* Utilisation de type="text" pour accepter les virgules + parseNumber au changement */}
+                          <div className="relative"><input type="text" value={formData.currentBalance} onChange={(e) => updateForm({ ...formData, currentBalance: parseNumber(e.target.value) })} className="w-full text-2xl font-bold text-slate-800 bg-slate-50 border border-slate-200 rounded-xl p-3 pl-4 focus:border-indigo-500 outline-none transition-all" placeholder="0" /><span className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold">€</span></div>
                       </Card>
                       <Card className="p-6 border-l-4 border-l-emerald-500">
                           <div className="flex items-center gap-2 mb-4"><div className="p-2 bg-emerald-50 text-emerald-600 rounded-lg"><Shield size={20} /></div><h3 className="font-bold text-slate-800">Épargne Dispo</h3></div>
-                          <div className="relative"><input type="number" value={formData.savings} onChange={(e) => updateForm({ ...formData, savings: e.target.value })} className="w-full text-2xl font-bold text-slate-800 bg-slate-50 border border-slate-200 rounded-xl p-3 pl-4 focus:border-emerald-500 outline-none transition-all" placeholder="0" /><span className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold">€</span></div>
+                          <div className="relative"><input type="text" value={formData.savings} onChange={(e) => updateForm({ ...formData, savings: parseNumber(e.target.value) })} className="w-full text-2xl font-bold text-slate-800 bg-slate-50 border border-slate-200 rounded-xl p-3 pl-4 focus:border-emerald-500 outline-none transition-all" placeholder="0" /><span className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold">€</span></div>
                       </Card>
                   </div>
 
@@ -293,12 +376,13 @@ export default function ProfilePage() {
 
                   {/* 2. LE SWITCH INVESTISSEMENT */}
                   <div className="bg-slate-50 rounded-2xl p-6 border border-slate-200">
-                      <div className="flex items-center justify-between cursor-pointer" onClick={() => setShowInvestments(!showInvestments)}>
+                      
+                      <div className="flex items-center justify-between cursor-pointer" onClick={toggleInvestments}>
                           <div className="flex items-center gap-3">
                               <div className={`p-2 rounded-lg ${showInvestments ? 'bg-purple-100 text-purple-600' : 'bg-slate-200 text-slate-500'}`}><TrendingUp size={20} /></div>
                               <div>
                                   <h3 className="font-bold text-slate-800">As-tu des placements financiers ?</h3>
-                                  <p className="text-xs text-slate-500">Bourse, Crypto, Immobilier Locatif, SCPI...</p>
+                                  <p className="text-xs text-slate-500">Bourse, Crypto, Immobilier... ou Épargne mensuelle programmée</p>
                               </div>
                           </div>
                           <div className={`w-12 h-6 rounded-full p-1 transition-colors duration-300 ${showInvestments ? 'bg-purple-600' : 'bg-slate-300'}`}>
@@ -310,13 +394,14 @@ export default function ProfilePage() {
                       {showInvestments && (
                           <div className="mt-6 pt-6 border-t border-slate-200 animate-slide-up">
                               <Card className="p-6 border-l-4 border-l-purple-500 bg-white shadow-sm mb-4">
-                                  <div className="flex items-center gap-2 mb-4"><h3 className="font-bold text-slate-800">Montant total investi</h3></div>
+                                  <div className="flex items-center gap-2 mb-4"><h3 className="font-bold text-slate-800">Montant total investi (Stock)</h3></div>
                                   <div className="flex gap-4 items-center">
-                                      <div className="relative flex-1"><input type="number" value={formData.investments || ''} onChange={(e) => updateForm({ ...formData, investments: parseFloat(e.target.value) || 0 })} className="w-full text-2xl font-bold text-slate-800 bg-slate-50 border border-slate-200 rounded-xl p-3 pl-4 focus:border-purple-500 outline-none transition-all" placeholder="0" /><span className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold">€</span></div>
-                                      <div className="relative w-32"><input type="number" value={formData.investmentYield || ''} onChange={(e) => updateForm({ ...formData, investmentYield: parseFloat(e.target.value) || 0 })} className="w-full text-xl font-bold text-purple-700 bg-purple-50 border border-purple-100 rounded-xl p-3 text-center outline-none" placeholder="5" /><span className="absolute right-2 top-1/2 -translate-y-1/2 text-purple-300 text-xs font-bold">% /an</span></div>
+                                      {/* Utilisation de type="text" pour accepter les virgules + parseNumber au changement */}
+                                      <div className="relative flex-1"><input type="text" value={formData.investments || ''} onChange={(e) => updateForm({ ...formData, investments: e.target.value })} className="w-full text-2xl font-bold text-slate-800 bg-slate-50 border border-slate-200 rounded-xl p-3 pl-4 focus:border-purple-500 outline-none transition-all" placeholder="0" /><span className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold">€</span></div>
+                                      <div className="relative w-32"><input type="text" value={formData.investmentYield || ''} onChange={(e) => updateForm({ ...formData, investmentYield: e.target.value })} className="w-full text-xl font-bold text-purple-700 bg-purple-50 border border-purple-100 rounded-xl p-3 text-center outline-none" placeholder="5" /><span className="absolute right-2 top-1/2 -translate-y-1/2 text-purple-300 text-xs font-bold">% /an</span></div>
                                   </div>
                               </Card>
-                              <AccordionSection mode="expert" defaultOpen={true} title="Virements mensuels vers ces comptes" icon={PiggyBank} colorClass="text-purple-600" items={formData.savingsContributions} onItemChange={(id, f, v) => updateItem('savingsContributions', id, f, v)} onItemAdd={() => addItem('savingsContributions')} onItemRemove={(id) => removeItem('savingsContributions', id)} description="Ton effort d'épargne automatique." />
+                              <AccordionSection mode="expert" defaultOpen={true} title="Virements mensuels vers ces comptes" icon={PiggyBank} colorClass="text-purple-600" items={formData.savingsContributions} onItemChange={(id, f, v) => updateItem('savingsContributions', id, f, v)} onItemAdd={() => addItem('savingsContributions')} onItemRemove={(id) => removeItem('savingsContributions', id)} description="Ton effort d'épargne automatique (ex: Virement Livret A, PEA...)" />
                           </div>
                       )}
                   </div>
@@ -334,7 +419,7 @@ export default function ProfilePage() {
                                   <p className="text-indigo-200 text-sm mb-4">Une fois tout payé, il te reste :</p>
                                   <div className="text-5xl font-black tracking-tight text-white mb-8">{formatCurrency(stats.remainingToLive)}</div>
                                   <p className="text-indigo-100 font-medium mb-3">Budget <strong>Plaisirs / Courses</strong> ?</p>
-                                  <div className="relative"><input type="number" value={formData.variableCosts || ''} onChange={(e) => updateForm({ ...formData, variableCosts: parseFloat(e.target.value) || 0 })} className="w-full p-4 pl-6 pr-12 bg-white/10 border border-white/20 rounded-2xl text-3xl font-bold text-white placeholder:text-white/30 focus:bg-white/20 outline-none backdrop-blur-sm transition-all shadow-inner" placeholder="0" /><span className="absolute right-6 top-1/2 -translate-y-1/2 text-indigo-200 font-medium">€</span></div>
+                                  <div className="relative"><input type="text" value={formData.variableCosts || ''} onChange={(e) => updateForm({ ...formData, variableCosts: parseNumber(e.target.value) })} className="w-full p-4 pl-6 pr-12 bg-white/10 border border-white/20 rounded-2xl text-3xl font-bold text-white placeholder:text-white/30 focus:bg-white/20 outline-none backdrop-blur-sm transition-all shadow-inner" placeholder="0" /><span className="absolute right-6 top-1/2 -translate-y-1/2 text-indigo-200 font-medium">€</span></div>
                               </div>
                               <div className="bg-white/10 backdrop-blur-md rounded-2xl p-6 border border-white/10">
                                   <div className="flex justify-between items-center mb-4"><span className="text-xs font-bold uppercase tracking-wider text-indigo-300">Capacité d&apos;épargne réelle</span>{stats.capacityToSave > 0 ? <CheckCircle size={16} className="text-emerald-400" /> : <AlertTriangle size={16} className="text-rose-400" />}</div>
@@ -349,8 +434,8 @@ export default function ProfilePage() {
 
           {/* NAV */}
           <div className="flex justify-between items-center pt-8 mt-8 border-t border-slate-100">
-              <button onClick={goPrev} disabled={currentStep === 1} className={`px-6 py-3 font-bold rounded-xl transition-colors flex items-center gap-2 ${currentStep === 1 ? 'text-slate-300 cursor-not-allowed' : 'text-slate-500 hover:bg-slate-100'}`}><ChevronLeft size={20} /> Précédent</button>
-              <Button onClick={goNext} disabled={isSaving} className="px-8 py-4 shadow-xl flex items-center gap-2 bg-slate-900 hover:bg-slate-800 text-white">{isSaving ? 'Sauvegarde...' : currentStep === 4 ? 'Valider et Terminer' : 'Continuer'} {(!isSaving && currentStep < 4) && <ArrowRight size={20} />}</Button>
+              <button onClick={goPrev} disabled={currentStep === 1} type="button" className={`px-6 py-3 font-bold rounded-xl transition-colors flex items-center gap-2 ${currentStep === 1 ? 'text-slate-300 cursor-not-allowed' : 'text-slate-500 hover:bg-slate-100'}`}><ChevronLeft size={20} /> Précédent</button>
+              <Button onClick={goNext} disabled={isSaving} type="button" className="px-8 py-4 shadow-xl flex items-center gap-2 bg-slate-900 hover:bg-slate-800 text-white">{isSaving ? 'Sauvegarde...' : currentStep === 4 ? 'Valider et Terminer' : 'Continuer'} {(!isSaving && currentStep < 4) && <ArrowRight size={20} />}</Button>
           </div>
 
         </div>

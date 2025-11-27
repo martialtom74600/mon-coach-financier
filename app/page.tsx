@@ -136,6 +136,7 @@ function DashboardView() {
 
   // --- RENDU DU DASHBOARD ---
   // Note : Pas de <main>, pas de padding externe, pas de max-w. Le RootLayout s'en occupe.
+  // On commence DIRECTEMENT par la grille.
   return (
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start animate-fade-in">
         
