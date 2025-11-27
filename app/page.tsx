@@ -1,8 +1,8 @@
 'use client';
 
-import React, { useMemo } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation'; // 1. On ajoute useSearchParams
-import { useAuth, SignIn, SignUp } from '@clerk/nextjs';      // 2. On importe aussi SignUp
+import React, { useMemo, Suspense } from 'react'; // 1. J'ai ajouté Suspense ici
+import { useRouter, useSearchParams } from 'next/navigation';
+import { useAuth, SignIn, SignUp } from '@clerk/nextjs';
 import { clerkAppearanceHybrid } from '@/app/config/clerk-theme';
 
 // --- IMPORTS RÉELS ---
@@ -103,7 +103,7 @@ const BudgetRow = ({ label, icon: Icon, amount, total, color, subtext = null }: 
 };
 
 // ============================================================================
-// 2. DASHBOARD (VUE CONNECTÉE) - Je garde intact
+// 2. DASHBOARD (VUE CONNECTÉE)
 // ============================================================================
 
 function DashboardView() {
@@ -247,37 +247,22 @@ function DashboardView() {
 }
 
 // ============================================================================
-// 3. PAGE PRINCIPALE (Aiguilleur) - LA MAGIE EST ICI
+// 3. COMPOSANT AUTH SCREEN (C'est lui qui gère la logique d'affichage)
 // ============================================================================
 
-export default function Home() {
-  const { isLoaded, isSignedIn } = useAuth();
+function AuthScreen() {
+    // On lit l'URL
+    const searchParams = useSearchParams();
+    const isSignUpMode = searchParams.get('mode') === 'signup';
   
-  // 3. ON AJOUTE CECI POUR LIRE L'URL SANS RECHARGER LA PAGE
-  const searchParams = useSearchParams();
-  const isSignUpMode = searchParams.get('mode') === 'signup';
-
-  if (!isLoaded) {
-    return (
-      <div className="animate-pulse grid grid-cols-1 lg:grid-cols-12 gap-6">
-         <div className="lg:col-span-4 h-96 bg-slate-200 rounded-3xl"></div>
-         <div className="lg:col-span-8 h-96 bg-slate-200 rounded-3xl"></div>
-      </div>
-    );
-  }
-
-  // LOGIN / SIGNUP PAGE (Plein écran)
-  // On utilise le même code, on change juste le composant à droite
-  if (!isSignedIn) {
     return (
       <div className="min-h-screen w-full bg-slate-50 flex md:grid md:grid-cols-2">
-        {/* MARKETING GAUCHE - FIXE, IL NE BOUGE PAS ! */}
+        {/* MARKETING GAUCHE */}
         <div className="hidden md:flex flex-col justify-center p-12 lg:p-20 bg-indigo-600 text-white relative overflow-hidden">
            <div className="absolute top-0 right-0 p-40 bg-white opacity-5 rounded-full blur-3xl transform translate-x-20 -translate-y-20"></div>
            <div className="max-w-md mx-auto space-y-8 relative z-10">
              <div className="h-14 w-14 bg-white/10 rounded-2xl flex items-center justify-center backdrop-blur-md border border-white/20 shadow-xl"><TrendingUp size={32} /></div>
              
-             {/* TEXTE QUI CHANGE LÉGÈREMENT SELON LE MODE */}
              {isSignUpMode ? (
                <>
                  <h1 className="text-4xl lg:text-5xl font-black tracking-tight leading-tight">Rejoignez l'aventure.</h1>
@@ -291,31 +276,61 @@ export default function Home() {
              )}
            </div>
         </div>
-
+  
         {/* FORMULAIRE DROITE */}
         <div className="flex-1 flex flex-col items-center justify-center p-4 md:p-12 bg-slate-50">
           <div className="w-full max-w-md">
              <div className="md:hidden text-center mb-8"><h1 className="text-2xl font-black text-slate-900">Mon Coach</h1></div>
              
-             {/* 4. LE SWITCH : On reste sur la même page, on change juste le composant */}
+             {/* C'EST ICI LA CLÉ DU SUCCÈS : key="..." */}
              {isSignUpMode ? (
                 // MODE INSCRIPTION
                 <SignUp 
+                    key="signup" // <-- FORCE REACT À RAFRAICHIR
+                    routing="path" // <-- GÈRE MIEUX L'URL
                     appearance={clerkAppearanceHybrid} 
-                    signInUrl="/?mode=login" // <--- L'ASTUCE EST LÀ : on renvoie vers la page actuelle
+                    signInUrl="/?mode=login" 
                     forceRedirectUrl="/" 
                 />
              ) : (
                 // MODE CONNEXION
                 <SignIn 
+                    key="login" // <-- FORCE REACT À RAFRAICHIR
+                    routing="path" // <-- GÈRE MIEUX L'URL
                     appearance={clerkAppearanceHybrid} 
-                    signUpUrl="/?mode=signup" // <--- L'ASTUCE EST LÀ : on renvoie vers la page actuelle
+                    signUpUrl="/?mode=signup" 
                     forceRedirectUrl="/" 
                 />
              )}
           </div>
         </div>
       </div>
+    );
+}
+
+// ============================================================================
+// 4. PAGE PRINCIPALE (Aiguilleur)
+// ============================================================================
+
+export default function Home() {
+  const { isLoaded, isSignedIn } = useAuth();
+
+  if (!isLoaded) {
+    return (
+      <div className="animate-pulse grid grid-cols-1 lg:grid-cols-12 gap-6">
+         <div className="lg:col-span-4 h-96 bg-slate-200 rounded-3xl"></div>
+         <div className="lg:col-span-8 h-96 bg-slate-200 rounded-3xl"></div>
+      </div>
+    );
+  }
+
+  // LOGIN / SIGNUP PAGE (Plein écran)
+  // On utilise Suspense car on lit les paramètres d'URL
+  if (!isSignedIn) {
+    return (
+        <Suspense fallback={<div className="min-h-screen bg-slate-50 flex items-center justify-center"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div></div>}>
+            <AuthScreen />
+        </Suspense>
     );
   }
 
