@@ -1,137 +1,223 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Loader2, AlertCircle } from 'lucide-react';
+import { 
+  ChevronLeft, ChevronRight, Calendar as CalendarIcon, 
+  Loader2, AlertCircle, X, CreditCard, ShoppingBag 
+} from 'lucide-react';
 import { formatCurrency } from '@/app/lib/logic';
 
-const CalendarView = ({ timeline }: { timeline: any[] }) => {
-  const [currentMonthIndex, setCurrentMonthIndex] = useState(0);
-
-  // Reset l'index si la timeline change (pour éviter de pointer sur un mois qui n'existe plus)
-  useEffect(() => {
-    setCurrentMonthIndex(0);
-  }, [timeline]);
-
-  // SÉCURITÉ 1 : Chargement
-  if (!timeline) {
-    return (
-      <div className="bg-white rounded-3xl border border-slate-200 p-12 flex flex-col items-center justify-center text-slate-400 min-h-[400px]">
-        <Loader2 size={32} className="animate-spin mb-3 text-indigo-500" />
-        <p className="text-sm font-medium">Chargement...</p>
-      </div>
-    );
-  }
-
-  // SÉCURITÉ 2 : Pas de données
-  if (timeline.length === 0) {
-    return (
-      <div className="bg-white rounded-3xl border border-slate-200 p-12 flex flex-col items-center justify-center text-slate-400 min-h-[400px]">
-        <AlertCircle size={32} className="mb-3 text-slate-300" />
-        <p className="text-sm font-medium">Aucune projection disponible.</p>
-        <p className="text-xs mt-2">Vérifie que ton profil contient des revenus ou un solde initial.</p>
-      </div>
-    );
-  }
-
-  const currentMonth = timeline[currentMonthIndex];
-
-  // SÉCURITÉ 3 : Index hors limite
-  if (!currentMonth) return null;
-
-  const goNext = () => {
-    if (currentMonthIndex < timeline.length - 1) setCurrentMonthIndex(currentMonthIndex + 1);
-  };
-
-  const goPrev = () => {
-    if (currentMonthIndex > 0) setCurrentMonthIndex(currentMonthIndex - 1);
-  };
-
-  // Calcul des cases vides (Décalage du 1er jour pour que le mois commence bien sous le bon jour)
-  // On sécurise la date par défaut
-  const firstDateStr = currentMonth.days && currentMonth.days[0] ? currentMonth.days[0].date : new Date().toISOString();
-  const firstDayObj = new Date(firstDateStr);
-  const firstDayIndex = firstDayObj.getDay(); // 0 = Dimanche
-  
-  // On veut Lundi = 0 ... Dimanche = 6
-  const startOffset = firstDayIndex === 0 ? 6 : firstDayIndex - 1; 
-  const blanks = Array(Math.max(0, startOffset)).fill(null);
+// --- COMPOSANT MODAL (Détail du jour) ---
+const DayDetailModal = ({ day, onClose }: { day: any, onClose: () => void }) => {
+  if (!day) return null;
 
   return (
-    <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden animate-fade-in">
-      
-      {/* HEADER */}
-      <div className="flex items-center justify-between p-6 border-b border-slate-100">
-        <button onClick={goPrev} disabled={currentMonthIndex === 0} className="p-2 rounded-xl hover:bg-slate-100 disabled:opacity-30 transition-colors text-slate-600">
-            <ChevronLeft size={24} />
-        </button>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in" onClick={onClose}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden animate-slide-up" onClick={e => e.stopPropagation()}>
         
-        <div className="flex flex-col items-center">
-            <h3 className="text-xl font-black text-slate-800 capitalize flex items-center gap-2">
-                <CalendarIcon size={20} className="text-indigo-500" />
-                {currentMonth.label}
+        {/* Header Modal */}
+        <div className="bg-slate-50 p-4 border-b border-slate-100 flex justify-between items-center">
+          <div>
+            <h3 className="font-bold text-slate-800 text-lg">
+              {new Date(day.date).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })}
             </h3>
-            <span className="text-xs font-medium text-slate-400 uppercase tracking-widest mt-1">
-                Solde Fin de mois : <span className={currentMonth.stats.balanceEnd < 0 ? 'text-rose-500' : 'text-emerald-600'}>{formatCurrency(currentMonth.stats.balanceEnd)}</span>
-            </span>
+            <div className={`text-sm font-bold ${day.balance < 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
+              Solde : {formatCurrency(day.balance)}
+            </div>
+          </div>
+          <button onClick={onClose} className="p-2 bg-white rounded-full hover:bg-slate-200 transition-colors text-slate-500">
+            <X size={20} />
+          </button>
         </div>
 
-        <button onClick={goNext} disabled={currentMonthIndex === timeline.length - 1} className="p-2 rounded-xl hover:bg-slate-100 disabled:opacity-30 transition-colors text-slate-600">
-            <ChevronRight size={24} />
-        </button>
-      </div>
-
-      {/* JOURS SEMAINE */}
-      <div className="grid grid-cols-7 border-b border-slate-100 bg-slate-50/50">
-        {['LUN', 'MAR', 'MER', 'JEU', 'VEN', 'SAM', 'DIM'].map(d => (
-            <div key={d} className="py-3 text-center text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                {d}
-            </div>
-        ))}
-      </div>
-
-      {/* GRILLE */}
-      <div className="grid grid-cols-7 auto-rows-fr bg-white">
-        {/* Cases vides début de mois */}
-        {blanks.map((_, i) => <div key={`blank-${i}`} className="min-h-[100px] sm:min-h-[120px] bg-slate-50/30 border-b border-r border-slate-50"></div>)}
-
-        {/* Jours réels */}
-        {currentMonth.days && currentMonth.days.map((day: any) => {
-            const isNegative = day.balance < 0;
-            
-            return (
-                <div key={day.date} className={`min-h-[100px] sm:min-h-[120px] border-b border-r border-slate-100 p-2 relative group hover:bg-slate-50 transition-colors flex flex-col justify-between ${isNegative ? 'bg-rose-50/30' : ''}`}>
-                    
-                    {/* En-tête jour */}
-                    <div className="flex justify-between items-start mb-2">
-                        <span className={`text-xs sm:text-sm font-bold ${isNegative ? 'text-rose-600' : 'text-slate-400 group-hover:text-slate-600'}`}>
-                            {day.dayOfMonth}
-                        </span>
-                        <span className={`text-[9px] sm:text-[10px] font-bold px-1.5 py-0.5 rounded-md ${isNegative ? 'bg-rose-100 text-rose-600' : 'bg-indigo-50 text-indigo-600'}`}>
-                            {formatCurrency(day.balance)}
-                        </span>
-                    </div>
-
-                    {/* Liste événements */}
-                    <div className="space-y-1 flex-1 overflow-hidden">
-                        {day.events.slice(0, 3).map((e: any) => (
-                            <div key={e.id} className={`text-[8px] sm:text-[9px] truncate px-1 py-0.5 rounded-sm font-medium flex justify-between items-center ${e.amount < 0 ? 'text-slate-600 bg-slate-100' : 'text-emerald-700 bg-emerald-50'}`}>
-                                <span className="truncate mr-1">{e.name}</span>
-                                <span className="font-bold opacity-80">{Math.round(Math.abs(e.amount))}</span>
-                            </div>
-                        ))}
-                        {day.events.length > 3 && (
-                            <div className="text-[9px] text-slate-400 pl-1 italic">
-                                + {day.events.length - 3} autres
-                            </div>
-                        )}
-                    </div>
-
+        {/* Liste des événements */}
+        <div className="p-4 max-h-[60vh] overflow-y-auto custom-scrollbar space-y-2">
+          {day.events.length === 0 ? (
+            <p className="text-center text-slate-400 text-sm py-4 italic">Aucune opération ce jour-là.</p>
+          ) : (
+            day.events.map((e: any) => (
+              <div key={e.id} className="flex items-center justify-between p-3 rounded-xl border border-slate-100 hover:border-indigo-100 hover:bg-indigo-50/30 transition-colors">
+                <div className="flex items-center gap-3 overflow-hidden">
+                  <div className={`p-2 rounded-lg shrink-0 ${e.amount < 0 ? 'bg-rose-50 text-rose-500' : 'bg-emerald-50 text-emerald-500'}`}>
+                    {e.type === 'debt' ? <CreditCard size={16} /> : <ShoppingBag size={16} />}
+                  </div>
+                  <span className="text-sm font-bold text-slate-700 truncate">{e.name}</span>
                 </div>
-            );
-        })}
+                <span className={`text-sm font-bold shrink-0 ${e.amount < 0 ? 'text-slate-800' : 'text-emerald-600'}`}>
+                  {e.amount > 0 ? '+' : ''}{formatCurrency(e.amount)}
+                </span>
+              </div>
+            ))
+          )}
+        </div>
       </div>
     </div>
   );
 };
+
+// --- COMPOSANT PRINCIPAL ---
+const CalendarView = ({ timeline }: { timeline: any[] }) => {
+  const [currentMonthIndex, setCurrentMonthIndex] = useState(0);
+  const [selectedDay, setSelectedDay] = useState<any>(null); // État pour la popup
+
+  useEffect(() => { setCurrentMonthIndex(0); }, [timeline]);
+
+  if (!timeline) return <LoadingState message="Chargement..." />;
+  if (timeline.length === 0) return <EmptyState />;
+
+  const currentMonth = timeline[currentMonthIndex];
+  if (!currentMonth) return null;
+
+  const goNext = () => currentMonthIndex < timeline.length - 1 && setCurrentMonthIndex(currentMonthIndex + 1);
+  const goPrev = () => currentMonthIndex > 0 && setCurrentMonthIndex(currentMonthIndex - 1);
+
+  // Calculs Grille Desktop
+  const firstDateStr = currentMonth.days && currentMonth.days[0] ? currentMonth.days[0].date : new Date().toISOString();
+  const firstDayIndex = new Date(firstDateStr).getDay(); 
+  const startOffset = firstDayIndex === 0 ? 6 : firstDayIndex - 1; 
+  const blanks = Array(Math.max(0, startOffset)).fill(null);
+
+  return (
+    <>
+      {/* POPUP DÉTAIL */}
+      {selectedDay && <DayDetailModal day={selectedDay} onClose={() => setSelectedDay(null)} />}
+
+      <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden animate-fade-in flex flex-col h-full">
+        
+        {/* HEADER */}
+        <div className="flex items-center justify-between p-4 md:p-6 border-b border-slate-100 bg-white sticky top-0 z-10">
+          <button onClick={goPrev} disabled={currentMonthIndex === 0} className="p-2 rounded-full hover:bg-slate-100 disabled:opacity-30 text-slate-600 transition-colors">
+              <ChevronLeft size={24} />
+          </button>
+          
+          <div className="flex flex-col items-center">
+              <h3 className="text-lg md:text-xl font-black text-slate-800 capitalize flex items-center gap-2">
+                  <CalendarIcon size={18} className="text-indigo-500 hidden md:block" />
+                  {currentMonth.label}
+              </h3>
+              <div className={`text-xs font-bold px-3 py-1 rounded-full mt-1 ${currentMonth.stats.balanceEnd < 0 ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                  Fin : {formatCurrency(currentMonth.stats.balanceEnd)}
+              </div>
+          </div>
+
+          <button onClick={goNext} disabled={currentMonthIndex === timeline.length - 1} className="p-2 rounded-full hover:bg-slate-100 disabled:opacity-30 text-slate-600 transition-colors">
+              <ChevronRight size={24} />
+          </button>
+        </div>
+
+        {/* VUE MOBILE (Liste) */}
+        <div className="block md:hidden bg-slate-50">
+          {currentMonth.days.map((day: any) => {
+             const isToday = new Date().toDateString() === new Date(day.date).toDateString();
+             if (day.events.length === 0 && !isToday) return null; 
+
+             return (
+               <div key={day.date} className={`p-4 border-b border-slate-200 ${isToday ? 'bg-indigo-50' : 'bg-white'}`}>
+                  <div className="flex justify-between items-center mb-3">
+                      <div className="flex items-center gap-3">
+                          <div className={`w-10 h-10 rounded-xl flex flex-col items-center justify-center border ${isToday ? 'bg-indigo-600 border-indigo-600 text-white' : 'bg-white border-slate-200 text-slate-700'}`}>
+                              <span className="text-[10px] font-bold uppercase leading-none">{new Date(day.date).toLocaleDateString('fr-FR', { weekday: 'short' }).slice(0, 3)}</span>
+                              <span className="text-lg font-black leading-none">{day.dayOfMonth}</span>
+                          </div>
+                          <div>
+                              {isToday && <span className="text-[10px] font-bold text-indigo-600 uppercase tracking-wider">Aujourd'hui</span>}
+                          </div>
+                      </div>
+                      <div className={`text-lg font-black ${day.balance < 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
+                          {formatCurrency(day.balance)}
+                      </div>
+                  </div>
+                  <div className="space-y-2 pl-[52px]">
+                      {day.events.map((e: any) => (
+                          <div key={e.id} className="flex justify-between items-center text-sm">
+                              <span className="text-slate-600 truncate pr-2">{e.name}</span>
+                              <span className={`font-bold whitespace-nowrap ${e.amount < 0 ? 'text-slate-800' : 'text-emerald-600'}`}>
+                                  {e.amount > 0 ? '+' : ''}{Math.round(e.amount)}€
+                              </span>
+                          </div>
+                      ))}
+                  </div>
+               </div>
+             );
+          })}
+        </div>
+
+        {/* VUE DESKTOP (Grille Carrée Fixe) */}
+        <div className="hidden md:block">
+          <div className="grid grid-cols-7 border-b border-slate-100 bg-slate-50/50">
+              {['LUN', 'MAR', 'MER', 'JEU', 'VEN', 'SAM', 'DIM'].map(d => (
+                  <div key={d} className="py-3 text-center text-[10px] font-bold text-slate-400 uppercase tracking-widest">{d}</div>
+              ))}
+          </div>
+
+          <div className="grid grid-cols-7 auto-rows-fr bg-white">
+              {blanks.map((_, i) => <div key={`blank-${i}`} className="h-32 bg-slate-50/30 border-b border-r border-slate-50"></div>)}
+
+              {currentMonth.days.map((day: any) => {
+                  const isNegative = day.balance < 0;
+                  const isToday = new Date().toDateString() === new Date(day.date).toDateString();
+                  // On limite à 2 événements max pour garder la hauteur fixe
+                  const visibleEvents = day.events.slice(0, 2);
+                  const hiddenCount = Math.max(0, day.events.length - 2);
+                  
+                  return (
+                      <div 
+                        key={day.date} 
+                        onClick={() => setSelectedDay(day)} // Clic pour ouvrir la popup
+                        className={`h-32 border-b border-r border-slate-100 p-2 relative group hover:bg-indigo-50/50 transition-colors flex flex-col cursor-pointer ${isToday ? 'bg-indigo-50/20 ring-1 ring-inset ring-indigo-100' : ''}`}
+                      >
+                          {/* Date & Solde */}
+                          <div className="flex justify-between items-start mb-2">
+                              <span className={`text-sm font-bold w-6 h-6 flex items-center justify-center rounded-full ${isToday ? 'bg-indigo-600 text-white' : 'text-slate-400 group-hover:text-indigo-600'}`}>
+                                  {day.dayOfMonth}
+                              </span>
+                              {day.balance !== null && (
+                                  <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md ${isNegative ? 'bg-rose-100 text-rose-700' : 'bg-emerald-50 text-emerald-700'}`}>
+                                      {Math.round(day.balance)}€
+                                  </span>
+                              )}
+                          </div>
+
+                          {/* Événements (Limités à 2) */}
+                          <div className="space-y-1 flex-1 overflow-hidden">
+                              {visibleEvents.map((e: any) => (
+                                  <div key={e.id} className={`text-[9px] px-1.5 py-1 rounded-sm flex justify-between items-center ${e.amount < 0 ? 'bg-slate-100 text-slate-600' : 'bg-emerald-50 text-emerald-700'}`}>
+                                      <span className="truncate font-medium max-w-[60%]">{e.name}</span>
+                                      <span className="font-bold opacity-80">{Math.round(Math.abs(e.amount))}</span>
+                                  </div>
+                              ))}
+                              
+                              {/* Indicateur "+ X autres" */}
+                              {hiddenCount > 0 && (
+                                  <div className="text-[9px] text-center text-slate-400 font-medium bg-slate-50 rounded-sm py-0.5 mt-auto">
+                                      + {hiddenCount} autres
+                                  </div>
+                              )}
+                          </div>
+                      </div>
+                  );
+              })}
+          </div>
+        </div>
+
+      </div>
+    </>
+  );
+};
+
+// --- STATES ---
+const LoadingState = ({ message }: { message: string }) => (
+  <div className="bg-white rounded-3xl border border-slate-200 p-12 flex flex-col items-center justify-center text-slate-400 min-h-[400px]">
+    <Loader2 size={32} className="animate-spin mb-3 text-indigo-500" />
+    <p className="text-sm font-medium">{message}</p>
+  </div>
+);
+
+const EmptyState = () => (
+  <div className="bg-white rounded-3xl border border-slate-200 p-12 flex flex-col items-center justify-center text-slate-400 min-h-[400px]">
+    <AlertCircle size={32} className="mb-3 text-slate-300" />
+    <p className="text-sm font-medium">Aucune donnée.</p>
+  </div>
+);
 
 export default CalendarView;
