@@ -165,18 +165,29 @@ function DashboardView() {
 
             <Button onClick={() => router.push('/simulator')} className="w-full shadow-lg py-4"><Zap size={20} /> Simuler un nouvel achat</Button>
 
-            {/* CARTE PATRIMOINE */}
-            <Card className="p-6 bg-slate-900 text-white border-none relative overflow-hidden group hover:shadow-xl transition-all">
-                <div className="absolute top-0 right-0 p-32 bg-indigo-500 rounded-full opacity-10 blur-3xl transform translate-x-10 -translate-y-10 group-hover:opacity-20 transition-opacity"></div>
+            {/* CARTE PATRIMOINE CORRIGÉE */}
+            <Card className="p-6 !bg-slate-900 !text-white border-none relative overflow-hidden group hover:shadow-xl transition-all shadow-2xl">
+                {/* Effet de fond lumineux discret */}
+                <div className="absolute top-0 right-0 p-32 bg-indigo-600 rounded-full opacity-20 blur-3xl transform translate-x-10 -translate-y-10 group-hover:opacity-30 transition-opacity pointer-events-none"></div>
+                
                 <div className="relative z-10">
-                    <div className="flex items-center gap-3 mb-4 text-slate-400">
-                        <Layers size={20} /> <span className="text-sm font-bold uppercase tracking-wider">Patrimoine Net</span>
+                    <div className="flex items-center gap-3 mb-4 text-slate-300">
+                        <Layers size={20} className="text-indigo-400" /> 
+                        <span className="text-sm font-bold uppercase tracking-wider opacity-80">Patrimoine Net</span>
                     </div>
-                    <div className="text-4xl font-black tracking-tight mb-1">{formatCurrency(stats.totalWealth)}</div>
+                    
+                    {/* LE MONTANT (En très gros et très blanc) */}
+                    <div className="text-4xl lg:text-5xl font-black tracking-tight mb-2 text-white drop-shadow-md">
+                        {formatCurrency(stats.totalWealth)}
+                    </div>
+
+                    {/* SOUS-TEXTE (Investissements) */}
                     {stats.investments > 0 && (
-                        <div className="text-xs text-slate-400 flex justify-between items-center mt-4 pt-4 border-t border-slate-700">
-                            <span>Dont Investi</span>
-                            <span className="text-emerald-400 font-bold">{formatCurrency(stats.investments)}</span>
+                        <div className="text-xs font-medium text-slate-300 flex justify-between items-center mt-4 pt-4 border-t border-slate-700/50">
+                            <span className="opacity-70">Dont placements</span>
+                            <span className="text-emerald-400 font-bold bg-emerald-400/10 px-2 py-1 rounded-md">
+                                {formatCurrency(stats.investments)}
+                            </span>
                         </div>
                     )}
                 </div>
