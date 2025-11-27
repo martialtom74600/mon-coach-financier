@@ -62,7 +62,7 @@ export function useFinancialData() {
   // FONCTION INTERNE POUR ENVOYER À L'API
   const pushToDB = async (dataToSave: any) => {
     if (!user) return;
-    console.log("💾 Sauvegarde IMMÉDIATE vers Postgres...", dataToSave); 
+    // console.log("💾 Sauvegarde vers Postgres...", dataToSave); 
     try {
       const response = await fetch('/api/user', {
         method: 'POST',
@@ -70,40 +70,34 @@ export function useFinancialData() {
         body: JSON.stringify(dataToSave),
       });
       if (!response.ok) throw new Error('Erreur API');
-      return await response.json(); // On retourne la réponse pour pouvoir l'attendre
+      return await response.json(); 
     } catch (error) {
       console.error("Erreur de sauvegarde:", error);
-      throw error; // On remonte l'erreur pour que le bouton le sache
+      throw error; 
     }
   };
 
   // 2. SAUVEGARDER LE PROFIL (INTELLIGENT)
-  // forceImmediate = true permet de contourner le délai (pour le bouton "Sauvegarder")
   const saveProfile = async (newProfile: any, forceImmediate = false) => {
-    // Mise à jour visuelle locale
     const updatedProfile = { ...profile, ...newProfile };
     setProfile(updatedProfile); 
 
-    // Annulation du timer précédent s'il y en a un
     if (saveTimeoutRef.current) {
       clearTimeout(saveTimeoutRef.current);
       saveTimeoutRef.current = null;
     }
 
     if (forceImmediate) {
-      // CAS 1 : Clic sur "Sauvegarder et Quitter" -> On envoie tout de suite et on attend la réponse
       return await pushToDB({ ...updatedProfile, history });
     } else {
-      // CAS 2 : Frappe au clavier -> On attend 1s pour ne pas spammer
       saveTimeoutRef.current = setTimeout(() => {
         pushToDB({ ...updatedProfile, history });
       }, 1000);
-      // On retourne une promesse vide immédiate pour ne pas bloquer l'UI
       return Promise.resolve();
     }
   };
 
-  // 3. SAUVEGARDER UNE DÉCISION (Historique)
+  // 3. SAUVEGARDER UNE DÉCISION (AJOUT)
   const saveDecision = async (decision: any) => {
     const newHistory = [...history, decision];
     setHistory(newHistory);
@@ -113,11 +107,28 @@ export function useFinancialData() {
     return await pushToDB({ ...profile, history: newHistory });
   };
 
+  // 4. SUPPRIMER UNE DÉCISION (NOUVEAU)
+  const deleteDecision = async (idToDelete: string) => {
+    // A. On met à jour l'interface tout de suite (Optimistic UI)
+    const newHistory = history.filter((item: any) => item.id !== idToDelete);
+    setHistory(newHistory);
+
+    // B. On annule tout timer en cours pour éviter les conflits
+    if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+        saveTimeoutRef.current = null;
+    }
+
+    // C. On sauvegarde la nouvelle liste nettoyée en base
+    return await pushToDB({ ...profile, history: newHistory });
+  };
+
   return {
     profile,
     history,
     saveProfile,
     saveDecision,
+    deleteDecision, // <--- On exporte la nouvelle fonction
     isLoaded: isClerkLoaded && !isLoadingData,
     user
   };

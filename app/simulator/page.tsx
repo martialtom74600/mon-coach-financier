@@ -4,12 +4,12 @@ import { useState, useMemo, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useFinancialData } from '@/app/hooks/useFinancialData';
 import {
-  calculateFinancials,
   analyzePurchaseImpact,
   formatCurrency,
   PURCHASE_TYPES,
   PAYMENT_MODES,
   generateId,
+  calculateFinancials,
 } from '@/app/lib/logic';
 
 // Imports Icônes
@@ -36,17 +36,18 @@ import {
   Target,
   ArrowRightCircle,
   Tag,
-  CreditCard
+  CreditCard,
+  Calendar,
+  CalendarDays
 } from 'lucide-react';
 
-// --- IMPORTS UI KIT (NETTOYAGE 🧹) ---
+// --- IMPORTS UI KIT ---
 import Card from '@/app/components/ui/Card';
 import Button from '@/app/components/ui/Button';
 import InputGroup from '@/app/components/ui/InputGroup';
 import Badge from '@/app/components/ui/Badge';
-// ProgressBar n'est pas utilisé ici, mais Card et Button oui.
 
-// --- COMPOSANTS UI SPÉCIFIQUES (Non présents dans le UI Kit) ---
+// --- COMPOSANTS UI SPÉCIFIQUES ---
 
 const ContextToggle = ({ label, subLabel, icon: Icon, checked, onChange }: any) => (
   <label className={`flex items-center gap-4 p-4 border rounded-xl cursor-pointer transition-all duration-200 ${checked ? 'bg-indigo-50 border-indigo-200 ring-1 ring-indigo-200' : 'bg-white border-slate-200 hover:bg-slate-50'}`}>
@@ -72,19 +73,22 @@ const PurchaseRecap = ({ purchase }: { purchase: any }) => {
   // @ts-ignore
   const paymentLabel = PAYMENT_MODES[purchase.paymentMode] || purchase.paymentMode;
 
+  // Calcul de la date de fin (basé sur la date unique)
+  let endDateStr = '';
+  if ((purchase.paymentMode === 'CREDIT' || purchase.paymentMode === 'SPLIT') && purchase.duration && purchase.date) {
+      const start = new Date(purchase.date);
+      const end = new Date(start.setMonth(start.getMonth() + parseInt(purchase.duration)));
+      endDateStr = end.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
+  }
+
   return (
     <Card className="p-5 border-slate-200 bg-white">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <div className="flex items-center gap-2 mb-1">
             <h3 className="text-xl font-bold text-slate-800">{purchase.name}</h3>
-            {/* Utilisation des Badges du UI Kit */}
-            {purchase.isPro && (
-                <Badge color="bg-indigo-100 text-indigo-700 border border-indigo-200">Pro</Badge>
-            )}
-            {purchase.isReimbursable && (
-                <Badge color="bg-emerald-100 text-emerald-700 border border-emerald-200">Remboursable</Badge>
-            )}
+            {purchase.isPro && <Badge color="bg-indigo-100 text-indigo-700 border border-indigo-200">Pro</Badge>}
+            {purchase.isReimbursable && <Badge color="bg-emerald-100 text-emerald-700 border border-emerald-200">Remboursable</Badge>}
           </div>
           
           <div className="flex flex-wrap gap-3 text-sm text-slate-500 mt-2">
@@ -94,13 +98,30 @@ const PurchaseRecap = ({ purchase }: { purchase: any }) => {
             </div>
             <div className="w-px h-3 bg-slate-300 self-center"></div>
             <div className="flex items-center gap-1.5">
+                <Calendar size={14} />
+                {/* On précise ce que représente la date */}
+                <span>
+                    {purchase.paymentMode === 'CASH_SAVINGS' ? 'Achat le ' : '1ère échéance le '} 
+                    {new Date(purchase.date).toLocaleDateString('fr-FR')}
+                </span>
+            </div>
+            <div className="w-px h-3 bg-slate-300 self-center"></div>
+            <div className="flex items-center gap-1.5">
                 <CreditCard size={14} />
                 <span>{paymentLabel}</span>
             </div>
+            
             {(purchase.paymentMode === 'CREDIT' || purchase.paymentMode === 'SPLIT') && (
-                <Badge color="bg-slate-100 text-slate-600">
-                    {purchase.duration} mois {purchase.rate ? `@ ${purchase.rate}%` : ''}
-                </Badge>
+                <div className="flex gap-2">
+                    <Badge color="bg-slate-100 text-slate-600">
+                        {purchase.duration} mois {purchase.rate ? `@ ${purchase.rate}%` : ''}
+                    </Badge>
+                    {endDateStr && (
+                        <Badge color="bg-indigo-50 text-indigo-600 border border-indigo-100">
+                            Fin : {endDateStr}
+                        </Badge>
+                    )}
+                </div>
             )}
           </div>
         </div>
@@ -118,7 +139,7 @@ const PurchaseRecap = ({ purchase }: { purchase: any }) => {
   );
 };
 
-// --- CARTE DIAGNOSTIC V4 ---
+// --- CARTE DIAGNOSTIC ---
 const DiagnosticCard = ({ result }: { result: any }) => {
   const [showDetails, setShowDetails] = useState(true);
 
@@ -217,10 +238,13 @@ export default function SimulatorPage() {
   const [step, setStep] = useState<'input' | 'result'>('input');
   const [isSaving, setIsSaving] = useState(false);
   
+  const today = new Date().toISOString().split('T')[0];
+
   const [purchase, setPurchase] = useState({
     name: '',
     type: 'need',
     amount: '',
+    date: today, // CHAMP UNIQUE : Date d'achat OU 1ère échéance
     paymentMode: 'CASH_SAVINGS',
     duration: '',
     rate: '',
@@ -243,7 +267,7 @@ export default function SimulatorPage() {
     if (!result) return;
     
     setIsSaving(true);
-    await new Promise(resolve => setTimeout(resolve, 600)); // Simulation chargement
+    await new Promise(resolve => setTimeout(resolve, 600));
 
     const decision = {
       id: generateId(),
@@ -259,6 +283,7 @@ export default function SimulatorPage() {
       name: '',
       type: 'need',
       amount: '',
+      date: today,
       paymentMode: 'CASH_SAVINGS',
       duration: '',
       rate: '',
@@ -281,6 +306,11 @@ export default function SimulatorPage() {
     );
   }
 
+  // Label dynamique pour la date
+  const dateLabel = (purchase.paymentMode === 'SPLIT' || purchase.paymentMode === 'CREDIT') 
+    ? "Date de la 1ère échéance" 
+    : "Date de l'achat";
+
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start animate-fade-in">
       
@@ -291,7 +321,6 @@ export default function SimulatorPage() {
           <Card className="p-6 md:p-8">
             <h2 className="text-2xl font-bold text-slate-800 mb-6">Décris ton achat</h2>
             <div className="space-y-6">
-              {/* Utilisation des InputGroup du UI Kit */}
               <InputGroup label="C'est quoi ?" placeholder="iPhone, Réparation..." value={purchase.name} onChange={(v: string) => setPurchase({ ...purchase, name: v })} />
               
               <div>
@@ -306,7 +335,11 @@ export default function SimulatorPage() {
                 </div>
               </div>
               
-              <InputGroup label="Montant total" type="number" placeholder="0" suffix="€" value={purchase.amount} onChange={(v: string) => setPurchase({ ...purchase, amount: v })} />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <InputGroup label="Montant total" type="number" placeholder="0" suffix="€" value={purchase.amount} onChange={(v: string) => setPurchase({ ...purchase, amount: v })} />
+                  {/* CHAMP DATE UNIQUE : Label dynamique */}
+                  <InputGroup label={dateLabel} type="date" value={purchase.date} onChange={(v: string) => setPurchase({ ...purchase, date: v })} />
+              </div>
               
               <div>
                 <label className="block text-sm font-medium text-slate-600 mb-2">Comment tu paies ?</label>
@@ -315,10 +348,23 @@ export default function SimulatorPage() {
                 </select>
               </div>
               
+              {/* SECTION CRÉDIT : Apparaît seulement si paiement différé */}
               {(purchase.paymentMode === 'SPLIT' || purchase.paymentMode === 'CREDIT') && (
-                <div className="grid grid-cols-2 gap-4 animate-fade-in">
-                  <InputGroup label="Durée (mois)" type="number" value={purchase.duration} onChange={(v: string) => setPurchase({ ...purchase, duration: v })} />
-                  {purchase.paymentMode === 'CREDIT' && <InputGroup label="Taux (%)" type="number" value={purchase.rate} onChange={(v: string) => setPurchase({ ...purchase, rate: v })} />}
+                <div className="p-4 bg-indigo-50 rounded-xl border border-indigo-100 space-y-4 animate-fade-in">
+                  <h4 className="text-sm font-bold text-indigo-900 flex items-center gap-2"><CalendarDays size={16} /> Détails de l&apos;échéancier</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* On a enlevé la date d'ici car elle est en haut maintenant */}
+                    <InputGroup label="Durée (mois)" type="number" value={purchase.duration} onChange={(v: string) => setPurchase({ ...purchase, duration: v })} />
+                    {purchase.paymentMode === 'CREDIT' && <InputGroup label="Taux (%)" type="number" value={purchase.rate} onChange={(v: string) => setPurchase({ ...purchase, rate: v })} />}
+                  </div>
+                  
+                  {/* Calcul prévisionnel de fin */}
+                  {purchase.duration && purchase.amount && (
+                      <div className="text-xs text-indigo-600 font-medium bg-indigo-100/50 p-3 rounded-lg border border-indigo-100">
+                          Mensualité estimée : ~{formatCurrency(parseFloat(purchase.amount) / parseInt(purchase.duration))} / mois
+                          {purchase.date && ` jusqu'en ${new Date(new Date(purchase.date).setMonth(new Date(purchase.date).getMonth() + parseInt(purchase.duration))).toLocaleDateString('fr-FR', {month: 'long', year: 'numeric'})}`}
+                      </div>
+                  )}
                 </div>
               )}
               
@@ -343,10 +389,7 @@ export default function SimulatorPage() {
               <ArrowLeft size={16} /> Modifier la saisie
             </button>
             
-            {/* Récapitulatif refactorisé avec Badge */}
             <PurchaseRecap purchase={purchase} />
-
-            {/* Diagnostic Refactorisé avec Card */}
             <DiagnosticCard result={result} />
           </div>
         )}

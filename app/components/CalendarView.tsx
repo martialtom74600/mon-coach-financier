@@ -1,167 +1,137 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
-import { AlertTriangle, CheckCircle, ChevronLeft, ChevronRight } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Loader2, AlertCircle } from 'lucide-react';
 import { formatCurrency } from '@/app/lib/logic';
-import { 
-  startOfMonth, 
-  endOfMonth, 
-  eachDayOfInterval, 
-  isSameMonth, 
-  isSameDay, 
-  addMonths, 
-  subMonths, 
-  getDay, 
-  isPast,
-  isToday,
-  format
-} from 'date-fns';
-import { fr } from 'date-fns/locale';
 
-export default function CalendarView({ timeline }: { timeline: any[] }) {
-  // État : Le mois qu'on est en train de regarder (par défaut : aujourd'hui)
-  const [viewDate, setViewDate] = useState(new Date());
+const CalendarView = ({ timeline }: { timeline: any[] }) => {
+  const [currentMonthIndex, setCurrentMonthIndex] = useState(0);
 
-  // 1. Calculs de la grille du mois sélectionné
-  const daysInMonth = useMemo(() => {
-    const start = startOfMonth(viewDate);
-    const end = endOfMonth(viewDate);
-    return eachDayOfInterval({ start, end });
-  }, [viewDate]);
+  // Reset l'index si la timeline change (pour éviter de pointer sur un mois qui n'existe plus)
+  useEffect(() => {
+    setCurrentMonthIndex(0);
+  }, [timeline]);
 
-  // 2. Navigation
-  const nextMonth = () => setViewDate(addMonths(viewDate, 1));
-  const prevMonth = () => setViewDate(subMonths(viewDate, 1));
-  const jumpToToday = () => setViewDate(new Date());
+  // SÉCURITÉ 1 : Chargement
+  if (!timeline) {
+    return (
+      <div className="bg-white rounded-3xl border border-slate-200 p-12 flex flex-col items-center justify-center text-slate-400 min-h-[400px]">
+        <Loader2 size={32} className="animate-spin mb-3 text-indigo-500" />
+        <p className="text-sm font-medium">Chargement...</p>
+      </div>
+    );
+  }
 
-  // 3. Analyse du mois pour les alertes (uniquement sur les jours futurs affichés)
-  const displayedFutureDays = timeline.filter(t => isSameMonth(new Date(t.date), viewDate));
-  const lowestPoint = displayedFutureDays.length > 0 
-    ? Math.min(...displayedFutureDays.map((d:any) => d.balance)) 
-    : 0;
-  const isCritical = lowestPoint < 0;
+  // SÉCURITÉ 2 : Pas de données
+  if (timeline.length === 0) {
+    return (
+      <div className="bg-white rounded-3xl border border-slate-200 p-12 flex flex-col items-center justify-center text-slate-400 min-h-[400px]">
+        <AlertCircle size={32} className="mb-3 text-slate-300" />
+        <p className="text-sm font-medium">Aucune projection disponible.</p>
+        <p className="text-xs mt-2">Vérifie que ton profil contient des revenus ou un solde initial.</p>
+      </div>
+    );
+  }
 
-  // 4. Helper pour aligner le 1er jour du mois (Lundi = 1, Dimanche = 0 dans JS de base, mais on veut Lundi=0)
-  // date-fns getDay : 0 = Dimanche, 1 = Lundi...
-  // On veut décaler pour que Lundi soit la première colonne
-  const startDayIndex = (getDay(startOfMonth(viewDate)) + 6) % 7; 
+  const currentMonth = timeline[currentMonthIndex];
+
+  // SÉCURITÉ 3 : Index hors limite
+  if (!currentMonth) return null;
+
+  const goNext = () => {
+    if (currentMonthIndex < timeline.length - 1) setCurrentMonthIndex(currentMonthIndex + 1);
+  };
+
+  const goPrev = () => {
+    if (currentMonthIndex > 0) setCurrentMonthIndex(currentMonthIndex - 1);
+  };
+
+  // Calcul des cases vides (Décalage du 1er jour pour que le mois commence bien sous le bon jour)
+  // On sécurise la date par défaut
+  const firstDateStr = currentMonth.days && currentMonth.days[0] ? currentMonth.days[0].date : new Date().toISOString();
+  const firstDayObj = new Date(firstDateStr);
+  const firstDayIndex = firstDayObj.getDay(); // 0 = Dimanche
+  
+  // On veut Lundi = 0 ... Dimanche = 6
+  const startOffset = firstDayIndex === 0 ? 6 : firstDayIndex - 1; 
+  const blanks = Array(Math.max(0, startOffset)).fill(null);
 
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden animate-fade-in">
       
-      {/* --- EN-TÊTE ET NAVIGATION --- */}
-      <div className="flex flex-col md:flex-row items-center justify-between gap-4 bg-white p-4 rounded-2xl border border-slate-100 shadow-sm">
+      {/* HEADER */}
+      <div className="flex items-center justify-between p-6 border-b border-slate-100">
+        <button onClick={goPrev} disabled={currentMonthIndex === 0} className="p-2 rounded-xl hover:bg-slate-100 disabled:opacity-30 transition-colors text-slate-600">
+            <ChevronLeft size={24} />
+        </button>
         
-        {/* Contrôles Mois */}
-        <div className="flex items-center gap-4 bg-slate-50 p-1 rounded-xl">
-            <button onClick={prevMonth} className="p-2 hover:bg-white rounded-lg transition-all text-slate-500 hover:text-indigo-600 shadow-sm"><ChevronLeft size={20} /></button>
-            <div className="text-sm font-bold text-slate-800 w-32 text-center capitalize">
-                {viewDate.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })}
-            </div>
-            <button onClick={nextMonth} className="p-2 hover:bg-white rounded-lg transition-all text-slate-500 hover:text-indigo-600 shadow-sm"><ChevronRight size={20} /></button>
+        <div className="flex flex-col items-center">
+            <h3 className="text-xl font-black text-slate-800 capitalize flex items-center gap-2">
+                <CalendarIcon size={20} className="text-indigo-500" />
+                {currentMonth.label}
+            </h3>
+            <span className="text-xs font-medium text-slate-400 uppercase tracking-widest mt-1">
+                Solde Fin de mois : <span className={currentMonth.stats.balanceEnd < 0 ? 'text-rose-500' : 'text-emerald-600'}>{formatCurrency(currentMonth.stats.balanceEnd)}</span>
+            </span>
         </div>
 
-        {/* Bouton Aujourd'hui */}
-        {!isSameMonth(viewDate, new Date()) && (
-            <button onClick={jumpToToday} className="text-xs font-bold text-indigo-600 hover:bg-indigo-50 px-3 py-1.5 rounded-lg transition-colors">
-                Revenir à aujourd&apos;hui
-            </button>
-        )}
-        
-        {/* Indicateur Santé du Mois */}
-        {displayedFutureDays.length > 0 ? (
-            <div className={`text-xs font-bold px-4 py-2 rounded-xl flex items-center gap-2 ${isCritical ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-700'}`}>
-                {isCritical ? <AlertTriangle size={16} /> : <CheckCircle size={16} />}
-                {isCritical ? `Point bas : ${formatCurrency(lowestPoint)}` : "Mois sécurisé"}
-            </div>
-        ) : (
-            <div className="text-xs font-bold px-4 py-2 rounded-xl bg-slate-100 text-slate-500">
-                Historique / Pas de données
-            </div>
-        )}
+        <button onClick={goNext} disabled={currentMonthIndex === timeline.length - 1} className="p-2 rounded-xl hover:bg-slate-100 disabled:opacity-30 transition-colors text-slate-600">
+            <ChevronRight size={24} />
+        </button>
       </div>
 
-      {/* --- GRILLE CALENDRIER --- */}
-      <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
-        
-        {/* Jours de la semaine */}
-        <div className="grid grid-cols-7 bg-slate-50 border-b border-slate-200">
-            {['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'].map(day => (
-                <div key={day} className="py-3 text-center text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                    {day}
-                </div>
-            ))}
-        </div>
+      {/* JOURS SEMAINE */}
+      <div className="grid grid-cols-7 border-b border-slate-100 bg-slate-50/50">
+        {['LUN', 'MAR', 'MER', 'JEU', 'VEN', 'SAM', 'DIM'].map(d => (
+            <div key={d} className="py-3 text-center text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                {d}
+            </div>
+        ))}
+      </div>
 
-        {/* Cases des jours */}
-        <div className="grid grid-cols-7 auto-rows-fr">
+      {/* GRILLE */}
+      <div className="grid grid-cols-7 auto-rows-fr bg-white">
+        {/* Cases vides début de mois */}
+        {blanks.map((_, i) => <div key={`blank-${i}`} className="min-h-[100px] sm:min-h-[120px] bg-slate-50/30 border-b border-r border-slate-50"></div>)}
+
+        {/* Jours réels */}
+        {currentMonth.days && currentMonth.days.map((day: any) => {
+            const isNegative = day.balance < 0;
             
-            {/* Cases vides avant le 1er du mois (Offset) */}
-            {Array.from({ length: startDayIndex }).map((_, i) => (
-                <div key={`empty-${i}`} className="h-32 bg-slate-50/50 border-b border-r border-slate-100/50"></div>
-            ))}
-
-            {/* Les vrais jours */}
-            {daysInMonth.map((date) => {
-                // On cherche si ce jour existe dans notre timeline (donc s'il est futur ou aujourd'hui)
-                const timelineDay = timeline.find(t => isSameDay(new Date(t.date), date));
-                const isDayPast = isPast(date) && !isToday(date);
-                const isDayToday = isToday(date);
-                
-                // Styles dynamiques
-                let bgClass = "bg-white";
-                if (isDayPast) bgClass = "bg-slate-50/30";
-                if (isDayToday) bgClass = "bg-indigo-50/30";
-                if (timelineDay?.balance < 0) bgClass = "bg-rose-50/50";
-
-                return (
-                    <div 
-                        key={date.toString()} 
-                        className={`relative h-32 border-b border-r border-slate-100 p-2 flex flex-col justify-between transition-colors hover:bg-slate-50 ${bgClass}`}
-                    >
-                        {/* En-tête Jour */}
-                        <div className="flex justify-between items-start">
-                            <span className={`text-sm font-bold ${isDayToday ? 'bg-indigo-600 text-white w-6 h-6 flex items-center justify-center rounded-full' : isDayPast ? 'text-slate-400' : 'text-slate-700'}`}>
-                                {date.getDate()}
-                            </span>
-                            
-                            {/* Solde (Uniquement si disponible dans timeline) */}
-                            {timelineDay && (
-                                <span className={`text-[10px] font-bold ${timelineDay.balance < 0 ? 'text-rose-600' : 'text-indigo-600'}`}>
-                                    {formatCurrency(timelineDay.balance)}
-                                </span>
-                            )}
-                        </div>
-
-                        {/* Événements */}
-                        <div className="flex-1 mt-1 overflow-y-auto custom-scrollbar">
-                            {timelineDay ? (
-                                // Cas Futur : On affiche les prévisions
-                                <div className="space-y-1">
-                                    {timelineDay.events.map((e: any, i: number) => (
-                                        <div key={i} className={`text-[9px] truncate px-1 rounded-sm ${e.type === 'income' ? 'bg-emerald-100 text-emerald-700' : 'text-slate-500'}`}>
-                                            {e.type === 'income' ? '+' : '-'}{Math.round(e.amount)} {e.name}
-                                        </div>
-                                    ))}
-                                </div>
-                            ) : (
-                                // Cas Passé : Vide (ou on pourrait afficher l'historique réel si on l'avait stocké jour par jour)
-                                <div className="h-full flex items-center justify-center">
-                                    {isDayPast && <div className="w-1 h-1 bg-slate-200 rounded-full"></div>}
-                                </div>
-                            )}
-                        </div>
+            return (
+                <div key={day.date} className={`min-h-[100px] sm:min-h-[120px] border-b border-r border-slate-100 p-2 relative group hover:bg-slate-50 transition-colors flex flex-col justify-between ${isNegative ? 'bg-rose-50/30' : ''}`}>
+                    
+                    {/* En-tête jour */}
+                    <div className="flex justify-between items-start mb-2">
+                        <span className={`text-xs sm:text-sm font-bold ${isNegative ? 'text-rose-600' : 'text-slate-400 group-hover:text-slate-600'}`}>
+                            {day.dayOfMonth}
+                        </span>
+                        <span className={`text-[9px] sm:text-[10px] font-bold px-1.5 py-0.5 rounded-md ${isNegative ? 'bg-rose-100 text-rose-600' : 'bg-indigo-50 text-indigo-600'}`}>
+                            {formatCurrency(day.balance)}
+                        </span>
                     </div>
-                );
-            })}
-            
-            {/* Cases vides pour finir la dernière ligne proprement (Optionnel mais joli) */}
-            {Array.from({ length: (7 - (daysInMonth.length + startDayIndex) % 7) % 7 }).map((_, i) => (
-                <div key={`end-empty-${i}`} className="h-32 bg-slate-50/50 border-b border-r border-slate-100/50"></div>
-            ))}
 
-        </div>
+                    {/* Liste événements */}
+                    <div className="space-y-1 flex-1 overflow-hidden">
+                        {day.events.slice(0, 3).map((e: any) => (
+                            <div key={e.id} className={`text-[8px] sm:text-[9px] truncate px-1 py-0.5 rounded-sm font-medium flex justify-between items-center ${e.amount < 0 ? 'text-slate-600 bg-slate-100' : 'text-emerald-700 bg-emerald-50'}`}>
+                                <span className="truncate mr-1">{e.name}</span>
+                                <span className="font-bold opacity-80">{Math.round(Math.abs(e.amount))}</span>
+                            </div>
+                        ))}
+                        {day.events.length > 3 && (
+                            <div className="text-[9px] text-slate-400 pl-1 italic">
+                                + {day.events.length - 3} autres
+                            </div>
+                        )}
+                    </div>
+
+                </div>
+            );
+        })}
       </div>
     </div>
   );
-}
+};
+
+export default CalendarView;
