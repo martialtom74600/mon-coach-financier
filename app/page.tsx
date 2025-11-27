@@ -251,14 +251,25 @@ function DashboardView() {
 // ============================================================================
 
 function AuthScreen() {
-    // On lit l'URL
+    // 1. Détection du mode
     const searchParams = useSearchParams();
     const isSignUpMode = searchParams.get('mode') === 'signup';
+    const router = useRouter(); // Import de useRouter pour la redirection propre
+
+    // 2. Fonctions de bascule
+    const switchToSignIn = () => {
+        router.replace('/?mode=login');
+    };
+
+    const switchToSignUp = () => {
+        router.replace('/?mode=signup');
+    };
   
     return (
       <div className="min-h-screen w-full bg-slate-50 flex md:grid md:grid-cols-2">
-        {/* MARKETING GAUCHE */}
+        {/* MARKETING GAUCHE (Aucun changement) */}
         <div className="hidden md:flex flex-col justify-center p-12 lg:p-20 bg-indigo-600 text-white relative overflow-hidden">
+           {/* ... Contenu du bandeau gauche ... */}
            <div className="absolute top-0 right-0 p-40 bg-white opacity-5 rounded-full blur-3xl transform translate-x-20 -translate-y-20"></div>
            <div className="max-w-md mx-auto space-y-8 relative z-10">
              <div className="h-14 w-14 bg-white/10 rounded-2xl flex items-center justify-center backdrop-blur-md border border-white/20 shadow-xl"><TrendingUp size={32} /></div>
@@ -282,25 +293,55 @@ function AuthScreen() {
           <div className="w-full max-w-md">
              <div className="md:hidden text-center mb-8"><h1 className="text-2xl font-black text-slate-900">Mon Coach</h1></div>
              
-             {/* C'EST ICI LA CLÉ DU SUCCÈS : key="..." */}
              {isSignUpMode ? (
                 // MODE INSCRIPTION
                 <SignUp 
-                    key="signup" // <-- FORCE REACT À RAFRAICHIR
-                    routing="path" // <-- GÈRE MIEUX L'URL
-                    appearance={clerkAppearanceHybrid} 
-                    signInUrl="/?mode=login" 
-                    forceRedirectUrl="/" 
-                />
+                    key="signup"
+                    routing="virtual" // <-- IMPORTANT : Utilisation du routing virtuel
+                    appearance={{
+                      baseTheme: clerkAppearanceHybrid,
+                      elements: {
+                        footerActionLink: "cursor-pointer text-indigo-600 hover:text-indigo-700 font-bold"
+                      }
+                    }} 
+                    signInUrl="/?mode=login" // URL utilisée par le composant Clerk
+                    afterSignInUrl="/"
+                >
+                    {/* On ajoute une customisation du footer si la prop signInUrl ne fonctionne pas directement */}
+                    <div className="cl-footer-action-custom text-sm text-center mt-6">
+                        <span className="text-slate-500">Vous avez déjà un compte ?</span>
+                        <a 
+                           onClick={switchToSignIn} 
+                           className="cursor-pointer text-indigo-600 hover:text-indigo-700 font-bold ml-1"
+                        >
+                            S'identifier
+                        </a>
+                    </div>
+                </SignUp>
              ) : (
                 // MODE CONNEXION
                 <SignIn 
-                    key="login" // <-- FORCE REACT À RAFRAICHIR
-                    routing="path" // <-- GÈRE MIEUX L'URL
-                    appearance={clerkAppearanceHybrid} 
-                    signUpUrl="/?mode=signup" 
-                    forceRedirectUrl="/" 
-                />
+                    key="login"
+                    routing="virtual" // <-- IMPORTANT : Utilisation du routing virtuel
+                    appearance={{
+                        baseTheme: clerkAppearanceHybrid,
+                        elements: {
+                            footerActionLink: "cursor-pointer text-indigo-600 hover:text-indigo-700 font-bold"
+                        }
+                    }}
+                    signUpUrl="/?mode=signup" // URL utilisée par le composant Clerk
+                    afterSignUpUrl="/"
+                >
+                    <div className="cl-footer-action-custom text-sm text-center mt-6">
+                        <span className="text-slate-500">Vous n'avez pas encore de compte ?</span>
+                        <a 
+                           onClick={switchToSignUp} 
+                           className="cursor-pointer text-indigo-600 hover:text-indigo-700 font-bold ml-1"
+                        >
+                            S'inscrire
+                        </a>
+                    </div>
+                </SignIn>
              )}
           </div>
         </div>
