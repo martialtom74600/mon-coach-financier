@@ -190,7 +190,7 @@ export default function ProfilePage() {
       });
   };
 
-  // 4. SAUVEGARDE (Fixée et Sécurisée)
+  // 4. SAUVEGARDE (La clé du système !)
   const handleSaveAndExit = async (e?: any) => {
     if (e && e.preventDefault) e.preventDefault();
     
@@ -200,6 +200,14 @@ export default function ProfilePage() {
 
     try {
       const finalData = { ...formData };
+
+      // 
+      // ===============================================================
+      // POINT CRUCIAL : L'ANCRE TEMPORELLE
+      // On injecte la date actuelle pour dire au moteur : 
+      // "Le solde est à jour à cet instant précis."
+      // ===============================================================
+      finalData.balanceDate = new Date().toISOString(); 
 
       // LOGIQUE D'ARBITRAGE : ON vs OFF
       if (showInvestments) {
@@ -214,9 +222,7 @@ export default function ProfilePage() {
           finalData.savingsContributions = [];
       }
 
-      // 🔥 ICI EST LA CLÉ DU SUCCÈS 🔥
-      // On passe 'true' en 2e argument pour forcer l'envoi immédiat
-      // sans passer par le délai de 1 seconde (qui serait annulé par le rechargement de page)
+      // On force l'envoi immédiat
       await saveProfile(finalData, true);
       
       // On redirige avec rechargement forcé

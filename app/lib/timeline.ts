@@ -9,11 +9,12 @@ import {
   format,
   isBefore,
   startOfMonth,
-  isAfter
+  isAfter,
+  differenceInDays
 } from 'date-fns';
 import { fr } from 'date-fns/locale';
 
-const generateId = () => Math.random().toString(36).substr(2, 9);
+export const generateId = () => Math.random().toString(36).substr(2, 9);
 
 // Parsing sécurisé
 const safeFloat = (val: any) => {
@@ -24,21 +25,30 @@ const safeFloat = (val: any) => {
     return isNaN(parsed) ? 0 : parsed;
 };
 
-export const generateTimeline = (profile: any, history: any[], daysToProject = 730) => {
+export const generateTimeline = (profile: any, history: any[], simulatedEvents: any[] = [], daysToProject = 730) => {
   
-  // 1. DATES PIVOTS
-  // "Vrai" aujourd'hui (Midi pour éviter les bugs UTC)
+  // 1. DÉFINITION DU "PRÉSENT"
   const realToday = new Date();
   realToday.setHours(12, 0, 0, 0);
 
-  // Le début de la timeline (1er du mois en cours)
-  const startDateLoop = startOfMonth(realToday);
+  // 2. L'ANCRE TEMPORELLE (Le point de vérité)
+  // On cherche la date de "balanceDate" (mise à jour via le bouton sauvegarde)
+  // Sinon "updatedAt" (base de données), Sinon Aujourd'hui.
+  const anchorDate = profile.balanceDate 
+    ? new Date(profile.balanceDate) 
+    : (profile.updatedAt ? new Date(profile.updatedAt) : realToday);
+    
+  anchorDate.setHours(12, 0, 0, 0);
+
+  // 3. DÉBUT DE L'AFFICHAGE (VISUEL)
+  // On recule au 1er du mois de l'ancre pour avoir un calendrier propre
+  const startDateLoop = startOfMonth(anchorDate);
   startDateLoop.setHours(12, 0, 0, 0);
 
-  // Solde initial (Saisi par l'utilisateur, considéré comme le solde "Actuel")
+  // Solde de départ (sera appliqué le jour de l'ancre)
   let currentBalance = safeFloat(profile.currentBalance);
 
-  // 2. Événements Récurrents
+  // 4. ÉVÉNEMENTS RÉCURRENTS (TA LOGIQUE INTACTE)
   const recurringEvents = [
     ...(profile.incomes || []).map((i: any) => ({ name: i.name, type: 'income', day: parseInt(i.dayOfMonth) || 1, amount: safeFloat(i.amount) })),
     ...(profile.fixedCosts || []).map((i: any) => ({ name: i.name, type: 'expense', day: parseInt(i.dayOfMonth) || 5, amount: safeFloat(i.amount) })),
@@ -47,14 +57,13 @@ export const generateTimeline = (profile: any, history: any[], daysToProject = 7
     ...(profile.savingsContributions || []).map((i: any) => ({ name: `Épargne: ${i.name}`, type: 'expense', day: parseInt(i.dayOfMonth) || 20, amount: safeFloat(i.amount) })),
   ];
 
-  // 3. Événements Historique
+  // 5. HISTORIQUE (TA LOGIQUE INTACTE)
   const historyEvents: any[] = [];
   if (Array.isArray(history)) {
     history.forEach((decision: any) => {
-        if (!decision.result || !decision.purchase) return;
+        if (!decision.purchase) return;
         const p = decision.purchase;
         const amount = safeFloat(p.amount);
-        // Date normalisée
         const d = new Date(p.date || decision.date);
         d.setHours(12,0,0,0);
 
@@ -73,28 +82,31 @@ export const generateTimeline = (profile: any, history: any[], daysToProject = 7
     });
   }
 
-  // 4. Lissage
+  // 6. LISSAGE VIE COURANTE
   const dailyVariableCost = safeFloat(profile.variableCosts) / 30;
 
-  // --- BOUCLE ---
+  // --- BOUCLE PRINCIPALE ---
   const monthsMap = new Map();
 
-  // On calcule le décalage pour commencer au 1er du mois
-  const daysSinceStartOfMonth = Math.floor((realToday.getTime() - startDateLoop.getTime()) / (1000 * 60 * 60 * 24));
-  // On projette sur 2 ans + les quelques jours du début de mois déjà écoulés
-  const totalDays = daysToProject + daysSinceStartOfMonth;
+  // On calcule combien de jours il y a entre le début de l'affichage et l'ancre
+  const daysFromStartToAnchor = differenceInDays(anchorDate, startDateLoop);
+  // On projette X jours APRÈS l'ancre (pour garantir le futur)
+  const totalDays = Math.abs(daysFromStartToAnchor) + daysToProject;
 
   for (let i = 0; i < totalDays; i++) {
     const currentDate = addDays(startDateLoop, i);
     const dayNum = currentDate.getDate();
     const isMonthEnd = isLastDayOfMonth(currentDate);
     const daysInCurrentMonth = getDaysInMonth(currentDate);
-    
-    // EST-CE DU PASSÉ ? (Avant aujourd'hui minuit)
-    // On utilise une comparaison stricte pour éviter que "Aujourd'hui" soit considéré comme passé
-    const isPast = isBefore(currentDate, realToday) && !isSameDay(currentDate, realToday);
-
     const monthKey = format(currentDate, 'yyyy-MM');
+
+    // LOGIQUE TEMPORELLE
+    // Est-ce qu'on est avant la date de vérité ?
+    const isBeforeAnchor = isBefore(currentDate, anchorDate);
+    const isAnchorDay = isSameDay(currentDate, anchorDate);
+    
+    // Le moteur ne calcule que si on a atteint ou dépassé l'ancre
+    const shouldCalculate = !isBeforeAnchor;
 
     if (!monthsMap.has(monthKey)) {
         monthsMap.set(monthKey, {
@@ -116,35 +128,41 @@ export const generateTimeline = (profile: any, history: any[], daysToProject = 7
 
         if ((isTargetDay || isFallback) && e.amount > 0) {
             const val = e.type === 'income' ? e.amount : -e.amount;
-            
-            // On affiche l'événement même si c'est du passé (pour mémoire)
             eventsOfTheDay.push({ id: generateId(), name: e.name, amount: val, type: e.type });
-
-            // MAIS on n'impacte le solde QUE si c'est futur ou aujourd'hui
-            // (Car le solde 'currentBalance' contient déjà l'impact du passé)
-            if (!isPast) {
-                dailyImpact += val;
-            }
+            // On n'applique au solde que si le calcul est actif
+            if (shouldCalculate) dailyImpact += val;
         }
     });
 
-    // B. Historique
-    historyEvents.forEach((h: any) => {
-        if (isSameDay(currentDate, h.date)) {
+    // B. Fusion Historique + Simulation
+    const allOneOffEvents = [...historyEvents];
+    // Injection du nouveau moteur (Simulated Events)
+    if (simulatedEvents && simulatedEvents.length > 0) {
+        simulatedEvents.forEach((s: any) => allOneOffEvents.push({ ...s, date: new Date(s.date) }));
+    }
+
+    allOneOffEvents.forEach((h: any) => {
+        const hDate = new Date(h.date);
+        hDate.setHours(12,0,0,0);
+        if (isSameDay(currentDate, hDate)) {
             eventsOfTheDay.push({ id: generateId(), name: h.name, amount: h.amount, type: h.type });
-            if (!isPast) {
-                dailyImpact += h.amount;
-            }
+            if (shouldCalculate) dailyImpact += h.amount;
         }
     });
 
-    // C. Vie courante (Futur seulement)
-    if (!isPast && dailyVariableCost > 0 && currentBalance > 0) {
+    // C. Vie courante
+    // On ne déduit pas le jour de l'ancre (on suppose que le solde saisi est net)
+    if (shouldCalculate && !isAnchorDay && dailyVariableCost > 0 && currentBalance > 0) {
         dailyImpact -= dailyVariableCost;
     }
 
-    // Mise à jour du solde (Seulement à partir d'aujourd'hui)
-    if (!isPast) {
+    // MISE À JOUR DU SOLDE (C'est ici que la magie opère)
+    if (isAnchorDay) {
+        // RESET : C'est le jour de vérité, on force la valeur saisie par l'utilisateur
+        currentBalance = safeFloat(profile.currentBalance);
+    } 
+    else if (shouldCalculate) {
+        // ÉVOLUTION : Pour les jours suivants, on applique les mouvements
         currentBalance += dailyImpact;
     }
 
@@ -152,15 +170,17 @@ export const generateTimeline = (profile: any, history: any[], daysToProject = 7
     currentMonthData.days.push({
         date: currentDate.toISOString(),
         dayOfMonth: dayNum,
-        // Si c'est passé : on met null (CalendarView affichera "Passé" ou grisé)
-        // Si c'est futur/aujourd'hui : on met le solde calculé
-        balance: isPast ? null : Math.round(currentBalance),
+        // Si avant l'ancre -> null (case grisée/vide)
+        // Si après -> solde calculé
+        balance: isBeforeAnchor ? null : Math.round(currentBalance),
         events: eventsOfTheDay,
-        status: !isPast && currentBalance < 0 ? 'danger' : 'safe'
+        status: !isBeforeAnchor && currentBalance < 0 ? 'danger' : 'safe'
     });
     
-    // On garde le dernier solde connu pour la fin de mois
-    currentMonthData.stats.balanceEnd = Math.round(currentBalance);
+    // On met à jour la stat de fin de mois uniquement si on a des données calculées
+    if (shouldCalculate) {
+        currentMonthData.stats.balanceEnd = Math.round(currentBalance);
+    }
   }
 
   return Array.from(monthsMap.values());

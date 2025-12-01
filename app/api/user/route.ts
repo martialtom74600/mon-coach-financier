@@ -11,16 +11,22 @@ export async function GET() {
 
   try {
     const user = await prisma.user.findUnique({ where: { id: userId } });
+    
+    // Si pas d'utilisateur, on renvoie null proprement
     if (!user) return NextResponse.json(null);
 
     const financialData = (user.financialData as object) || {};
     
+    // ✅ CORRECTION ICI : ON RENVOIE LES DATES SYSTÈME
     return NextResponse.json({
       ...financialData,
       id: user.id,
       email: user.email,
       firstName: user.firstName,
+      createdAt: user.createdAt, // <--- INDISPENSABLE pour l'historique visuel
+      updatedAt: user.updatedAt, // <--- INDISPENSABLE pour le backup de l'ancre
     });
+
   } catch (error) {
     console.error("[API_GET_USER]", error);
     return new NextResponse("Erreur interne", { status: 500 });
@@ -42,26 +48,26 @@ export async function POST(req: Request) {
       ...inputFinancialData 
     } = body;
 
-    // 🛡️ SÉCURITÉ ABSOLUE (Le "Force 0" dont tu parlais)
-    // On crée une copie pour modifier les valeurs sans toucher à l'original
+    // 🛡️ SÉCURITÉ ABSOLUE
     const safeFinancialData: any = { ...inputFinancialData };
 
-    // SI le mode est "beginner" (Débutant) -> ON VIDE TOUT DE FORCE CÔTÉ SERVEUR
-    // C'est ça qui va régler ton bug définitivement.
+    // SI le mode est "beginner" (Débutant) -> ON VIDE TOUT DE FORCE
     if (safeFinancialData.mode === 'beginner') {
-        console.log("🔒 Mode Débutant détecté : Nettoyage forcé des investissements.");
+        // console.log("🔒 Mode Débutant détecté : Nettoyage forcé.");
         safeFinancialData.investments = 0;
         safeFinancialData.investmentYield = 0;
-        safeFinancialData.savingsContributions = []; // On force le tableau vide
+        safeFinancialData.savingsContributions = []; 
     }
 
-    // 2. On sauvegarde la version "nettoyée" (safeFinancialData)
+    // 2. On sauvegarde
     const updatedUser = await prisma.user.upsert({
       where: { id: userId },
       update: {
         firstName: firstName || undefined,
-        financialData: safeFinancialData, // <--- C'est ici que ça part propre en base
-        updatedAt: new Date(),
+        financialData: safeFinancialData,
+        // Pas besoin de mettre à jour updatedAt manuellement, Prisma le fait seul grâce à @updatedAt
+        // mais le laisser ne fait pas de mal.
+        updatedAt: new Date(), 
       },
       create: {
         id: userId,
@@ -71,7 +77,9 @@ export async function POST(req: Request) {
       },
     });
 
+    // Ici updatedUser contient DÉJÀ createdAt/updatedAt par défaut car c'est l'objet Prisma complet
     return NextResponse.json(updatedUser);
+    
   } catch (error) {
     console.error("[API_POST_USER]", error);
     return new NextResponse("Erreur interne", { status: 500 });
