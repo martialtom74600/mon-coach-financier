@@ -2,28 +2,19 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useUser } from '@clerk/nextjs';
-
-// Structure par défaut
-const DEFAULT_PROFILE = {
-  firstName: '',
-  monthlyIncome: 0,
-  mandatoryExpenses: 0,
-  discretionaryExpenses: 0,
-  investments: 0,
-  matelas: 0,
-  goal: 'security',
-  mode: 'beginner',
-};
+// 👇 IMPORT CRUCIAL : On utilise la source de vérité unique
+import { INITIAL_PROFILE } from '@/app/lib/constants'; 
 
 export function useFinancialData() {
   const { user, isLoaded: isClerkLoaded } = useUser();
   
   // États locaux
-  const [profile, setProfile] = useState<any>(DEFAULT_PROFILE);
+  // On initialise avec INITIAL_PROFILE pour garantir que les tableaux (goals, etc.) existent
+  const [profile, setProfile] = useState<any>(INITIAL_PROFILE);
   const [history, setHistory] = useState<any[]>([]); 
   const [isLoadingData, setIsLoadingData] = useState(true);
 
-  // REF pour le Debounce
+  // REF pour le Debounce (Anti-spam sauvegarde)
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // 1. CHARGEMENT DES DONNÉES
@@ -36,11 +27,19 @@ export function useFinancialData() {
         const data = await res.json();
         
         if (data) {
+          // On sépare l'historique du reste du profil
           const { history: savedHistory, ...savedProfile } = data;
-          setProfile({ ...DEFAULT_PROFILE, ...savedProfile });
+          
+          // FUSION INTELLIGENTE :
+          // On prend la structure vide complète (INITIAL_PROFILE)
+          // Et on écrase avec ce qui vient de la BDD (savedProfile)
+          // Ça évite les bugs si on a ajouté un nouveau champ (ex: goals) récemment
+          setProfile({ ...INITIAL_PROFILE, ...savedProfile });
+          
           setHistory(Array.isArray(savedHistory) ? savedHistory : []);
         } else {
-           setProfile({ ...DEFAULT_PROFILE, firstName: user.firstName || '' });
+           // Nouvel utilisateur : On met juste son prénom dans la coquille vide
+           setProfile({ ...INITIAL_PROFILE, firstName: user.firstName || '' });
         }
       }
     } catch (error) {
@@ -62,7 +61,6 @@ export function useFinancialData() {
   // FONCTION INTERNE POUR ENVOYER À L'API
   const pushToDB = async (dataToSave: any) => {
     if (!user) return;
-    // console.log("💾 Sauvegarde vers Postgres...", dataToSave); 
     try {
       const response = await fetch('/api/user', {
         method: 'POST',
@@ -92,34 +90,32 @@ export function useFinancialData() {
     } else {
       saveTimeoutRef.current = setTimeout(() => {
         pushToDB({ ...updatedProfile, history });
-      }, 1000);
+      }, 1000); // Debounce de 1s
       return Promise.resolve();
     }
   };
 
-  // 3. SAUVEGARDER UNE DÉCISION (AJOUT)
+  // 3. SAUVEGARDER UNE DÉCISION
   const saveDecision = async (decision: any) => {
     const newHistory = [...history, decision];
     setHistory(newHistory);
     
+    // Si une sauvegarde de profil était en attente, on l'annule pour tout envoyer d'un coup
     if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
     
     return await pushToDB({ ...profile, history: newHistory });
   };
 
-  // 4. SUPPRIMER UNE DÉCISION (NOUVEAU)
+  // 4. SUPPRIMER UNE DÉCISION
   const deleteDecision = async (idToDelete: string) => {
-    // A. On met à jour l'interface tout de suite (Optimistic UI)
     const newHistory = history.filter((item: any) => item.id !== idToDelete);
     setHistory(newHistory);
 
-    // B. On annule tout timer en cours pour éviter les conflits
     if (saveTimeoutRef.current) {
         clearTimeout(saveTimeoutRef.current);
         saveTimeoutRef.current = null;
     }
 
-    // C. On sauvegarde la nouvelle liste nettoyée en base
     return await pushToDB({ ...profile, history: newHistory });
   };
 
@@ -128,7 +124,7 @@ export function useFinancialData() {
     history,
     saveProfile,
     saveDecision,
-    deleteDecision, // <--- On exporte la nouvelle fonction
+    deleteDecision,
     isLoaded: isClerkLoaded && !isLoadingData,
     user
   };

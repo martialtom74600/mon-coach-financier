@@ -1,6 +1,7 @@
 import { CONSTANTS, PERSONA_PRESETS } from './constants';
 import { calculateFutureValue, formatCurrency, calculateListTotal, generateId } from './utils';
 import { generateTimeline } from './timeline';
+import { calculateMonthlyEffort } from './goals'; // <--- 1. NOUVEL IMPORT
 import { addMonths, addDays, isSameMonth, startOfDay, isBefore } from 'date-fns'; 
 
 // Helper pour arrondir proprement
@@ -21,21 +22,42 @@ export const calculateFinancials = (profile: any) => {
   const monthlyCredits = calculateListTotal(profile.credits);
   const mandatoryExpenses = monthlyFixed + monthlySubs + monthlyCredits;
 
-  const profitableExpenses = calculateListTotal(profile.savingsContributions);
+  // --- NOUVEAU BLOC : GESTION DES OBJECTIFS & ÉPARGNE ---
+  // A. Épargne Manuelle (Virements programmés classiques)
+  const manualSavings = calculateListTotal(profile.savingsContributions);
+
+  // B. Épargne Projets (Calculée par le moteur Goals)
+  let totalGoalsEffort = 0;
+  const goalsBreakdown = (profile.goals || []).map((goal: any) => {
+      const monthlyNeed = calculateMonthlyEffort(goal);
+      totalGoalsEffort += monthlyNeed;
+      return { ...goal, monthlyNeed };
+  });
+
+  // C. Total "Dépenses Vertueuses" (Qui construisent le patrimoine)
+  // On considère l'effort pour les projets comme une charge fixe pour sécuriser le budget
+  const profitableExpenses = manualSavings + totalGoalsEffort;
+  
   const discretionaryExpenses = getVal(profile.variableCosts);
 
   // 3. CAPACITÉS & RESTES
   const totalRecurring = mandatoryExpenses + profitableExpenses;
+  
+  // Le "Reste à Vivre" est maintenant net de tous les projets futurs !
   const remainingToLive = monthlyIncome - totalRecurring;
   
-  // Capacité d'épargne
-  const capacityToSave = Math.max(0, remainingToLive - discretionaryExpenses);
+  // Capacité d'épargne (Théorique)
+  // Note : On calcule ce qu'il reste avant le plaisir, mais après les charges fixes
+  const rawRemaining = monthlyIncome - mandatoryExpenses; 
+  const capacityToSave = Math.max(0, rawRemaining - discretionaryExpenses);
+  
   // Cashflow réel
   const realCashflow = monthlyIncome - (mandatoryExpenses + discretionaryExpenses + profitableExpenses);
 
   // 4. PATRIMOINE
   const yieldRate = getVal(profile.investmentYield) / 100;
-  const projectedAnnualYield = (profitableExpenses * 12) * yieldRate;
+  // On projette le rendement global principalement sur l'épargne libre pour l'instant
+  const projectedAnnualYield = (manualSavings * 12) * yieldRate;
 
   const matelas = getVal(profile.savings); 
   const investments = getVal(profile.investments); 
@@ -65,7 +87,9 @@ export const calculateFinancials = (profile: any) => {
     monthlyIncome,
     mandatoryExpenses,
     discretionaryExpenses,
-    profitableExpenses,
+    profitableExpenses, // Inclut Projets + Épargne manuelle
+    totalGoalsEffort,   // <--- NOUVEAU (Pour affichage UI)
+    goalsBreakdown,     // <--- NOUVEAU (Détail par projet)
     projectedAnnualYield,
     totalRecurring,
     remainingToLive,
@@ -250,7 +274,6 @@ export const analyzePurchaseImpact = (currentStats: any, purchase: any, profile:
   // --- B. ANALYSE DYNAMIQUE (Timeline / Mur de Trésorerie) ---
   let lowestProjectedBalance = Infinity;
   let firstDangerDate: string | null = null;
-  const STRESS_THRESHOLD = Math.max(150, (currentStats.monthlyIncome || 0) * 0.20);
   
   // Projection des 30 prochains jours pour le graphique
   let projectedCurve: any[] = [];
@@ -359,6 +382,7 @@ export const analyzePurchaseImpact = (currentStats: any, purchase: any, profile:
            issues.push({ level: 'orange', text: `Sécurité faible (${newSafetyMonths.toFixed(1)} mois).` });
            score -= 10;
       }
+      // ICI : on garde bien le check dynamique du profil (maxDebt)
       if (newEngagementRate > rules.maxDebt) {
            issues.push({ level: 'orange', text: `Taux d'effort élevé (${newEngagementRate}% > ${rules.maxDebt}%).` });
            score -= 10;

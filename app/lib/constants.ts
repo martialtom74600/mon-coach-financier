@@ -8,12 +8,37 @@ export const CONSTANTS = {
   WEALTHY_THRESHOLD: 12,
 };
 
-export const PERSONA_PRESETS = {
-  STUDENT: { id: 'student', label: 'Étudiant(e)', description: 'Budget serré, études, besoins flexibles.', rules: { safetyMonths: 1, maxDebt: 40, minLiving: 100 } },
-  SALARIED: { id: 'salaried', label: 'Salarié / Stable', description: 'Revenus réguliers (CDI, Fonctionnaire).', rules: { safetyMonths: 3, maxDebt: 35, minLiving: 300 } },
-  FREELANCE: { id: 'freelance', label: 'Indépendant / Freelance', description: 'Revenus variables, risque plus élevé.', rules: { safetyMonths: 6, maxDebt: 30, minLiving: 500 } },
-  RETIRED: { id: 'retired', label: 'Retraité(e)', description: 'Revenus fixes, préservation du capital.', rules: { safetyMonths: 6, maxDebt: 25, minLiving: 400 } },
-  UNEMPLOYED: { id: 'unemployed', label: 'En recherche / Transition', description: 'Revenus précaires, prudence maximale.', rules: { safetyMonths: 6, maxDebt: 0, minLiving: 200 } }
+export const PERSONA_PRESETS: any = {
+  STUDENT: { 
+    id: 'student', 
+    label: 'Étudiant(e)', 
+    description: 'Budget serré, études, besoins flexibles.', 
+    rules: { safetyMonths: 1, maxDebt: 40, minLiving: 100 } 
+  },
+  SALARIED: { 
+    id: 'salaried', 
+    label: 'Salarié / Stable', 
+    description: 'Revenus réguliers (CDI, Fonctionnaire).', 
+    rules: { safetyMonths: 3, maxDebt: 35, minLiving: 300 } 
+  },
+  FREELANCE: { 
+    id: 'freelance', 
+    label: 'Indépendant / Freelance', 
+    description: 'Revenus variables, risque plus élevé.', 
+    rules: { safetyMonths: 6, maxDebt: 30, minLiving: 500 } 
+  },
+  RETIRED: { 
+    id: 'retired', 
+    label: 'Retraité(e)', 
+    description: 'Revenus fixes, préservation du capital.', 
+    rules: { safetyMonths: 6, maxDebt: 25, minLiving: 400 } 
+  },
+  UNEMPLOYED: { 
+    id: 'unemployed', 
+    label: 'En recherche / Transition', 
+    description: 'Revenus précaires, prudence maximale.', 
+    rules: { safetyMonths: 6, maxDebt: 0, minLiving: 200 } 
+  }
 };
 
 export const INITIAL_PROFILE = {
@@ -38,6 +63,9 @@ export const INITIAL_PROFILE = {
   credits: [],
   savingsContributions: [], // Investissements mensuels (Flux sortant positif)
   annualExpenses: [],
+  
+  // NOUVEAU : LISTE DES OBJECTIFS LONG TERME
+  goals: [], 
 };
 
 export const PURCHASE_TYPES: any = {
@@ -52,4 +80,14 @@ export const PAYMENT_MODES: any = {
   SPLIT: 'Paiement 3x/4x (Dette court terme)',
   CREDIT: 'Crédit / LOA (Dette long terme)',
   SUBSCRIPTION: 'Abonnement (Charge fixe)',
+};
+
+// NOUVEAU : CATÉGORIES POUR LES PROJETS DE VIE
+export const GOAL_CATEGORIES: any = {
+  REAL_ESTATE: { id: 'REAL_ESTATE', label: 'Immobilier', icon: '🏠', description: 'Achat résidence, Investissement locatif' },
+  VEHICLE: { id: 'VEHICLE', label: 'Véhicule', icon: '🚗', description: 'Voiture, Moto (Achat cash ou apport)' },
+  TRAVEL: { id: 'TRAVEL', label: 'Voyage / Plaisir', icon: '✈️', description: 'Vacances, Tour du monde' },
+  WEDDING: { id: 'WEDDING', label: 'Mariage / Fête', icon: '💍', description: 'Grand événement prévu' },
+  EMERGENCY: { id: 'EMERGENCY', label: 'Matelas de Sécurité', icon: '🛡️', description: 'Constitution de l\'épargne de précaution' },
+  OTHER: { id: 'OTHER', label: 'Autre Projet', icon: '🎯', description: 'Toute autre dépense importante' },
 };

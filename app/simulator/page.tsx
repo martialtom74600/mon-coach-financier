@@ -10,7 +10,9 @@ import {
   PAYMENT_MODES,
   generateId,
   calculateFinancials,
+  GOAL_CATEGORIES,
 } from '@/app/lib/logic';
+import { calculateMonthlyEffort } from '@/app/lib/goals'; // NOUVEL IMPORT
 
 // Imports Icônes
 import {
@@ -29,16 +31,14 @@ import {
   Settings,
   Briefcase,
   RefreshCw,
-  ChevronDown,
-  ChevronUp,
-  Brain,
-  AlertOctagon,
+  CalendarDays,
   Target,
-  ArrowRightCircle,
-  Tag,
-  CreditCard,
-  Calendar,
-  CalendarDays
+  ShoppingBag,
+  Plane, 
+  Home, 
+  Car,
+  Heart,
+  ShieldAlert
 } from 'lucide-react';
 
 // --- IMPORTS UI KIT ---
@@ -46,6 +46,18 @@ import Card from '@/app/components/ui/Card';
 import Button from '@/app/components/ui/Button';
 import InputGroup from '@/app/components/ui/InputGroup';
 import Badge from '@/app/components/ui/Badge';
+
+// --- HELPERS ICONES ---
+const getGoalIcon = (catId: string) => {
+    switch(catId) {
+        case 'REAL_ESTATE': return <Home size={24} />;
+        case 'VEHICLE': return <Car size={24} />;
+        case 'TRAVEL': return <Plane size={24} />;
+        case 'WEDDING': return <Heart size={24} />;
+        case 'EMERGENCY': return <ShieldAlert size={24} />;
+        default: return <Target size={24} />;
+    }
+};
 
 // --- COMPOSANTS UI SPÉCIFIQUES ---
 
@@ -73,81 +85,31 @@ const PurchaseRecap = ({ purchase }: { purchase: any }) => {
   // @ts-ignore
   const paymentLabel = PAYMENT_MODES[purchase.paymentMode] || purchase.paymentMode;
 
-  let endDateStr = '';
-  if ((purchase.paymentMode === 'CREDIT' || purchase.paymentMode === 'SPLIT') && purchase.duration && purchase.date) {
-      const start = new Date(purchase.date);
-      const end = new Date(start.setMonth(start.getMonth() + parseInt(purchase.duration)));
-      endDateStr = end.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
-  }
-
   return (
-    <Card className="p-5 border-slate-200 bg-white">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <div className="flex items-center gap-2 mb-1">
-            <h3 className="text-xl font-bold text-slate-800">{purchase.name}</h3>
-            {purchase.isPro && <Badge color="bg-indigo-100 text-indigo-700 border border-indigo-200">Pro</Badge>}
-            {purchase.isReimbursable && <Badge color="bg-emerald-100 text-emerald-700 border border-emerald-200">Remboursable</Badge>}
+      <Card className="p-5 border-slate-200 bg-white">
+          <div className="flex items-center gap-3">
+              <div className="p-3 bg-indigo-50 rounded-lg text-indigo-600">
+                  <ShoppingBag size={24} />
+              </div>
+              <div>
+                  <h3 className="text-lg font-bold text-slate-800">{purchase.name}</h3>
+                  <div className="text-sm text-slate-500">{formatCurrency(purchase.amount)} • {paymentLabel}</div>
+              </div>
           </div>
-          
-          <div className="flex flex-wrap gap-3 text-sm text-slate-500 mt-2">
-            <div className="flex items-center gap-1.5">
-                <Tag size={14} />
-                <span>{typeInfo.label}</span>
-            </div>
-            <div className="w-px h-3 bg-slate-300 self-center"></div>
-            <div className="flex items-center gap-1.5">
-                <Calendar size={14} />
-                <span>
-                    {purchase.paymentMode === 'CASH_SAVINGS' ? 'Achat le ' : '1ère échéance le '} 
-                    {new Date(purchase.date).toLocaleDateString('fr-FR')}
-                </span>
-            </div>
-            <div className="w-px h-3 bg-slate-300 self-center"></div>
-            <div className="flex items-center gap-1.5">
-                <CreditCard size={14} />
-                <span>{paymentLabel}</span>
-            </div>
-            
-            {(purchase.paymentMode === 'CREDIT' || purchase.paymentMode === 'SPLIT') && (
-                <div className="flex gap-2">
-                    <Badge color="bg-slate-100 text-slate-600">
-                        {purchase.duration} mois {purchase.rate ? `@ ${purchase.rate}%` : ''}
-                    </Badge>
-                    {endDateStr && (
-                        <Badge color="bg-indigo-50 text-indigo-600 border border-indigo-100">
-                            Fin : {endDateStr}
-                        </Badge>
-                    )}
-                </div>
-            )}
-          </div>
-        </div>
-
-        <div className="text-right shrink-0">
-            <div className="text-3xl font-bold text-indigo-600 tracking-tight">
-                {formatCurrency(purchase.amount)}
-            </div>
-            <div className="text-xs text-slate-400 font-medium uppercase tracking-wider mt-1">
-                Montant total
-            </div>
-        </div>
-      </div>
-    </Card>
-  );
+      </Card>
+  )
 };
 
-// --- NOUVELLE CARTE DIAGNOSTIC (DOUBLE PILIER) ---
+// --- NOUVELLE CARTE DIAGNOSTIC ---
 const DiagnosticCard = ({ result }: { result: any }) => {
+  if (!result) return null;
   const theme = {
     green: { bg: 'bg-emerald-600', icon: CheckCircle },
     orange: { bg: 'bg-amber-500', icon: AlertTriangle },
     red: { bg: 'bg-rose-600', icon: XCircle },
   }[result.verdict as 'green' | 'orange' | 'red'];
-
   const MainIcon = theme.icon;
 
-  // Helpers badge
   const getStatusBadge = (isOk: boolean) => 
     isOk 
       ? <span className="flex items-center gap-1 text-xs font-bold text-emerald-700 bg-emerald-100 px-2 py-1 rounded-md border border-emerald-200"><CheckCircle size={12}/> Validé</span>
@@ -155,25 +117,20 @@ const DiagnosticCard = ({ result }: { result: any }) => {
 
   return (
     <Card className="overflow-hidden shadow-xl border-slate-100 p-0 animate-fade-in">
-      
-      {/* 1. EN-TÊTE PRINCIPAL (Synthèse) */}
-      <div className={`${theme.bg} p-6 text-white relative overflow-hidden`}>
-        <div className="absolute -right-6 -top-6 w-32 h-32 bg-white opacity-10 rounded-full blur-2xl"></div>
-        <div className="relative z-10 flex items-start gap-4">
-           <div className="p-2 bg-white/20 rounded-xl backdrop-blur-md shrink-0">
-             <MainIcon size={32} />
-           </div>
-           <div>
-             <h2 className="text-xl font-bold">{result.smartTitle}</h2>
-             <p className="text-white/90 text-sm font-medium opacity-95 leading-relaxed">{result.smartMessage}</p>
-           </div>
-        </div>
-      </div>
+       <div className={`${theme.bg} p-6 text-white relative overflow-hidden`}>
+         <div className="absolute -right-6 -top-6 w-32 h-32 bg-white opacity-10 rounded-full blur-2xl"></div>
+         <div className="relative z-10 flex items-start gap-4">
+            <div className="p-2 bg-white/20 rounded-xl backdrop-blur-md shrink-0">
+              <MainIcon size={32} />
+            </div>
+            <div>
+               <h2 className="text-xl font-bold">{result.smartTitle}</h2>
+               <p className="text-white/90 text-sm font-medium opacity-95 leading-relaxed">{result.smartMessage}</p>
+            </div>
+         </div>
+       </div>
 
-      {/* 2. LES DEUX PILIERS (CLARIFICATION) */}
       <div className="grid grid-cols-2 divide-x divide-slate-100 border-b border-slate-100 bg-slate-50/50">
-        
-        {/* PILIER GAUCHE : BUDGET (THÉORIQUE) */}
         <div className="p-5 flex flex-col gap-2">
            <div className="flex justify-between items-start">
              <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Moyens Théoriques</div>
@@ -189,7 +146,6 @@ const DiagnosticCard = ({ result }: { result: any }) => {
            </div>
         </div>
 
-        {/* PILIER DROITE : TRÉSORERIE (PRATIQUE) */}
         <div className="p-5 flex flex-col gap-2">
            <div className="flex justify-between items-start">
              <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Réalité Compte</div>
@@ -206,7 +162,6 @@ const DiagnosticCard = ({ result }: { result: any }) => {
         </div>
       </div>
 
-      {/* 3. TIPS DU COACH */}
       {result.tips.length > 0 && (
         <div className="p-5 bg-white space-y-3">
              {result.tips.map((tip: any, i: number) => (
@@ -218,7 +173,6 @@ const DiagnosticCard = ({ result }: { result: any }) => {
         </div>
       )}
       
-      {/* 4. POINTS TECHNIQUES (Dropdown Discret) */}
       {result.issues.length > 0 && (
           <div className="px-5 pb-4 bg-white">
             <div className="pt-4 border-t border-slate-100">
@@ -236,22 +190,28 @@ const DiagnosticCard = ({ result }: { result: any }) => {
   );
 };
 
-// --- PAGE PRINCIPALE ---
+
+// ============================================================================
+// PAGE PRINCIPALE
+// ============================================================================
 
 export default function SimulatorPage() {
   const router = useRouter();
   
-  // 1. AJOUT DE L'HISTORIQUE ICI
-  const { profile, history, saveDecision, isLoaded } = useFinancialData();
+  // 1. DATA HOOKS
+  const { profile, history, saveDecision, saveProfile, isLoaded } = useFinancialData();
   
   const stats = useMemo(() => calculateFinancials(profile), [profile]);
   const isProfileEmpty = stats.monthlyIncome === 0 && stats.matelas === 0;
 
+  // 2. STATE LOCAL
   const [step, setStep] = useState<'input' | 'result'>('input');
+  const [mode, setMode] = useState<'PURCHASE' | 'GOAL'>('PURCHASE');
   const [isSaving, setIsSaving] = useState(false);
   
   const today = new Date().toISOString().split('T')[0];
 
+  // A. State Achat
   const [purchase, setPurchase] = useState({
     name: '',
     type: 'need',
@@ -264,22 +224,50 @@ export default function SimulatorPage() {
     isPro: false,
   });
 
+  // B. State Objectif
+  const [goalData, setGoalData] = useState({
+      name: '',
+      category: 'REAL_ESTATE',
+      targetAmount: '',
+      currentSaved: '0',
+      deadline: '',
+      projectedYield: '3'
+  });
+
+  // 3. EFFETS & MEMOS
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, [step]);
 
-  // 2. CORRECTION DE L'APPEL À ANALYZE
+  // Calcul temps réel de l'effort d'épargne (Mode GOAL)
+  const monthlyEffort = useMemo(() => {
+      if (mode !== 'GOAL') return 0;
+      
+      // ✅ CORRECTION 1 : On récupère le rendement
+      const yieldVal = parseFloat(goalData.projectedYield) || 0;
+
+      return calculateMonthlyEffort({
+          ...goalData,
+          targetAmount: parseFloat(goalData.targetAmount) || 0,
+          currentSaved: parseFloat(goalData.currentSaved) || 0,
+          projectedYield: yieldVal,
+          // ✅ CORRECTION 1 : On active le mode investissement si taux > 0
+          isInvested: yieldVal > 0 
+      });
+  }, [goalData, mode]);
+
+  // Calcul du résultat (Mode PURCHASE)
   const result = useMemo(() => {
-    if (step === 'result') {
-      // On passe profile ET history pour la Timeline
+    if (step === 'result' && mode === 'PURCHASE') {
       return analyzePurchaseImpact(stats, purchase, profile, history);
     }
     return null;
-  }, [step, stats, purchase, profile, history]);
+  }, [step, mode, stats, purchase, profile, history]);
 
-  const handleSave = async () => {
+
+  // 4. HANDLERS
+  const handleSavePurchase = async () => {
     if (!result) return;
-    
     setIsSaving(true);
     await new Promise(resolve => setTimeout(resolve, 600));
 
@@ -307,6 +295,37 @@ export default function SimulatorPage() {
     setIsSaving(false);
   };
 
+  const handleSaveGoal = async () => {
+      if (!goalData.name || !goalData.targetAmount) return;
+      setIsSaving(true);
+
+      // ✅ CORRECTION 2 : On récupère le rendement pour la sauvegarde
+      const yieldVal = parseFloat(goalData.projectedYield) || 0;
+
+      const newGoal = {
+          id: generateId(),
+          name: goalData.name,
+          category: goalData.category,
+          targetAmount: parseFloat(goalData.targetAmount),
+          currentSaved: parseFloat(goalData.currentSaved),
+          deadline: goalData.deadline,
+          projectedYield: yieldVal,
+          // ✅ CORRECTION 2 : On sauvegarde le flag isInvested
+          isInvested: yieldVal > 0
+      };
+
+      const updatedProfile = {
+          ...profile,
+          goals: [...(profile.goals || []), newGoal]
+      };
+
+      await saveProfile(updatedProfile);
+      setIsSaving(false);
+      router.push('/'); 
+  };
+
+
+  // 5. RENDER LOADER / EMPTY
   if (!isLoaded) return <div className="min-h-[50vh] flex items-center justify-center"><div className="animate-pulse h-12 w-12 bg-slate-200 rounded-full"></div></div>;
 
   if (isProfileEmpty) {
@@ -314,7 +333,7 @@ export default function SimulatorPage() {
       <div className="min-h-[60vh] flex flex-col items-center justify-center p-6 text-center animate-fade-in">
         <div className="p-4 bg-indigo-50 text-indigo-600 rounded-full mb-6"><Settings size={48} /></div>
         <h2 className="text-2xl font-bold text-slate-800 mb-3">Profil manquant</h2>
-        <p className="text-slate-500 max-w-md mb-8">Pour analyser tes achats, configure d&apos;abord ton profil.</p>
+        <p className="text-slate-500 max-w-md mb-8">Pour analyser tes projets, configure d&apos;abord ton profil.</p>
         <Button onClick={() => router.push('/profile')}>Configurer mon Profil</Button>
       </div>
     );
@@ -324,13 +343,36 @@ export default function SimulatorPage() {
     ? "Date de la 1ère échéance" 
     : "Date de l'achat";
 
+
+  // ==========================================================================
+  // RENDER PRINCIPAL
+  // ==========================================================================
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start animate-fade-in">
       
-      {/* --- COLONNE GAUCHE (FORMULAIRE) --- */}
+      {/* --- COLONNE GAUCHE (FORMULAIRES) --- */}
       <div className="lg:col-span-7 xl:col-span-8 space-y-6">
         
+        {/* LE SWITCH MODE */}
         {step === 'input' && (
+             <div className="flex p-1 bg-white border border-slate-200 rounded-xl mb-6 shadow-sm">
+                <button 
+                    onClick={() => setMode('PURCHASE')}
+                    className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-lg text-sm font-bold transition-all ${mode === 'PURCHASE' ? 'bg-indigo-50 text-indigo-700 shadow-sm ring-1 ring-indigo-200' : 'text-slate-500 hover:bg-slate-50'}`}
+                >
+                    <ShoppingBag size={18} /> Dépense / Achat
+                </button>
+                <button 
+                    onClick={() => setMode('GOAL')}
+                    className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-lg text-sm font-bold transition-all ${mode === 'GOAL' ? 'bg-emerald-50 text-emerald-700 shadow-sm ring-1 ring-emerald-200' : 'text-slate-500 hover:bg-slate-50'}`}
+                >
+                    <Target size={18} /> Objectif / Épargne
+                </button>
+            </div>
+        )}
+
+        {/* --- FORMULAIRE ACHAT (PURCHASE) --- */}
+        {step === 'input' && mode === 'PURCHASE' && (
           <Card className="p-6 md:p-8">
             <h2 className="text-2xl font-bold text-slate-800 mb-6">Décris ton achat</h2>
             <div className="space-y-6">
@@ -339,7 +381,7 @@ export default function SimulatorPage() {
               <div>
                 <label className="block text-sm font-medium text-slate-600 mb-2">Quel type d&apos;achat ?</label>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                  {Object.values(PURCHASE_TYPES).map((type) => (
+                  {Object.values(PURCHASE_TYPES).map((type: any) => (
                     <button key={type.id} onClick={() => setPurchase({ ...purchase, type: type.id })} className={`p-3 rounded-lg text-sm font-medium border-2 transition-all text-left sm:text-center group ${purchase.type === type.id ? type.color : 'bg-white border-slate-100 text-slate-500 hover:border-slate-200'}`}>
                       <div className="font-bold mb-1">{type.label}</div>
                       <div className="text-xs opacity-70 font-normal hidden sm:block">{type.description}</div>
@@ -356,7 +398,7 @@ export default function SimulatorPage() {
               <div>
                 <label className="block text-sm font-medium text-slate-600 mb-2">Comment tu paies ?</label>
                 <select className="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500" value={purchase.paymentMode} onChange={(e) => setPurchase({ ...purchase, paymentMode: e.target.value })}>
-                  {Object.entries(PAYMENT_MODES).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
+                  {Object.entries(PAYMENT_MODES).map(([key, label]: any) => <option key={key} value={key}>{label}</option>)}
                 </select>
               </div>
               
@@ -367,12 +409,6 @@ export default function SimulatorPage() {
                     <InputGroup label="Durée (mois)" type="number" value={purchase.duration} onChange={(v: string) => setPurchase({ ...purchase, duration: v })} />
                     {purchase.paymentMode === 'CREDIT' && <InputGroup label="Taux (%)" type="number" value={purchase.rate} onChange={(v: string) => setPurchase({ ...purchase, rate: v })} />}
                   </div>
-                  
-                  {purchase.duration && purchase.amount && (
-                      <div className="text-xs text-indigo-600 font-medium bg-indigo-100/50 p-3 rounded-lg border border-indigo-100">
-                          Mensualité estimée : ~{formatCurrency(parseFloat(purchase.amount) / parseInt(purchase.duration))} / mois
-                      </div>
-                  )}
                 </div>
               )}
               
@@ -391,31 +427,141 @@ export default function SimulatorPage() {
           </Card>
         )}
 
-        {step === 'result' && result && (
+
+        {/* --- FORMULAIRE OBJECTIF (GOAL) --- */}
+        {step === 'input' && mode === 'GOAL' && (
+            <Card className="p-6 md:p-8 border-emerald-100 ring-4 ring-emerald-50/50">
+                <h2 className="text-2xl font-bold text-emerald-900 mb-6 flex items-center gap-2">
+                    <Target className="text-emerald-600"/>
+                    Nouveau Projet de Vie
+                </h2>
+
+                <div className="space-y-6">
+                    {/* 1. Catégorie */}
+                    <div>
+                        <label className="block text-sm font-medium text-slate-600 mb-3">Quel type de projet ?</label>
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                            {Object.values(GOAL_CATEGORIES).map((cat: any) => (
+                                <div 
+                                    key={cat.id}
+                                    onClick={() => setGoalData({...goalData, category: cat.id})}
+                                    className={`cursor-pointer border-2 rounded-xl p-4 flex flex-col items-center justify-center gap-2 text-center transition-all ${goalData.category === cat.id ? 'border-emerald-500 bg-emerald-50 text-emerald-800' : 'border-slate-100 hover:border-emerald-200 hover:bg-slate-50'}`}
+                                >
+                                    <div className={`p-2 rounded-full ${goalData.category === cat.id ? 'bg-emerald-100 text-emerald-600' : 'bg-white text-slate-400'}`}>
+                                        {getGoalIcon(cat.id)}
+                                    </div>
+                                    <div className="font-bold text-sm">{cat.label}</div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* 2. Nom */}
+                    <InputGroup label="Nom du projet" placeholder="Ex: Apport Maison, Voyage Japon..." value={goalData.name} onChange={(v: string) => setGoalData({...goalData, name: v})} />
+
+                    {/* 3. Chiffres */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <InputGroup label="Montant Cible" type="number" suffix="€" placeholder="20000" value={goalData.targetAmount} onChange={(v: string) => setGoalData({...goalData, targetAmount: v})} />
+                        <InputGroup label="Date butoir" type="date" value={goalData.deadline} onChange={(v: string) => setGoalData({...goalData, deadline: v})} />
+                    </div>
+
+                    {/* 4. Avancé */}
+                    <div className="p-4 bg-slate-50 rounded-lg border border-slate-100">
+                         <div className="flex items-center gap-2 mb-3">
+                             <TrendingUp size={16} className="text-slate-400"/>
+                             <span className="text-sm font-bold text-slate-600">Options avancées</span>
+                         </div>
+                         <div className="grid grid-cols-2 gap-4">
+                            <InputGroup label="J'ai déjà (Apport)" type="number" suffix="€" value={goalData.currentSaved} onChange={(v: string) => setGoalData({...goalData, currentSaved: v})} />
+                            <InputGroup label="Rendement annuel (%)" type="number" suffix="%" value={goalData.projectedYield} onChange={(v: string) => setGoalData({...goalData, projectedYield: v})} />
+                         </div>
+                         <p className="text-[10px] text-slate-400 mt-2">Laisser à 0% pour une épargne simple sur compte courant.</p>
+                    </div>
+
+                    {/* 5. LE COACH (Calcul temps réel) */}
+                    {monthlyEffort > 0 && (
+                        <div className="mt-6 bg-emerald-50 border border-emerald-100 rounded-xl p-5 animate-fade-in">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <h4 className="text-emerald-900 font-bold text-lg">Effort requis</h4>
+                                    <p className="text-emerald-700 text-sm opacity-80">Pour atteindre l'objectif à temps</p>
+                                </div>
+                                <div className="text-right">
+                                    <span className="text-3xl font-black text-emerald-600 tracking-tight">
+                                        {Math.round(monthlyEffort)} €
+                                    </span>
+                                    <span className="text-sm font-bold text-emerald-600 uppercase"> / mois</span>
+                                </div>
+                            </div>
+                            
+                            {/* Analyse rapide */}
+                            <div className="mt-3 pt-3 border-t border-emerald-200/50 flex items-center gap-2 text-sm text-emerald-800">
+                                {monthlyEffort > stats.capacityToSave 
+                                    ? <><AlertTriangle size={16} className="text-amber-500"/> Attention, c'est supérieur à ta capacité actuelle ({Math.round(stats.capacityToSave)}€).</>
+                                    : <><CheckCircle size={16} className="text-emerald-500"/> C'est réaliste (Capacité: {Math.round(stats.capacityToSave)}€).</>
+                                }
+                            </div>
+                        </div>
+                    )}
+
+                    <Button 
+                        onClick={handleSaveGoal} 
+                        className="w-full bg-emerald-600 hover:bg-emerald-700 shadow-lg shadow-emerald-100 text-lg py-4"
+                        disabled={!goalData.name || !goalData.targetAmount || isSaving}
+                    >
+                        {isSaving ? "Création..." : "🚀 Créer mon objectif"}
+                    </Button>
+                </div>
+            </Card>
+        )}
+
+        {/* --- RÉSULTAT (UNIQUEMENT POUR PURCHASE) --- */}
+        {step === 'result' && result && mode === 'PURCHASE' && (
           <div className="space-y-6 animate-fade-in">
             <button onClick={() => setStep('input')} className="text-slate-500 flex items-center gap-1 text-sm font-medium hover:text-indigo-600 transition-colors">
               <ArrowLeft size={16} /> Modifier la saisie
             </button>
-            
             <PurchaseRecap purchase={purchase} />
             <DiagnosticCard result={result} />
           </div>
         )}
       </div>
 
-      {/* --- COLONNE DROITE (IMPACT) --- */}
+
+      {/* --- COLONNE DROITE (DASHBOARD LATÉRAL) --- */}
       <div className="lg:col-span-5 xl:col-span-4 lg:sticky lg:top-24 space-y-6">
-        {step === 'input' ? (
-          <Card className="p-6 bg-slate-50/50 border-slate-200">
-            <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2"><Wallet size={20} className="text-slate-400" /> Situation Actuelle</h3>
-            <div className="space-y-4">
-              <div className="flex justify-between items-center"><span className="text-slate-500 text-sm">Reste à vivre</span><span className="font-bold text-slate-700">{formatCurrency(stats.remainingToLive)}</span></div>
-              <div className="flex justify-between items-center"><span className="text-slate-500 text-sm">Épargne dispo</span><span className="font-bold text-slate-700">{formatCurrency(stats.matelas)}</span></div>
+        
+        {/* CARTE SITUATION ACTUELLE */}
+        <Card className="p-6 bg-white border-slate-100 shadow-sm">
+          <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2">
+            <Wallet size={20} className="text-slate-400" /> Situation Mensuelle
+          </h3>
+          <div className="space-y-4">
+            <div className="flex justify-between items-center p-3 bg-slate-50 rounded-lg">
+                <span className="text-slate-500 text-sm font-medium">Revenus</span>
+                <span className="font-bold text-slate-700">{formatCurrency(stats.monthlyIncome)}</span>
             </div>
-          </Card>
-        ) : (
+            
+            {/* Si des projets existent, on les montre ici */}
+            {stats.totalGoalsEffort > 0 && (
+                <div className="flex justify-between items-center p-3 bg-emerald-50 border border-emerald-100 rounded-lg">
+                    <span className="text-emerald-700 text-sm font-bold flex items-center gap-2"><Target size={14}/> Épargne Projets</span>
+                    <span className="font-bold text-emerald-700">-{formatCurrency(stats.totalGoalsEffort)}</span>
+                </div>
+            )}
+
+            <div className="flex justify-between items-center p-3 bg-indigo-50 border border-indigo-100 rounded-lg">
+                <span className="text-indigo-900 text-sm font-bold">Reste à vivre</span>
+                <span className="font-bold text-indigo-700 text-xl">{formatCurrency(stats.remainingToLive)}</span>
+            </div>
+          </div>
+        </Card>
+
+        {/* --- BLOC D'IMPACT (Seulement en mode Resultat Achat) --- */}
+        {step === 'result' && result && mode === 'PURCHASE' && (
           <div className="space-y-4 animate-fade-in">
-            <Card className="p-6 border-indigo-100 shadow-md bg-white">
+            <Card className="p-6 border-indigo-100 shadow-md bg-white relative overflow-hidden">
+              <div className="absolute top-0 left-0 w-1 h-full bg-indigo-500"></div>
               <h3 className="font-bold text-indigo-900 mb-4 flex items-center gap-2"><TrendingDown size={20} /> Impact Immédiat</h3>
               <div className="space-y-4">
                 <div>
@@ -430,13 +576,12 @@ export default function SimulatorPage() {
                 <div className="h-px bg-slate-100"></div>
                 <div>
                   <div className="text-xs text-slate-400 font-bold uppercase mb-1">Nouveau Reste à Vivre</div>
-                  <div className="font-bold text-slate-800 text-2xl">{formatCurrency(result.newRV)}</div>
+                  <div className={`font-bold text-2xl ${result.newRV < 0 ? 'text-rose-600' : 'text-slate-800'}`}>{formatCurrency(result.newRV)}</div>
                 </div>
               </div>
             </Card>
 
-            {/* --- NOUVEAU : MINI GRAPHIQUE 30 JOURS --- */}
-            
+            {/* --- MINI GRAPHIQUE 30 JOURS --- */}
             {result.projectedCurve && result.projectedCurve.length > 0 && (
               <Card className="p-4 border-slate-200 bg-white overflow-hidden">
                 <h3 className="text-xs font-bold text-slate-400 uppercase mb-3">Projection 30 Jours</h3>
@@ -446,46 +591,22 @@ export default function SimulatorPage() {
                     const heightPercent = Math.min(100, Math.max(5, (Math.abs(point.value) / (stats.monthlyIncome || 1000)) * 50));
                     return (
                       <div key={i} className="flex-1 flex flex-col justify-end h-full group relative">
-                         <div 
-                           className={`w-full rounded-t-sm transition-all ${isNegative ? 'bg-rose-400' : 'bg-emerald-300 group-hover:bg-emerald-400'}`} 
-                           style={{ height: `${heightPercent}%` }}
-                         ></div>
+                          <div 
+                            className={`w-full rounded-t-sm transition-all ${isNegative ? 'bg-rose-400' : 'bg-emerald-300 group-hover:bg-emerald-400'}`} 
+                            style={{ height: `${heightPercent}%` }}
+                          ></div>
                       </div>
                     );
                   })}
                 </div>
                 <div className="mt-2 text-[10px] text-center text-slate-400">
-                   Vision de ton compte si tu achètes
+                    Vision de ton compte si tu achètes
                 </div>
               </Card>
             )}
 
-            <Card className="p-6 border-slate-200 bg-slate-50/50">
-              <h3 className="font-bold text-slate-700 mb-4 text-sm uppercase tracking-wide">La réalité de cet achat</h3>
-              <div className="space-y-4">
-                {result.timeToWork > 0 && (
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 bg-white rounded-lg text-slate-500 shadow-sm"><Clock size={18} /></div>
-                    <div><div className="text-xs text-slate-500 font-medium">Temps de travail</div><div className="font-bold text-slate-800">{result.timeToWork < 1 ? "Quelques heures" : `${Math.ceil(result.timeToWork)} jours`}</div></div>
-                  </div>
-                )}
-                {result.opportunityCost > 10 && (
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 bg-white rounded-lg text-emerald-500 shadow-sm"><TrendingUp size={18} /></div>
-                    <div><div className="text-xs text-slate-500 font-medium">Manque à gagner (10 ans)</div><div className="font-bold text-emerald-700">{formatCurrency(result.opportunityCost)}</div></div>
-                  </div>
-                )}
-                 {result.creditCost > 0 && (
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 bg-white rounded-lg text-rose-500 shadow-sm"><PiggyBank size={18} /></div>
-                    <div><div className="text-xs text-slate-500 font-medium">Coût du crédit</div><div className="font-bold text-rose-700">{formatCurrency(result.creditCost)}</div></div>
-                  </div>
-                )}
-              </div>
-            </Card>
-
             <div className="flex flex-col gap-3">
-              <Button onClick={handleSave} className="w-full shadow-xl" disabled={isSaving}>{isSaving ? "..." : <><Save size={18} /> Enregistrer</>}</Button>
+              <Button onClick={handleSavePurchase} className="w-full shadow-xl" disabled={isSaving}>{isSaving ? "..." : <><Save size={18} /> Enregistrer la décision</>}</Button>
               <Button variant="secondary" onClick={() => setStep('input')} className="w-full" disabled={isSaving}><RefreshCcw size={18} /> Refaire un test</Button>
             </div>
           </div>

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo, Suspense } from 'react'; // 1. J'ai ajouté Suspense ici
+import React, { useMemo, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth, SignIn, SignUp } from '@clerk/nextjs';
 import { clerkAppearanceHybrid } from '@/app/config/clerk-theme';
@@ -25,11 +25,13 @@ import {
   Wallet,
   CreditCard,
   ShoppingCart,
-  Settings
+  Settings,
+  Target,     // NOUVEAU
+  Calendar    // NOUVEAU
 } from 'lucide-react';
 
 // ============================================================================
-// 1. HELPERS (Je garde tes helpers intacts)
+// 1. HELPERS
 // ============================================================================
 
 const ProgressBar = ({ value, max, colorClass }: { value: number, max: number, colorClass: string }) => {
@@ -102,6 +104,41 @@ const BudgetRow = ({ label, icon: Icon, amount, total, color, subtext = null }: 
     );
 };
 
+// --- NOUVEAU COMPOSANT : CARTE OBJECTIF ---
+const GoalCard = ({ goal }: { goal: any }) => {
+    const percent = Math.min(100, (goal.currentSaved / goal.targetAmount) * 100);
+    return (
+        <div className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm flex flex-col gap-3 group hover:border-emerald-200 transition-colors">
+            <div className="flex justify-between items-start">
+                <div className="flex items-center gap-3">
+                    <div className="p-2 bg-emerald-50 text-emerald-600 rounded-lg group-hover:bg-emerald-100 transition-colors">
+                        <Target size={18} />
+                    </div>
+                    <div>
+                        <div className="font-bold text-slate-800 text-sm">{goal.name}</div>
+                        <div className="text-[10px] text-slate-400 flex items-center gap-1">
+                            <Calendar size={10}/> {new Date(goal.deadline).toLocaleDateString('fr-FR', {year: 'numeric'})}
+                        </div>
+                    </div>
+                </div>
+                <div className="text-right">
+                    <div className="font-bold text-emerald-700 text-sm">{formatCurrency(goal.currentSaved)}</div>
+                    <div className="text-[10px] text-slate-400">sur {formatCurrency(goal.targetAmount)}</div>
+                </div>
+            </div>
+            
+            <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
+                <div className="h-full bg-emerald-500 transition-all duration-1000 ease-out" style={{ width: `${percent}%` }}></div>
+            </div>
+            
+            <div className="flex justify-between items-center text-[10px] font-medium pt-1 border-t border-slate-50">
+                <span className="text-slate-500">Effort mensuel</span>
+                <span className="text-emerald-600 font-bold">+{Math.round(goal.monthlyNeed)}€ / mois</span>
+            </div>
+        </div>
+    );
+};
+
 // ============================================================================
 // 2. DASHBOARD (VUE CONNECTÉE)
 // ============================================================================
@@ -152,7 +189,28 @@ function DashboardView() {
                     </div>
                 </div>
             </Card>
+            
             <Button onClick={() => router.push('/simulator')} className="w-full shadow-lg py-4"><Zap size={20} /> Simuler un nouvel achat</Button>
+            
+            {/* NOUVEAU BLOC : OBJECTIFS (Si présents) */}
+            {stats.goalsBreakdown && stats.goalsBreakdown.length > 0 && (
+                <div className="space-y-3">
+                    <div className="flex items-center justify-between px-1">
+                        <h3 className="text-sm font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2">
+                            <Target size={16} /> Mes Objectifs
+                        </h3>
+                        <span className="text-xs bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full font-bold">
+                            {stats.goalsBreakdown.length}
+                        </span>
+                    </div>
+                    <div className="space-y-3 max-h-[300px] overflow-y-auto pr-1 custom-scrollbar">
+                        {stats.goalsBreakdown.map((goal: any) => (
+                            <GoalCard key={goal.id} goal={goal} />
+                        ))}
+                    </div>
+                </div>
+            )}
+
             <Card className="p-6 !bg-slate-900 !text-white border-none relative overflow-hidden group hover:shadow-xl transition-all shadow-2xl">
                 <div className="absolute top-0 right-0 p-32 bg-indigo-600 rounded-full opacity-20 blur-3xl transform translate-x-10 -translate-y-10 group-hover:opacity-30 transition-opacity pointer-events-none"></div>
                 <div className="relative z-10">
@@ -182,9 +240,17 @@ function DashboardView() {
                     <BudgetRow label="Revenus Nets" icon={Wallet} amount={stats.monthlyIncome} total={stats.monthlyIncome} color={{ bg: 'bg-emerald-100', text: 'text-emerald-600', bar: 'bg-emerald-500' }} />
                     <div className="h-px bg-slate-100 my-4 mx-4"></div>
                     <BudgetRow label="Charges Fixes" icon={CreditCard} amount={stats.mandatoryExpenses} total={stats.monthlyIncome} color={{ bg: 'bg-slate-100', text: 'text-slate-600', bar: 'bg-slate-500' }} subtext="Loyer, factures, crédits..." />
-                    {stats.profitableExpenses > 0 && (
-                        <BudgetRow label="Investissements" icon={TrendingUp} amount={stats.profitableExpenses} total={stats.monthlyIncome} color={{ bg: 'bg-purple-100', text: 'text-purple-600', bar: 'bg-purple-500' }} subtext="Épargne active" />
+                    
+                    {/* AFFICHAGE DISTINCT DES PROJETS DANS LE BUDGET */}
+                    {stats.totalGoalsEffort > 0 && (
+                        <BudgetRow label="Épargne Projets" icon={Target} amount={stats.totalGoalsEffort} total={stats.monthlyIncome} color={{ bg: 'bg-emerald-100', text: 'text-emerald-600', bar: 'bg-emerald-500' }} subtext="Immo, Voyage..." />
                     )}
+                    
+                    {/* On affiche les investissements manuels (hors projets) s'il y en a */}
+                    {stats.profitableExpenses - stats.totalGoalsEffort > 0 && (
+                        <BudgetRow label="Investissements Libres" icon={TrendingUp} amount={stats.profitableExpenses - stats.totalGoalsEffort} total={stats.monthlyIncome} color={{ bg: 'bg-purple-100', text: 'text-purple-600', bar: 'bg-purple-500' }} subtext="Épargne active" />
+                    )}
+
                     <BudgetRow label="Vie Courante" icon={ShoppingCart} amount={stats.discretionaryExpenses} total={stats.monthlyIncome} color={{ bg: 'bg-indigo-100', text: 'text-indigo-600', bar: 'bg-indigo-500' }} subtext="Courses, plaisirs..." />
                     <div className="h-px bg-slate-100 my-6 mx-4"></div>
                     <div className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-200">
@@ -246,17 +312,15 @@ function DashboardView() {
   );
 }
 
-// ============================================================================
-// 3. COMPOSANT AUTH SCREEN (C'est lui qui gère la logique d'affichage)
-// ============================================================================
+// ... LE RESTE DU FICHIER (AuthScreen, Home) RESTE IDENTIQUE ...
+// Je te le remets pas pour éviter de saturer, tu peux garder la fin de ton fichier actuel.
+// Mais pour être complet si tu copies/colles tout :
 
 function AuthScreen() {
-    // 1. Détection du mode
     const searchParams = useSearchParams();
     const isSignUpMode = searchParams.get('mode') === 'signup';
-    const router = useRouter(); // Import de useRouter pour la redirection propre
+    const router = useRouter(); 
 
-    // 2. Fonctions de bascule
     const switchToSignIn = () => {
         router.replace('/?mode=login');
     };
@@ -267,9 +331,7 @@ function AuthScreen() {
   
     return (
       <div className="min-h-screen w-full bg-slate-50 flex md:grid md:grid-cols-2">
-        {/* MARKETING GAUCHE (Aucun changement) */}
         <div className="hidden md:flex flex-col justify-center p-12 lg:p-20 bg-indigo-600 text-white relative overflow-hidden">
-           {/* ... Contenu du bandeau gauche ... */}
            <div className="absolute top-0 right-0 p-40 bg-white opacity-5 rounded-full blur-3xl transform translate-x-20 -translate-y-20"></div>
            <div className="max-w-md mx-auto space-y-8 relative z-10">
              <div className="h-14 w-14 bg-white/10 rounded-2xl flex items-center justify-center backdrop-blur-md border border-white/20 shadow-xl"><TrendingUp size={32} /></div>
@@ -288,26 +350,23 @@ function AuthScreen() {
            </div>
         </div>
   
-        {/* FORMULAIRE DROITE */}
         <div className="flex-1 flex flex-col items-center justify-center p-4 md:p-12 bg-slate-50">
           <div className="w-full max-w-md">
-             <div className="md:hidden text-center mb-8"><h1 className="text-2xl font-black text-slate-900">Mon Coach</h1></div>
-             
-             {isSignUpMode ? (
-                // MODE INSCRIPTION
+              <div className="md:hidden text-center mb-8"><h1 className="text-2xl font-black text-slate-900">Mon Coach</h1></div>
+              
+              {isSignUpMode ? (
                 <SignUp 
                     key="signup"
-                    routing="virtual" // <-- IMPORTANT : Utilisation du routing virtuel
+                    routing="virtual" 
                     appearance={{
                       baseTheme: clerkAppearanceHybrid,
                       elements: {
                         footerActionLink: "cursor-pointer text-indigo-600 hover:text-indigo-700 font-bold"
                       }
                     }} 
-                    signInUrl="/?mode=login" // URL utilisée par le composant Clerk
+                    signInUrl="/?mode=login" 
                     afterSignInUrl="/"
                 >
-                    {/* On ajoute une customisation du footer si la prop signInUrl ne fonctionne pas directement */}
                     <div className="cl-footer-action-custom text-sm text-center mt-6">
                         <span className="text-slate-500">Vous avez déjà un compte ?</span>
                         <a 
@@ -318,18 +377,17 @@ function AuthScreen() {
                         </a>
                     </div>
                 </SignUp>
-             ) : (
-                // MODE CONNEXION
+              ) : (
                 <SignIn 
                     key="login"
-                    routing="virtual" // <-- IMPORTANT : Utilisation du routing virtuel
+                    routing="virtual" 
                     appearance={{
                         baseTheme: clerkAppearanceHybrid,
                         elements: {
                             footerActionLink: "cursor-pointer text-indigo-600 hover:text-indigo-700 font-bold"
                         }
                     }}
-                    signUpUrl="/?mode=signup" // URL utilisée par le composant Clerk
+                    signUpUrl="/?mode=signup" 
                     afterSignUpUrl="/"
                 >
                     <div className="cl-footer-action-custom text-sm text-center mt-6">
@@ -342,16 +400,12 @@ function AuthScreen() {
                         </a>
                     </div>
                 </SignIn>
-             )}
+              )}
           </div>
         </div>
       </div>
     );
 }
-
-// ============================================================================
-// 4. PAGE PRINCIPALE (Aiguilleur)
-// ============================================================================
 
 export default function Home() {
   const { isLoaded, isSignedIn } = useAuth();
@@ -365,8 +419,6 @@ export default function Home() {
     );
   }
 
-  // LOGIN / SIGNUP PAGE (Plein écran)
-  // On utilise Suspense car on lit les paramètres d'URL
   if (!isSignedIn) {
     return (
         <Suspense fallback={<div className="min-h-screen bg-slate-50 flex items-center justify-center"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div></div>}>
