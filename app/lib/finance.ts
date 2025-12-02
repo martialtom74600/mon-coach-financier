@@ -359,8 +359,8 @@ export const analyzePurchaseImpact = (currentStats: any, purchase: any, profile:
            issues.push({ level: 'orange', text: `Sécurité faible (${newSafetyMonths.toFixed(1)} mois).` });
            score -= 10;
       }
-      if (newEngagementRate > 45) {
-           issues.push({ level: 'orange', text: `Charges fixes élevées.` });
+      if (newEngagementRate > rules.maxDebt) {
+           issues.push({ level: 'orange', text: `Taux d'effort élevé (${newEngagementRate}% > ${rules.maxDebt}%).` });
            score -= 10;
       }
   }
