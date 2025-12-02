@@ -1,7 +1,6 @@
 import { 
   addDays, 
   startOfDay, 
-  getDate, 
   isLastDayOfMonth, 
   getDaysInMonth,
   addMonths,
@@ -9,12 +8,13 @@ import {
   format,
   isBefore,
   startOfMonth,
-  isAfter,
-  differenceInDays
+  differenceInDays,
+  parseISO
 } from 'date-fns';
 import { fr } from 'date-fns/locale';
 
-export const generateId = () => Math.random().toString(36).substr(2, 9);
+// --- CORRECTION : Import depuis utils pour éviter le conflit d'export ---
+import { generateId } from './utils';
 
 // Parsing sécurisé
 const safeFloat = (val: any) => {
@@ -25,87 +25,143 @@ const safeFloat = (val: any) => {
     return isNaN(parsed) ? 0 : parsed;
 };
 
+// Helper pour normaliser les clés de date (YYYY-MM-DD)
+const toDateKey = (date: Date | string) => {
+    const d = typeof date === 'string' ? new Date(date) : date;
+    return format(d, 'yyyy-MM-dd');
+};
+
+// --- CONFIGURATION DU LISSAGE DES DÉPENSES ---
+// Répartition psychologique des dépenses variables (Courses/Loisirs) sur la semaine
+// Index: 0=Dimanche, 1=Lundi, ... 6=Samedi
+const SPENDING_WEIGHTS = [
+    1.3, // Dimanche (Loisirs/Famille)
+    0.6, // Lundi (Calme)
+    0.6, // Mardi
+    0.6, // Mercredi
+    0.6, // Jeudi
+    1.0, // Vendredi (Sortie)
+    2.3  // Samedi (Gros courses + Sortie)
+];
+
 export const generateTimeline = (profile: any, history: any[], simulatedEvents: any[] = [], daysToProject = 730) => {
   
-  // 1. DÉFINITION DU "PRÉSENT"
+  // 1. DÉFINITION DU "PRÉSENT" ET ANCRE
   const realToday = new Date();
-  realToday.setHours(12, 0, 0, 0);
-
-  // 2. L'ANCRE TEMPORELLE (Le point de vérité)
-  // On cherche la date de "balanceDate" (mise à jour via le bouton sauvegarde)
-  // Sinon "updatedAt" (base de données), Sinon Aujourd'hui.
-  const anchorDate = profile.balanceDate 
+  
+  let anchorDateRaw = profile.balanceDate 
     ? new Date(profile.balanceDate) 
     : (profile.updatedAt ? new Date(profile.updatedAt) : realToday);
-    
+
+  const anchorDate = new Date(anchorDateRaw);
   anchorDate.setHours(12, 0, 0, 0);
 
-  // 3. DÉBUT DE L'AFFICHAGE (VISUEL)
-  // On recule au 1er du mois de l'ancre pour avoir un calendrier propre
   const startDateLoop = startOfMonth(anchorDate);
   startDateLoop.setHours(12, 0, 0, 0);
 
-  // Solde de départ (sera appliqué le jour de l'ancre)
   let currentBalance = safeFloat(profile.currentBalance);
 
-  // 4. ÉVÉNEMENTS RÉCURRENTS (TA LOGIQUE INTACTE)
-  const recurringEvents = [
-    ...(profile.incomes || []).map((i: any) => ({ name: i.name, type: 'income', day: parseInt(i.dayOfMonth) || 1, amount: safeFloat(i.amount) })),
-    ...(profile.fixedCosts || []).map((i: any) => ({ name: i.name, type: 'expense', day: parseInt(i.dayOfMonth) || 5, amount: safeFloat(i.amount) })),
-    ...(profile.subscriptions || []).map((i: any) => ({ name: i.name, type: 'expense', day: parseInt(i.dayOfMonth) || 10, amount: safeFloat(i.amount) })),
-    ...(profile.credits || []).map((i: any) => ({ name: i.name, type: 'expense', day: parseInt(i.dayOfMonth) || 15, amount: safeFloat(i.amount) })),
-    ...(profile.savingsContributions || []).map((i: any) => ({ name: `Épargne: ${i.name}`, type: 'expense', day: parseInt(i.dayOfMonth) || 20, amount: safeFloat(i.amount) })),
-  ];
+  // --- PRÉPARATION DES DÉPENSES VARIABLES PONDÉRÉES ---
+  const monthlyVarCost = safeFloat(profile.variableCosts);
+  const avgDaily = monthlyVarCost / 30;
+  const costPerWeekDay = SPENDING_WEIGHTS.map(w => avgDaily * w);
 
-  // 5. HISTORIQUE (TA LOGIQUE INTACTE)
-  const historyEvents: any[] = [];
+  // =================================================================================
+  // OPTIMISATION 1 : PRÉ-CLASSEMENT DES ÉVÉNEMENTS RÉCURRENTS
+  // =================================================================================
+  const recurringByDay = new Map<number, any[]>();
+
+  const pushRecurring = (items: any[], type: string, defaultDay: number) => {
+      (items || []).forEach((item: any) => {
+          const day = parseInt(item.dayOfMonth) || defaultDay;
+          const amount = safeFloat(item.amount);
+          if (amount > 0) {
+              if (!recurringByDay.has(day)) recurringByDay.set(day, []);
+              recurringByDay.get(day)?.push({
+                  name: item.name, 
+                  type: type,
+                  amount: type === 'income' ? amount : -amount
+              });
+          }
+      });
+  };
+
+  pushRecurring(profile.incomes, 'income', 1);
+  pushRecurring(profile.fixedCosts, 'expense', 5);
+  pushRecurring(profile.subscriptions, 'expense', 10);
+  pushRecurring(profile.credits, 'expense', 15);
+  (profile.savingsContributions || []).forEach((i: any) => {
+      const day = parseInt(i.dayOfMonth) || 20;
+      const amount = safeFloat(i.amount);
+      if(amount > 0) {
+          if (!recurringByDay.has(day)) recurringByDay.set(day, []);
+          recurringByDay.get(day)?.push({ name: `Épargne: ${i.name}`, type: 'expense', amount: -amount });
+      }
+  });
+
+  // =================================================================================
+  // OPTIMISATION 2 : PRÉ-CLASSEMENT DE L'HISTORIQUE ET SIMULATIONS
+  // =================================================================================
+  const oneOffEventsMap = new Map<string, any[]>();
+
+  const addOneOffEvent = (date: Date | string, event: any) => {
+      const key = toDateKey(date);
+      if (!oneOffEventsMap.has(key)) oneOffEventsMap.set(key, []);
+      oneOffEventsMap.get(key)?.push(event);
+  };
+
+  // A. Historique
   if (Array.isArray(history)) {
-    history.forEach((decision: any) => {
-        if (!decision.purchase) return;
-        const p = decision.purchase;
-        const amount = safeFloat(p.amount);
-        const d = new Date(p.date || decision.date);
-        d.setHours(12,0,0,0);
+      history.forEach((decision: any) => {
+          if (!decision.purchase) return;
+          const p = decision.purchase;
+          const amount = safeFloat(p.amount);
+          const d = new Date(p.date || decision.date);
 
-        if (p.paymentMode === 'CASH_FLOW' || p.paymentMode === 'CASH_ACCOUNT') {
-            historyEvents.push({ date: d, amount: -amount, name: p.name, type: 'purchase' });
-        }
-        else if ((p.paymentMode === 'CREDIT' || p.paymentMode === 'SPLIT') && p.duration) {
-            const duration = parseInt(p.duration) || 1;
-            const monthlyPart = amount / duration;
-            for (let i = 0; i < duration; i++) {
-                const payDate = addMonths(d, i);
-                payDate.setHours(12,0,0,0);
-                historyEvents.push({ date: payDate, amount: -monthlyPart, name: `${p.name} (${i + 1}/${duration})`, type: 'debt' });
-            }
-        }
-    });
+          if (p.paymentMode === 'CASH_FLOW' || p.paymentMode === 'CASH_ACCOUNT') {
+              addOneOffEvent(d, { name: p.name, amount: -amount, type: 'purchase' });
+          }
+          else if ((p.paymentMode === 'CREDIT' || p.paymentMode === 'SPLIT') && p.duration) {
+              const duration = parseInt(p.duration) || 1;
+              const monthlyPart = amount / duration;
+              for (let i = 0; i < duration; i++) {
+                  const payDate = addMonths(d, i);
+                  addOneOffEvent(payDate, { 
+                      name: `${p.name} (${i + 1}/${duration})`, 
+                      amount: -monthlyPart, 
+                      type: 'debt' 
+                  });
+              }
+          }
+      });
   }
 
-  // 6. LISSAGE VIE COURANTE
-  const dailyVariableCost = safeFloat(profile.variableCosts) / 30;
+  // B. Simulations
+  if (simulatedEvents && simulatedEvents.length > 0) {
+      simulatedEvents.forEach((s: any) => {
+          addOneOffEvent(s.date, { ...s });
+      });
+  }
 
-  // --- BOUCLE PRINCIPALE ---
+  // =================================================================================
+  // BOUCLE PRINCIPALE (PROJECTION)
+  // =================================================================================
   const monthsMap = new Map();
-
-  // On calcule combien de jours il y a entre le début de l'affichage et l'ancre
   const daysFromStartToAnchor = differenceInDays(anchorDate, startDateLoop);
-  // On projette X jours APRÈS l'ancre (pour garantir le futur)
   const totalDays = Math.abs(daysFromStartToAnchor) + daysToProject;
+  const anchorKey = toDateKey(anchorDate);
 
   for (let i = 0; i < totalDays; i++) {
     const currentDate = addDays(startDateLoop, i);
+    currentDate.setHours(12, 0, 0, 0); 
+    
+    const dateKey = toDateKey(currentDate);
     const dayNum = currentDate.getDate();
     const isMonthEnd = isLastDayOfMonth(currentDate);
-    const daysInCurrentMonth = getDaysInMonth(currentDate);
     const monthKey = format(currentDate, 'yyyy-MM');
 
-    // LOGIQUE TEMPORELLE
-    // Est-ce qu'on est avant la date de vérité ?
-    const isBeforeAnchor = isBefore(currentDate, anchorDate);
-    const isAnchorDay = isSameDay(currentDate, anchorDate);
-    
-    // Le moteur ne calcule que si on a atteint ou dépassé l'ancre
+    const isBeforeAnchor = dateKey < anchorKey;
+    const isAnchorDay = dateKey === anchorKey;
     const shouldCalculate = !isBeforeAnchor;
 
     if (!monthsMap.has(monthKey)) {
@@ -117,67 +173,76 @@ export const generateTimeline = (profile: any, history: any[], simulatedEvents: 
         });
     }
     const currentMonthData = monthsMap.get(monthKey);
-
     let dailyImpact = 0;
     const eventsOfTheDay: any[] = [];
 
-    // A. Récurrents
-    recurringEvents.forEach((e: any) => {
-        const isTargetDay = e.day === dayNum;
-        const isFallback = e.day > daysInCurrentMonth && isMonthEnd;
+    // 1. Récurrents
+    if (recurringByDay.has(dayNum)) {
+        const events = recurringByDay.get(dayNum) || [];
+        events.forEach(e => {
+            eventsOfTheDay.push({ id: generateId(), ...e });
+            if (shouldCalculate) dailyImpact += e.amount;
+        });
+    }
 
-        if ((isTargetDay || isFallback) && e.amount > 0) {
-            const val = e.type === 'income' ? e.amount : -e.amount;
-            eventsOfTheDay.push({ id: generateId(), name: e.name, amount: val, type: e.type });
-            // On n'applique au solde que si le calcul est actif
-            if (shouldCalculate) dailyImpact += val;
+    // Fin de mois intelligente
+    if (isMonthEnd) {
+        for (let d = dayNum + 1; d <= 31; d++) {
+            if (recurringByDay.has(d)) {
+                const events = recurringByDay.get(d) || [];
+                events.forEach(e => {
+                     eventsOfTheDay.push({ id: generateId(), ...e });
+                     if (shouldCalculate) dailyImpact += e.amount;
+                });
+            }
+        }
+    }
+
+    // 2. Ponctuels (Historique + Simu)
+    if (oneOffEventsMap.has(dateKey)) {
+        const oneOffs = oneOffEventsMap.get(dateKey) || [];
+        oneOffs.forEach(e => {
+            eventsOfTheDay.push({ id: generateId(), ...e });
+            if (shouldCalculate) dailyImpact += e.amount;
+        });
+    }
+
+    // 3. Vie courante (Pondérée)
+    if (shouldCalculate && !isAnchorDay && monthlyVarCost > 0 && currentBalance > 0) {
+        const currentWeekDay = currentDate.getDay(); 
+        const dynamicDailyCost = costPerWeekDay[currentWeekDay];
+        dailyImpact -= dynamicDailyCost;
+    }
+
+    // --- LE CORRECTIF : CALCULER L'IMPACT DE LA SIMULATION DU JOUR ---
+    // On isole l'impact des events simulés pour pouvoir les forcer le jour de l'ancre
+    let simulationImpactOfTheDay = 0;
+    eventsOfTheDay.forEach((e: any) => {
+        if (e.isSimulation) {
+            simulationImpactOfTheDay += e.amount;
         }
     });
 
-    // B. Fusion Historique + Simulation
-    const allOneOffEvents = [...historyEvents];
-    // Injection du nouveau moteur (Simulated Events)
-    if (simulatedEvents && simulatedEvents.length > 0) {
-        simulatedEvents.forEach((s: any) => allOneOffEvents.push({ ...s, date: new Date(s.date) }));
-    }
-
-    allOneOffEvents.forEach((h: any) => {
-        const hDate = new Date(h.date);
-        hDate.setHours(12,0,0,0);
-        if (isSameDay(currentDate, hDate)) {
-            eventsOfTheDay.push({ id: generateId(), name: h.name, amount: h.amount, type: h.type });
-            if (shouldCalculate) dailyImpact += h.amount;
-        }
-    });
-
-    // C. Vie courante
-    // On ne déduit pas le jour de l'ancre (on suppose que le solde saisi est net)
-    if (shouldCalculate && !isAnchorDay && dailyVariableCost > 0 && currentBalance > 0) {
-        dailyImpact -= dailyVariableCost;
-    }
-
-    // MISE À JOUR DU SOLDE (C'est ici que la magie opère)
+    // 4. Mise à jour du solde
     if (isAnchorDay) {
-        // RESET : C'est le jour de vérité, on force la valeur saisie par l'utilisateur
+        // RESET : On prend la vérité banque
         currentBalance = safeFloat(profile.currentBalance);
+        // FIX : On applique quand même la simulation si elle est aujourd'hui
+        currentBalance += simulationImpactOfTheDay;
     } 
     else if (shouldCalculate) {
-        // ÉVOLUTION : Pour les jours suivants, on applique les mouvements
         currentBalance += dailyImpact;
     }
 
-    // PUSH DU JOUR
+    // 5. Push du résultat
     currentMonthData.days.push({
         date: currentDate.toISOString(),
         dayOfMonth: dayNum,
-        // Si avant l'ancre -> null (case grisée/vide)
-        // Si après -> solde calculé
         balance: isBeforeAnchor ? null : Math.round(currentBalance),
         events: eventsOfTheDay,
         status: !isBeforeAnchor && currentBalance < 0 ? 'danger' : 'safe'
     });
-    
-    // On met à jour la stat de fin de mois uniquement si on a des données calculées
+
     if (shouldCalculate) {
         currentMonthData.stats.balanceEnd = Math.round(currentBalance);
     }
