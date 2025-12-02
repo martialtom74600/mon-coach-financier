@@ -12,10 +12,10 @@ import {
   ArrowRight, 
   List,
   LayoutGrid,
-  Trash2 // <-- Import poubelle
+  Trash2
 } from 'lucide-react';
 import { useFinancialData } from '@/app/hooks/useFinancialData';
-import { formatCurrency, generateTimeline } from '@/app/lib/logic';
+import { formatCurrency, generateTimeline } from '@/app/lib/logic'; // Utilise le nouvel export unifié
 
 import Card from '@/app/components/ui/Card';
 import Button from '@/app/components/ui/Button';
@@ -25,18 +25,19 @@ import CalendarView from '@/app/components/CalendarView';
 
 export default function HistoryPage() {
   const router = useRouter();
-  // On récupère deleteDecision ici
   const { history, profile, isLoaded, deleteDecision } = useFinancialData();
   
   const [viewMode, setViewMode] = useState<'list' | 'calendar'>('calendar');
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
 
-  // Timeline
+  // --- TIMELINE (Génération sécurisée) ---
   const timeline = useMemo(() => {
     if (!profile) return [];
     try {
-        return generateTimeline(profile, Array.isArray(history) ? history : [], 730);
+        // On passe l'historique complet pour générer la vue globale
+        return generateTimeline(profile, Array.isArray(history) ? history : [], [], 730);
     } catch (e) {
+        console.error("Erreur Timeline History:", e);
         return [];
     }
   }, [profile, history]);
@@ -61,7 +62,7 @@ export default function HistoryPage() {
 
   // ACTION SUPPRESSION
   const handleDelete = async (id: string, e: React.MouseEvent) => {
-      e.stopPropagation(); // Empêche d'ouvrir la simulation en cliquant sur la poubelle
+      e.stopPropagation(); 
       if (window.confirm("Veux-tu vraiment supprimer cette simulation ?")) {
           setIsDeleting(id);
           try {
@@ -128,7 +129,7 @@ export default function HistoryPage() {
                     return (
                     <Card key={item.id} className={`p-5 flex flex-col sm:flex-row gap-4 sm:items-center transition-all hover:shadow-md border-l-4 ${theme.border.replace('border', 'border-l')} relative group`}>
                         
-                        {/* Bouton Poubelle (Apparaît au survol) */}
+                        {/* Bouton Poubelle */}
                         <button 
                             onClick={(e) => handleDelete(item.id, e)}
                             className="absolute top-4 right-4 p-2 bg-white text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-full transition-all opacity-0 group-hover:opacity-100 shadow-sm border border-slate-100"
@@ -161,7 +162,7 @@ export default function HistoryPage() {
                         </div>
 
                         {/* Montant & Verdict */}
-                        <div className="text-right flex flex-col items-end gap-1 sm:pr-12"> {/* Padding pour laisser place à la poubelle */}
+                        <div className="text-right flex flex-col items-end gap-1 sm:pr-12">
                             <div className="font-black text-slate-900 text-xl tracking-tight">
                                 {formatCurrency(item.purchase?.amount)}
                             </div>

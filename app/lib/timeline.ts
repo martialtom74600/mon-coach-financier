@@ -12,8 +12,6 @@ import {
   parseISO
 } from 'date-fns';
 import { fr } from 'date-fns/locale';
-
-// --- CORRECTION : Import depuis utils pour éviter le conflit d'export ---
 import { generateId } from './utils';
 
 // Parsing sécurisé
@@ -32,16 +30,14 @@ const toDateKey = (date: Date | string) => {
 };
 
 // --- CONFIGURATION DU LISSAGE DES DÉPENSES ---
-// Répartition psychologique des dépenses variables (Courses/Loisirs) sur la semaine
-// Index: 0=Dimanche, 1=Lundi, ... 6=Samedi
 const SPENDING_WEIGHTS = [
-    1.3, // Dimanche (Loisirs/Famille)
-    0.6, // Lundi (Calme)
+    1.3, // Dimanche
+    0.6, // Lundi
     0.6, // Mardi
     0.6, // Mercredi
     0.6, // Jeudi
-    1.0, // Vendredi (Sortie)
-    2.3  // Samedi (Gros courses + Sortie)
+    1.0, // Vendredi
+    2.3  // Samedi
 ];
 
 export const generateTimeline = (profile: any, history: any[], simulatedEvents: any[] = [], daysToProject = 730) => {
@@ -67,7 +63,7 @@ export const generateTimeline = (profile: any, history: any[], simulatedEvents: 
   const costPerWeekDay = SPENDING_WEIGHTS.map(w => avgDaily * w);
 
   // =================================================================================
-  // OPTIMISATION 1 : PRÉ-CLASSEMENT DES ÉVÉNEMENTS RÉCURRENTS
+  // 1. PRÉ-CLASSEMENT DES ÉVÉNEMENTS RÉCURRENTS
   // =================================================================================
   const recurringByDay = new Map<number, any[]>();
 
@@ -100,7 +96,7 @@ export const generateTimeline = (profile: any, history: any[], simulatedEvents: 
   });
 
   // =================================================================================
-  // OPTIMISATION 2 : PRÉ-CLASSEMENT DE L'HISTORIQUE ET SIMULATIONS
+  // 2. PRÉ-CLASSEMENT DE L'HISTORIQUE ET SIMULATIONS
   // =================================================================================
   const oneOffEventsMap = new Map<string, any[]>();
 
@@ -144,12 +140,14 @@ export const generateTimeline = (profile: any, history: any[], simulatedEvents: 
   }
 
   // =================================================================================
-  // BOUCLE PRINCIPALE (PROJECTION)
+  // BOUCLE PRINCIPALE (OPTIMISÉE "SAFE BY DESIGN")
   // =================================================================================
   const monthsMap = new Map();
   const daysFromStartToAnchor = differenceInDays(anchorDate, startDateLoop);
   const totalDays = Math.abs(daysFromStartToAnchor) + daysToProject;
   const anchorKey = toDateKey(anchorDate);
+
+  let runningBalance = 0;
 
   for (let i = 0; i < totalDays; i++) {
     const currentDate = addDays(startDateLoop, i);
@@ -162,8 +160,75 @@ export const generateTimeline = (profile: any, history: any[], simulatedEvents: 
 
     const isBeforeAnchor = dateKey < anchorKey;
     const isAnchorDay = dateKey === anchorKey;
-    const shouldCalculate = !isBeforeAnchor;
+    
+    const eventsOfTheDay: any[] = [];
 
+    // --- 1. SÉPARATION DES FLUX ---
+    // On distingue ce qui rentre et ce qui sort pour appliquer des règles différentes le Jour J
+    let dailyNegativeImpact = 0; // Dépenses programmées
+    let dailyPositiveImpact = 0; // Revenus programmés
+    let simulationImpact = 0;    // Simulations (toujours appliquées)
+
+    // Helper d'ajout intelligent
+    const addEvents = (events: any[]) => {
+        if (!events) return;
+        events.forEach(e => {
+            eventsOfTheDay.push({ id: generateId(), ...e });
+            
+            // Si c'est une simulation, on traite à part (c'est un test utilisateur)
+            if (e.isSimulation) {
+                simulationImpact += e.amount;
+            } 
+            // Sinon, on trie (Revenu vs Dépense)
+            else {
+                if (e.amount < 0) dailyNegativeImpact += e.amount;
+                else dailyPositiveImpact += e.amount;
+            }
+        });
+    };
+
+    // A. Récurrents
+    if (recurringByDay.has(dayNum)) addEvents(recurringByDay.get(dayNum) || []);
+    if (isMonthEnd) {
+        for (let d = dayNum + 1; d <= 31; d++) {
+            if (recurringByDay.has(d)) addEvents(recurringByDay.get(d) || []);
+        }
+    }
+
+    // B. Ponctuels (History)
+    if (oneOffEventsMap.has(dateKey)) addEvents(oneOffEventsMap.get(dateKey) || []);
+
+    // C. Vie courante (Variable Costs)
+    let dailyLivingCost = 0;
+    if (!isBeforeAnchor && !isAnchorDay && monthlyVarCost > 0) {
+        const currentWeekDay = currentDate.getDay(); 
+        dailyLivingCost = -costPerWeekDay[currentWeekDay]; // C'est une dépense (négatif)
+    }
+
+    // --- 2. MISE A JOUR DU SOLDE (LOGIQUE ASYMÉTRIQUE) ---
+    
+    if (isAnchorDay) {
+        // RESET : On prend la saisie utilisateur
+        runningBalance = safeFloat(profile.currentBalance);
+        
+        // RÈGLE DE SÉCURITÉ :
+        // 1. On applique les DÉPENSES prévues (Pessimisme : "ça va être débité ce soir")
+        runningBalance += dailyNegativeImpact; 
+        
+        // 2. On applique les SIMULATIONS (Logique : "Je veux voir l'effet de mon action")
+        runningBalance += simulationImpact;
+
+        // 3. On IGNORE les REVENUS prévus (Prudence : "C'est déjà dans le solde ou ça viendra demain")
+        // runningBalance += dailyPositiveImpact; <--- ON NE LE FAIT PAS !
+        
+        // Note : On n'applique pas la vie courante le jour J (déjà vécue)
+    } 
+    else if (!isBeforeAnchor) {
+        // Jours suivants : On applique TOUT normalement
+        runningBalance += dailyNegativeImpact + dailyPositiveImpact + simulationImpact + dailyLivingCost;
+    }
+
+    // 3. Construction de l'objet mois
     if (!monthsMap.has(monthKey)) {
         monthsMap.set(monthKey, {
             id: monthKey,
@@ -173,78 +238,19 @@ export const generateTimeline = (profile: any, history: any[], simulatedEvents: 
         });
     }
     const currentMonthData = monthsMap.get(monthKey);
-    let dailyImpact = 0;
-    const eventsOfTheDay: any[] = [];
 
-    // 1. Récurrents
-    if (recurringByDay.has(dayNum)) {
-        const events = recurringByDay.get(dayNum) || [];
-        events.forEach(e => {
-            eventsOfTheDay.push({ id: generateId(), ...e });
-            if (shouldCalculate) dailyImpact += e.amount;
-        });
-    }
-
-    // Fin de mois intelligente
-    if (isMonthEnd) {
-        for (let d = dayNum + 1; d <= 31; d++) {
-            if (recurringByDay.has(d)) {
-                const events = recurringByDay.get(d) || [];
-                events.forEach(e => {
-                     eventsOfTheDay.push({ id: generateId(), ...e });
-                     if (shouldCalculate) dailyImpact += e.amount;
-                });
-            }
-        }
-    }
-
-    // 2. Ponctuels (Historique + Simu)
-    if (oneOffEventsMap.has(dateKey)) {
-        const oneOffs = oneOffEventsMap.get(dateKey) || [];
-        oneOffs.forEach(e => {
-            eventsOfTheDay.push({ id: generateId(), ...e });
-            if (shouldCalculate) dailyImpact += e.amount;
-        });
-    }
-
-    // 3. Vie courante (Pondérée)
-    if (shouldCalculate && !isAnchorDay && monthlyVarCost > 0 && currentBalance > 0) {
-        const currentWeekDay = currentDate.getDay(); 
-        const dynamicDailyCost = costPerWeekDay[currentWeekDay];
-        dailyImpact -= dynamicDailyCost;
-    }
-
-    // --- LE CORRECTIF : CALCULER L'IMPACT DE LA SIMULATION DU JOUR ---
-    // On isole l'impact des events simulés pour pouvoir les forcer le jour de l'ancre
-    let simulationImpactOfTheDay = 0;
-    eventsOfTheDay.forEach((e: any) => {
-        if (e.isSimulation) {
-            simulationImpactOfTheDay += e.amount;
-        }
-    });
-
-    // 4. Mise à jour du solde
-    if (isAnchorDay) {
-        // RESET : On prend la vérité banque
-        currentBalance = safeFloat(profile.currentBalance);
-        // FIX : On applique quand même la simulation si elle est aujourd'hui
-        currentBalance += simulationImpactOfTheDay;
-    } 
-    else if (shouldCalculate) {
-        currentBalance += dailyImpact;
-    }
-
-    // 5. Push du résultat
+    // 4. Push du résultat
     currentMonthData.days.push({
         date: currentDate.toISOString(),
         dayOfMonth: dayNum,
-        balance: isBeforeAnchor ? null : Math.round(currentBalance),
+        // Si c'est le passé, on met null
+        balance: isBeforeAnchor ? null : Math.round(runningBalance),
         events: eventsOfTheDay,
-        status: !isBeforeAnchor && currentBalance < 0 ? 'danger' : 'safe'
+        status: !isBeforeAnchor && runningBalance < 0 ? 'danger' : 'safe'
     });
 
-    if (shouldCalculate) {
-        currentMonthData.stats.balanceEnd = Math.round(currentBalance);
+    if (!isBeforeAnchor) {
+        currentMonthData.stats.balanceEnd = Math.round(runningBalance);
     }
   }
 

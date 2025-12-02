@@ -73,7 +73,6 @@ const PurchaseRecap = ({ purchase }: { purchase: any }) => {
   // @ts-ignore
   const paymentLabel = PAYMENT_MODES[purchase.paymentMode] || purchase.paymentMode;
 
-  // Calcul de la date de fin (basé sur la date unique)
   let endDateStr = '';
   if ((purchase.paymentMode === 'CREDIT' || purchase.paymentMode === 'SPLIT') && purchase.duration && purchase.date) {
       const start = new Date(purchase.date);
@@ -99,7 +98,6 @@ const PurchaseRecap = ({ purchase }: { purchase: any }) => {
             <div className="w-px h-3 bg-slate-300 self-center"></div>
             <div className="flex items-center gap-1.5">
                 <Calendar size={14} />
-                {/* On précise ce que représente la date */}
                 <span>
                     {purchase.paymentMode === 'CASH_SAVINGS' ? 'Achat le ' : '1ère échéance le '} 
                     {new Date(purchase.date).toLocaleDateString('fr-FR')}
@@ -139,89 +137,101 @@ const PurchaseRecap = ({ purchase }: { purchase: any }) => {
   );
 };
 
-// --- CARTE DIAGNOSTIC ---
+// --- NOUVELLE CARTE DIAGNOSTIC (DOUBLE PILIER) ---
 const DiagnosticCard = ({ result }: { result: any }) => {
-  const [showDetails, setShowDetails] = useState(true);
-
   const theme = {
-    green: { bg: 'bg-emerald-600', icon: CheckCircle, title: 'Feu Vert' },
-    orange: { bg: 'bg-amber-500', icon: AlertTriangle, title: 'À surveiller' },
-    red: { bg: 'bg-rose-600', icon: XCircle, title: 'Pas maintenant' },
+    green: { bg: 'bg-emerald-600', icon: CheckCircle },
+    orange: { bg: 'bg-amber-500', icon: AlertTriangle },
+    red: { bg: 'bg-rose-600', icon: XCircle },
   }[result.verdict as 'green' | 'orange' | 'red'];
 
-  const Icon = theme.icon;
+  const MainIcon = theme.icon;
 
-  const tipStyles: any = {
-    stop: { icon: AlertOctagon, bg: 'bg-rose-50', text: 'text-rose-800', border: 'border-rose-100' },
-    warning: { icon: AlertTriangle, bg: 'bg-amber-50', text: 'text-amber-800', border: 'border-amber-100' },
-    action: { icon: ArrowRightCircle, bg: 'bg-blue-50', text: 'text-blue-800', border: 'border-blue-100' },
-    investor: { icon: TrendingUp, bg: 'bg-emerald-50', text: 'text-emerald-800', border: 'border-emerald-100' },
-    time: { icon: Clock, bg: 'bg-slate-50', text: 'text-slate-700', border: 'border-slate-100' },
-    psychology: { icon: Brain, bg: 'bg-purple-50', text: 'text-purple-800', border: 'border-purple-100' },
-    success: { icon: CheckCircle, bg: 'bg-green-50', text: 'text-green-800', border: 'border-green-100' },
-    info: { icon: Info, bg: 'bg-gray-50', text: 'text-gray-700', border: 'border-gray-100' }
-  };
+  // Helpers badge
+  const getStatusBadge = (isOk: boolean) => 
+    isOk 
+      ? <span className="flex items-center gap-1 text-xs font-bold text-emerald-700 bg-emerald-100 px-2 py-1 rounded-md border border-emerald-200"><CheckCircle size={12}/> Validé</span>
+      : <span className="flex items-center gap-1 text-xs font-bold text-rose-700 bg-rose-100 px-2 py-1 rounded-md border border-rose-200"><XCircle size={12}/> Risqué</span>;
 
   return (
-    <Card className="overflow-hidden shadow-lg animate-fade-in p-0 border-slate-100">
-      {/* EN-TÊTE */}
-      <div className={`${theme.bg} p-6 text-white flex items-center gap-4 relative overflow-hidden`}>
+    <Card className="overflow-hidden shadow-xl border-slate-100 p-0 animate-fade-in">
+      
+      {/* 1. EN-TÊTE PRINCIPAL (Synthèse) */}
+      <div className={`${theme.bg} p-6 text-white relative overflow-hidden`}>
         <div className="absolute -right-6 -top-6 w-32 h-32 bg-white opacity-10 rounded-full blur-2xl"></div>
-        <Icon size={40} className="shrink-0 relative z-10" />
-        <div className="relative z-10">
-          <h2 className="text-2xl font-bold">{theme.title}</h2>
-          <p className="text-white/90 text-sm font-medium opacity-90">Analyse terminée</p>
+        <div className="relative z-10 flex items-start gap-4">
+           <div className="p-2 bg-white/20 rounded-xl backdrop-blur-md shrink-0">
+             <MainIcon size={32} />
+           </div>
+           <div>
+             <h2 className="text-xl font-bold">{result.smartTitle}</h2>
+             <p className="text-white/90 text-sm font-medium opacity-95 leading-relaxed">{result.smartMessage}</p>
+           </div>
         </div>
       </div>
 
-      {/* CORPS */}
-      <div className="bg-white p-6 space-y-4">
-        <h3 className="font-bold text-slate-800 text-sm uppercase tracking-wide flex items-center gap-2">
-            <Target size={16} /> L&apos;avis du Coach
-        </h3>
+      {/* 2. LES DEUX PILIERS (CLARIFICATION) */}
+      <div className="grid grid-cols-2 divide-x divide-slate-100 border-b border-slate-100 bg-slate-50/50">
         
-        <div className="space-y-3">
-            {result.tips.map((tip: any, i: number) => {
-                const style = tipStyles[tip.type] || tipStyles.info;
-                const TipIcon = style.icon;
-                return (
-                    <div key={i} className={`p-4 rounded-xl border flex gap-4 items-start ${style.bg} ${style.border}`}>
-                        <div className={`p-2 bg-white rounded-full shrink-0 ${style.text} shadow-sm`}>
-                            <TipIcon size={18} />
-                        </div>
-                        <div>
-                            <h4 className={`font-bold text-sm mb-1 ${style.text}`}>{tip.title}</h4>
-                            <p className={`text-sm leading-relaxed opacity-90 ${style.text}`}>{tip.text}</p>
-                        </div>
-                    </div>
-                );
-            })}
+        {/* PILIER GAUCHE : BUDGET (THÉORIQUE) */}
+        <div className="p-5 flex flex-col gap-2">
+           <div className="flex justify-between items-start">
+             <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Moyens Théoriques</div>
+             {getStatusBadge(result.isBudgetOk)}
+           </div>
+           <div>
+             <div className="text-sm font-bold text-slate-800">Budget Mensuel</div>
+             <p className="text-xs text-slate-500 mt-1 leading-snug">
+               {result.isBudgetOk 
+                 ? "Cet achat rentre dans ton niveau de vie global." 
+                 : "Attention, tu vis au-dessus de tes revenus ce mois-ci."}
+             </p>
+           </div>
         </div>
 
-        {/* DÉTAILS TECHNIQUES */}
-        {result.issues.length > 0 && (
-          <div className="mt-6 pt-6 border-t border-slate-100">
-            <button 
-              onClick={() => setShowDetails(!showDetails)}
-              className="flex items-center justify-between w-full text-sm font-bold text-slate-500 hover:text-indigo-600 transition-colors mb-3"
-            >
-              <span>{result.issues.length} Indicateurs techniques</span>
-              {showDetails ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-            </button>
-            
-            {showDetails && (
-              <div className="space-y-2 animate-slide-up">
-                {result.issues.map((issue: any, i: number) => (
-                  <div key={i} className="text-xs font-medium text-slate-500 flex gap-2 items-center ml-1">
-                    <div className={`w-2 h-2 rounded-full ${issue.level === 'red' ? 'bg-rose-500' : 'bg-amber-500'}`}></div>
-                    {issue.text}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
+        {/* PILIER DROITE : TRÉSORERIE (PRATIQUE) */}
+        <div className="p-5 flex flex-col gap-2">
+           <div className="flex justify-between items-start">
+             <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Réalité Compte</div>
+             {getStatusBadge(result.isCashflowOk)}
+           </div>
+           <div>
+             <div className="text-sm font-bold text-slate-800">Trésorerie J+45</div>
+             <p className="text-xs text-slate-500 mt-1 leading-snug">
+               {result.isCashflowOk 
+                 ? "Aucun découvert prévu sur les 45 prochains jours." 
+                 : `Risque de découvert (Min: ${formatCurrency(result.lowestProjectedBalance)}).`}
+             </p>
+           </div>
+        </div>
       </div>
+
+      {/* 3. TIPS DU COACH */}
+      {result.tips.length > 0 && (
+        <div className="p-5 bg-white space-y-3">
+             {result.tips.map((tip: any, i: number) => (
+                <div key={i} className="flex gap-3 text-sm text-slate-600 items-start">
+                   <div className="mt-0.5 text-indigo-500 shrink-0"><Info size={16} /></div>
+                   <div className="leading-relaxed">{tip.text}</div>
+                </div>
+             ))}
+        </div>
+      )}
+      
+      {/* 4. POINTS TECHNIQUES (Dropdown Discret) */}
+      {result.issues.length > 0 && (
+          <div className="px-5 pb-4 bg-white">
+            <div className="pt-4 border-t border-slate-100">
+               <p className="text-xs font-bold text-slate-400 mb-2">Points d&apos;attention :</p>
+               {result.issues.map((issue: any, i: number) => (
+                 <div key={i} className="text-xs font-medium text-slate-500 flex gap-2 items-center mb-1">
+                   <div className={`w-1.5 h-1.5 rounded-full ${issue.level === 'red' ? 'bg-rose-500' : 'bg-amber-500'}`}></div>
+                   {issue.text}
+                 </div>
+               ))}
+            </div>
+          </div>
+      )}
     </Card>
   );
 };
@@ -230,7 +240,9 @@ const DiagnosticCard = ({ result }: { result: any }) => {
 
 export default function SimulatorPage() {
   const router = useRouter();
-  const { profile, saveDecision, isLoaded } = useFinancialData();
+  
+  // 1. AJOUT DE L'HISTORIQUE ICI
+  const { profile, history, saveDecision, isLoaded } = useFinancialData();
   
   const stats = useMemo(() => calculateFinancials(profile), [profile]);
   const isProfileEmpty = stats.monthlyIncome === 0 && stats.matelas === 0;
@@ -244,7 +256,7 @@ export default function SimulatorPage() {
     name: '',
     type: 'need',
     amount: '',
-    date: today, // CHAMP UNIQUE : Date d'achat OU 1ère échéance
+    date: today,
     paymentMode: 'CASH_SAVINGS',
     duration: '',
     rate: '',
@@ -256,12 +268,14 @@ export default function SimulatorPage() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, [step]);
 
+  // 2. CORRECTION DE L'APPEL À ANALYZE
   const result = useMemo(() => {
     if (step === 'result') {
-      return analyzePurchaseImpact(stats, purchase);
+      // On passe profile ET history pour la Timeline
+      return analyzePurchaseImpact(stats, purchase, profile, history);
     }
     return null;
-  }, [step, stats, purchase]);
+  }, [step, stats, purchase, profile, history]);
 
   const handleSave = async () => {
     if (!result) return;
@@ -306,7 +320,6 @@ export default function SimulatorPage() {
     );
   }
 
-  // Label dynamique pour la date
   const dateLabel = (purchase.paymentMode === 'SPLIT' || purchase.paymentMode === 'CREDIT') 
     ? "Date de la 1ère échéance" 
     : "Date de l'achat";
@@ -337,7 +350,6 @@ export default function SimulatorPage() {
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <InputGroup label="Montant total" type="number" placeholder="0" suffix="€" value={purchase.amount} onChange={(v: string) => setPurchase({ ...purchase, amount: v })} />
-                  {/* CHAMP DATE UNIQUE : Label dynamique */}
                   <InputGroup label={dateLabel} type="date" value={purchase.date} onChange={(v: string) => setPurchase({ ...purchase, date: v })} />
               </div>
               
@@ -348,21 +360,17 @@ export default function SimulatorPage() {
                 </select>
               </div>
               
-              {/* SECTION CRÉDIT : Apparaît seulement si paiement différé */}
               {(purchase.paymentMode === 'SPLIT' || purchase.paymentMode === 'CREDIT') && (
                 <div className="p-4 bg-indigo-50 rounded-xl border border-indigo-100 space-y-4 animate-fade-in">
                   <h4 className="text-sm font-bold text-indigo-900 flex items-center gap-2"><CalendarDays size={16} /> Détails de l&apos;échéancier</h4>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {/* On a enlevé la date d'ici car elle est en haut maintenant */}
                     <InputGroup label="Durée (mois)" type="number" value={purchase.duration} onChange={(v: string) => setPurchase({ ...purchase, duration: v })} />
                     {purchase.paymentMode === 'CREDIT' && <InputGroup label="Taux (%)" type="number" value={purchase.rate} onChange={(v: string) => setPurchase({ ...purchase, rate: v })} />}
                   </div>
                   
-                  {/* Calcul prévisionnel de fin */}
                   {purchase.duration && purchase.amount && (
                       <div className="text-xs text-indigo-600 font-medium bg-indigo-100/50 p-3 rounded-lg border border-indigo-100">
                           Mensualité estimée : ~{formatCurrency(parseFloat(purchase.amount) / parseInt(purchase.duration))} / mois
-                          {purchase.date && ` jusqu'en ${new Date(new Date(purchase.date).setMonth(new Date(purchase.date).getMonth() + parseInt(purchase.duration))).toLocaleDateString('fr-FR', {month: 'long', year: 'numeric'})}`}
                       </div>
                   )}
                 </div>
@@ -426,6 +434,31 @@ export default function SimulatorPage() {
                 </div>
               </div>
             </Card>
+
+            {/* --- NOUVEAU : MINI GRAPHIQUE 30 JOURS --- */}
+            
+            {result.projectedCurve && result.projectedCurve.length > 0 && (
+              <Card className="p-4 border-slate-200 bg-white overflow-hidden">
+                <h3 className="text-xs font-bold text-slate-400 uppercase mb-3">Projection 30 Jours</h3>
+                <div className="flex items-end gap-1 h-16 w-full">
+                  {result.projectedCurve.map((point: any, i: number) => {
+                    const isNegative = point.value < 0;
+                    const heightPercent = Math.min(100, Math.max(5, (Math.abs(point.value) / (stats.monthlyIncome || 1000)) * 50));
+                    return (
+                      <div key={i} className="flex-1 flex flex-col justify-end h-full group relative">
+                         <div 
+                           className={`w-full rounded-t-sm transition-all ${isNegative ? 'bg-rose-400' : 'bg-emerald-300 group-hover:bg-emerald-400'}`} 
+                           style={{ height: `${heightPercent}%` }}
+                         ></div>
+                      </div>
+                    );
+                  })}
+                </div>
+                <div className="mt-2 text-[10px] text-center text-slate-400">
+                   Vision de ton compte si tu achètes
+                </div>
+              </Card>
+            )}
 
             <Card className="p-6 border-slate-200 bg-slate-50/50">
               <h3 className="font-bold text-slate-700 mb-4 text-sm uppercase tracking-wide">La réalité de cet achat</h3>

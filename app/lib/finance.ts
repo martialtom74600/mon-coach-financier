@@ -1,13 +1,15 @@
 import { CONSTANTS, PERSONA_PRESETS } from './constants';
 import { calculateFutureValue, formatCurrency, calculateListTotal, generateId } from './utils';
 import { generateTimeline } from './timeline';
-import { addMonths, addDays } from 'date-fns';
+import { addMonths, addDays, isSameMonth, startOfDay, isBefore } from 'date-fns'; 
+
+// Helper pour arrondir proprement
+const round = (num: number) => Math.round((num + Number.EPSILON) * 100) / 100;
 
 // ============================================================================
 // 1. CALCULS DU PROFIL (DASHBOARD)
 // ============================================================================
 export const calculateFinancials = (profile: any) => {
-  // Parsing sécurisé inline
   const getVal = (v: any) => Math.abs(parseFloat(v) || 0);
 
   // 1. REVENUS
@@ -26,9 +28,9 @@ export const calculateFinancials = (profile: any) => {
   const totalRecurring = mandatoryExpenses + profitableExpenses;
   const remainingToLive = monthlyIncome - totalRecurring;
   
-  // Capacité d'épargne (Reste à vivre - Vie courante)
+  // Capacité d'épargne
   const capacityToSave = Math.max(0, remainingToLive - discretionaryExpenses);
-  // Cashflow réel (ce qui reste vraiment à la fin du mois sur le compte)
+  // Cashflow réel
   const realCashflow = monthlyIncome - (mandatoryExpenses + discretionaryExpenses + profitableExpenses);
 
   // 4. PATRIMOINE
@@ -46,7 +48,7 @@ export const calculateFinancials = (profile: any) => {
   
   const adults = Math.max(1, parseInt(profile.household?.adults) || 1);
   const children = Math.max(0, parseInt(profile.household?.children) || 0);
-  // Ajustement du reste à vivre min selon la famille (150€/adulte supp, 120€/enfant)
+  
   const adjustedMinLiving = baseRules.minLiving + ((adults - 1) * 150) + (children * 120);
   const userRules = { ...baseRules, minLiving: adjustedMinLiving };
 
@@ -54,7 +56,7 @@ export const calculateFinancials = (profile: any) => {
   const essentialMonthlyNeeds = mandatoryExpenses + (discretionaryExpenses * 0.5);
   let safetyMonths = 0;
   if (essentialMonthlyNeeds > 0) safetyMonths = matelas / essentialMonthlyNeeds;
-  else if (matelas > 0) safetyMonths = 99; // Infini
+  else if (matelas > 0) safetyMonths = 99; 
   
   const dailyIncome = monthlyIncome > 0 ? monthlyIncome / CONSTANTS.AVG_WORK_DAYS_MONTH : 0;
   const engagementRate = monthlyIncome > 0 ? (mandatoryExpenses / monthlyIncome) * 100 : 0;
@@ -83,19 +85,17 @@ export const calculateFinancials = (profile: any) => {
 
 // ============================================================================
 // 2. TRANSFORMER : INTENTION -> ÉVÉNEMENTS
-// Traduit un achat en série d'événements temporels
 // ============================================================================
 const getSimulatedEvents = (purchase: any) => {
     const events: any[] = [];
     const amount = Math.abs(parseFloat(purchase.amount) || 0);
     
     // Normalisation de la date à midi pour matcher timeline.ts
-    const date = new Date(purchase.date);
+    const date = new Date(purchase.date || new Date());
     date.setHours(12, 0, 0, 0);
 
     const mode = purchase.paymentMode;
 
-    // A. Paiement Comptant (Cash Account)
     if (mode === 'CASH_ACCOUNT') {
         events.push({ 
             id: generateId(), 
@@ -103,7 +103,7 @@ const getSimulatedEvents = (purchase: any) => {
             amount: -amount, 
             type: 'purchase', 
             date: date,
-            isSimulation: true // <--- AJOUT CRITIQUE POUR LE JOUR J
+            isSimulation: true 
         });
         if (purchase.isReimbursable) {
             events.push({ 
@@ -116,7 +116,6 @@ const getSimulatedEvents = (purchase: any) => {
             });
         }
     }
-    // B. Abonnement (Projection sur 24 mois)
     else if (mode === 'SUBSCRIPTION') {
         for (let i = 0; i < 24; i++) {
             events.push({ 
@@ -129,10 +128,8 @@ const getSimulatedEvents = (purchase: any) => {
             });
         }
     }
-    // C. Crédit ou Split
     else if (mode === 'CREDIT' || mode === 'SPLIT') {
         const months = Math.max(1, parseInt(purchase.duration) || 3);
-        // Taux: 0 si split, X si crédit
         const rate = mode === 'CREDIT' ? parseFloat(purchase.rate || 0) : 0;
         const totalPaid = amount * (1 + (rate / 100) * (months / 12)); 
         const monthlyPart = totalPaid / months;
@@ -148,21 +145,28 @@ const getSimulatedEvents = (purchase: any) => {
             });
         }
     }
-    // D. Cash Savings : Pas d'impact timeline (géré en statique sur le stock)
 
     return events;
 };
 
 
 // ============================================================================
-// 3. MOTEUR D'ANALYSE HYBRIDE (STATIQUE + DYNAMIQUE)
+// 3. MOTEUR D'ANALYSE HYBRIDE (AVEC GESTION DU PASSÉ)
 // ============================================================================
 export const analyzePurchaseImpact = (currentStats: any, purchase: any, profile: any = null, history: any[] = []) => {
   const amount = Math.abs(parseFloat(purchase.amount) || 0);
   const { isReimbursable = false, isPro = false, paymentMode } = purchase;
   const rules = currentStats.rules;
 
-  // --- A. ANALYSE STATIQUE (Impact immédiat sur les ratios) ---
+  // 1. DÉTECTION TEMPORELLE (Régularisation vs Futur)
+  const purchaseDate = purchase.date ? new Date(purchase.date) : new Date();
+  const today = new Date();
+  const isCurrentMonth = isSameMonth(today, purchaseDate);
+  
+  // On considère que c'est du passé si c'est avant aujourd'hui minuit
+  const isPast = isBefore(startOfDay(purchaseDate), startOfDay(today));
+
+  // --- A. ANALYSE STATIQUE (Impact théorique) ---
   let newMatelas = currentStats.matelas;
   let newRemainingToLive = currentStats.remainingToLive; 
   
@@ -172,18 +176,35 @@ export const analyzePurchaseImpact = (currentStats: any, purchase: any, profile:
   let timeToWork = 0;
   let realCost = amount;
 
-  // 1. Calcul des coûts selon le mode
+  // 2. Calculs selon le mode
   if (paymentMode === 'CASH_SAVINGS') {
-    newMatelas = Math.max(0, currentStats.matelas - amount);
+    // Si c'est du passé, on suppose que l'épargne actuelle reflète déjà la dépense
+    if (isPast) {
+        newMatelas = currentStats.matelas; 
+    } else {
+        newMatelas = Math.max(0, round(currentStats.matelas - amount));
+    }
     if(!isReimbursable) opportunityCost = calculateFutureValue(amount, CONSTANTS.INVESTMENT_RATE, 10) - amount;
   } 
   else if (paymentMode === 'CASH_ACCOUNT') {
-    newRemainingToLive = currentStats.remainingToLive - amount;
+    // Budget : Impacte le mois courant si la date est dans ce mois
+    if (isCurrentMonth) {
+        newRemainingToLive = round(currentStats.remainingToLive - amount);
+    }
+    // Trésorerie/Matelas :
+    // Si passé : le solde bancaire actuel a déjà baissé, on ne touche pas au matelas projeté.
+    // Si futur : on simule la baisse.
+    if (!isPast) {
+         // Note: Ici on simplifie en disant que ça tape dans le "matelas" virtuel si on paye comptant
+         // Dans la réalité timeline, ça tape le solde.
+    }
     if(!isReimbursable) opportunityCost = calculateFutureValue(amount, CONSTANTS.INVESTMENT_RATE, 10) - amount;
   } 
   else if (paymentMode === 'SUBSCRIPTION') {
     monthlyCost = amount;
-    newRemainingToLive = currentStats.remainingToLive - monthlyCost;
+    if (isCurrentMonth) {
+        newRemainingToLive = round(currentStats.remainingToLive - monthlyCost);
+    }
     const totalPaid5Years = amount * 12 * 5;
     if(!isReimbursable) opportunityCost = calculateFutureValue(totalPaid5Years, CONSTANTS.INVESTMENT_RATE, 5) - totalPaid5Years;
     realCost = amount * 12; 
@@ -193,12 +214,14 @@ export const analyzePurchaseImpact = (currentStats: any, purchase: any, profile:
     const rate = paymentMode === 'CREDIT' ? Math.abs(parseFloat(purchase.rate) || 0) : 0;
     const totalPaid = amount * (1 + (rate / 100) * (months / 12)); 
     
-    monthlyCost = totalPaid / months;
+    monthlyCost = round(totalPaid / months);
     if (paymentMode === 'CREDIT') {
-        creditCost = totalPaid - amount;
+        creditCost = round(totalPaid - amount);
         realCost = totalPaid;
     }
-    newRemainingToLive = currentStats.remainingToLive - monthlyCost;
+    if (isCurrentMonth) {
+        newRemainingToLive = round(currentStats.remainingToLive - monthlyCost);
+    }
     if(!isReimbursable) opportunityCost = calculateFutureValue(amount, CONSTANTS.INVESTMENT_RATE, 10) - amount;
   }
 
@@ -209,122 +232,157 @@ export const analyzePurchaseImpact = (currentStats: any, purchase: any, profile:
   // Temps de travail
   if (currentStats.dailyIncome > 1 && !isReimbursable) {
     const costToCompare = paymentMode === 'SUBSCRIPTION' ? (amount * 12) : realCost;
-    timeToWork = costToCompare / currentStats.dailyIncome;
+    timeToWork = round(costToCompare / currentStats.dailyIncome);
   }
 
   // Ratios Projetés
   const newMonthlyExpenses = currentStats.mandatoryExpenses + (monthlyCost > 0 ? monthlyCost : 0) + (currentStats.discretionaryExpenses * 0.5);
   
   let newSafetyMonths = 0;
-  if (newMonthlyExpenses > 0) newSafetyMonths = newMatelas / newMonthlyExpenses;
+  if (newMonthlyExpenses > 0) newSafetyMonths = round(newMatelas / newMonthlyExpenses);
   else if (newMatelas > 0) newSafetyMonths = 99;
 
   let newEngagementRate = 0;
   if (currentStats.monthlyIncome > 0) {
-    newEngagementRate = ((currentStats.mandatoryExpenses + monthlyCost) / currentStats.monthlyIncome) * 100;
+    newEngagementRate = round(((currentStats.mandatoryExpenses + monthlyCost) / currentStats.monthlyIncome) * 100);
   }
 
   // --- B. ANALYSE DYNAMIQUE (Timeline / Mur de Trésorerie) ---
   let lowestProjectedBalance = Infinity;
   let firstDangerDate: string | null = null;
-  
-  // SEUIL DE STRESS : 20% du revenu ou 150€ min.
   const STRESS_THRESHOLD = Math.max(150, (currentStats.monthlyIncome || 0) * 0.20);
+  
+  // Projection des 30 prochains jours pour le graphique
+  let projectedCurve: any[] = [];
 
   if (profile) {
-      // 1. Simulation des events (AVEC LE FLAG isSimulation)
       const simulatedEvents = getSimulatedEvents(purchase);
-      
-      // 2. Projection (45 jours)
+      // Timeline gère déjà nativement les événements passés via "isBeforeAnchor"
       const projection = generateTimeline(profile, history, simulatedEvents, 45);
       
-      // 3. Inspection du futur
+      const allDays = projection.flatMap((m: any) => m.days);
+      
+      // On récupère la courbe à partir d'aujourd'hui pour l'affichage
+      const todayKey = startOfDay(new Date()).getTime();
+      const futureDays = allDays.filter((d: any) => new Date(d.date).getTime() >= todayKey);
+
+      projectedCurve = futureDays.slice(0, 30).map((d: any) => ({ 
+          date: d.date, 
+          value: d.balance 
+      }));
+
+      // Analyse des creux (Uniquement sur le futur)
       projection.forEach((month: any) => {
           month.days.forEach((day: any) => {
+             // Si c'est passé, day.balance est null, donc ignoré
              if (day.balance !== null) {
                  if (day.balance < lowestProjectedBalance) lowestProjectedBalance = day.balance;
-                 // Capture du premier jour négatif
                  if (day.balance < 0 && !firstDangerDate) firstDangerDate = day.date;
              }
           });
       });
   }
 
-  // --- C. SCORING & VERDICT ---
+  // --- C. SCORING & VERDICT (MATRICE) ---
   const issues = [];
   const tips = [];
   let score = 100;
 
-  // 1. Règles Bloquantes (Rouge)
-  if (paymentMode === 'CASH_SAVINGS' && amount > currentStats.matelas) {
-      issues.push({ level: 'red', text: `FONDS INSUFFISANTS : Épargne actuelle (${formatCurrency(currentStats.matelas)}).` });
-      tips.push({ type: 'stop', title: "Bloquant", text: "Ton épargne ne couvre pas cet achat." });
-      score -= 100;
+  // 1. INDICATEUR BUDGET
+  let isBudgetOk = true;
+  if (paymentMode === 'CASH_SAVINGS') {
+      isBudgetOk = newMatelas >= 0;
+  } else {
+      isBudgetOk = newRemainingToLive >= rules.minLiving; 
   }
 
-  // Mur de trésorerie (Dynamique)
-  if (lowestProjectedBalance < 0 && firstDangerDate) {
-       const dateObj = new Date(firstDangerDate);
-       const dateStr = dateObj.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
-       
-       issues.push({ level: 'red', text: `DANGER : Découvert prévu le ${dateStr}.` });
-       tips.push({ type: 'stop', title: "Mur de Trésorerie", text: `Attention : tes charges fixes vont te faire passer à découvert le ${dateStr} avec cet achat.` });
-       score -= 100;
-  }
-  
-  // Reste à vivre négatif (Statique)
-  const missingCash = rules.minLiving - newRemainingToLive; 
-  if (paymentMode === 'CASH_ACCOUNT' && missingCash > 0) {
-      // Si on a du matelas pour couvrir, c'est orange, sinon rouge
-      if (newMatelas > missingCash) {
-          issues.push({ level: 'orange', text: `Trésorerie : Compte courant bas.` });
-          tips.push({ type: 'action', title: "Virement nécessaire", text: `Prévois un virement de ${formatCurrency(missingCash)} depuis ton épargne.` });
-          score -= 20;
-      } else {
-          issues.push({ level: 'red', text: `Reste à vivre insuffisant.` });
-          score -= 100;
-      }
-  }
+  // 2. INDICATEUR TRÉSORERIE
+  const isCashflowOk = lowestProjectedBalance >= 0;
 
-  // 2. Règles d'Avertissement (Orange)
-  if (lowestProjectedBalance >= 0 && lowestProjectedBalance < STRESS_THRESHOLD) {
-       issues.push({ level: 'orange', text: `Tension : Solde bas (${formatCurrency(lowestProjectedBalance)}).` });
-       tips.push({ type: 'warning', title: "Fin de mois difficile", text: `Tu restes dans le vert, mais avec très peu de marge de manœuvre.` });
-       score -= 25;
-  }
-
-  if (!isReimbursable) {
-      if (newSafetyMonths < 1 && currentStats.safetyMonths > 0) {
-           issues.push({ level: 'red', text: `Épargne de sécurité épuisée.` });
-           score -= 40;
-      } else if (newSafetyMonths < rules.safetyMonths) {
-           issues.push({ level: 'orange', text: `Fragilité : Sécurité sous l'objectif.` });
-           score -= 20;
-      }
-  }
-
-  if (newEngagementRate > 45 && !isReimbursable) {
-    issues.push({ level: 'orange', text: `Charges fixes élevées (${newEngagementRate.toFixed(0)}%).` });
-    score -= 15;
-  }
-
-  // 3. Calcul Verdict Final
+  // --- D. CONSTRUCTION DU MESSAGE ---
   let verdict = 'green';
-  if (score < 50 || issues.some((i: any) => i.level === 'red')) verdict = 'red';
-  else if (score < 80 || issues.some((i: any) => i.level === 'orange')) verdict = 'orange';
+  let smartTitle = "Feu vert";
+  let smartMessage = "Tout est ok.";
 
-  let smartTip = "Tout est ok.";
-  if (verdict === 'red') smartTip = "Achat dangereux ou impossible.";
-  else if (verdict === 'orange') smartTip = "Faisable, mais attention aux imprévus.";
-  else if (verdict === 'green') smartTip = "Feu vert, profite !";
+  // Cas Spécial : RÉGULARISATION (Passé)
+  if (isPast) {
+      verdict = 'green';
+      smartTitle = "Mise à jour";
+      smartMessage = "Dépense ajoutée à l'historique. Ton budget du mois a été ajusté.";
+      // On n'analyse pas la trésorerie critique car c'est déjà payé
+  }
+  // Cas 1 : Bloquant absolu (Pas d'épargne pour payer comptant)
+  else if (paymentMode === 'CASH_SAVINGS' && !isBudgetOk) {
+      verdict = 'red';
+      smartTitle = "Fonds insuffisants";
+      smartMessage = `Il te manque ${formatCurrency(amount - currentStats.matelas)} d'épargne.`;
+      score = 0;
+      issues.push({ level: 'red', text: "Épargne insuffisante." });
+  }
+  // Cas 2 : Tout va bien
+  else if (isBudgetOk && isCashflowOk) {
+      verdict = 'green';
+      smartTitle = "Fonce !";
+      smartMessage = "C'est validé : ça rentre dans le budget et ton compte suit.";
+  } 
+  // Cas 3 : Problème de TIMING
+  else if (isBudgetOk && !isCashflowOk) {
+      verdict = 'orange';
+      smartTitle = "Attends un peu";
+      smartMessage = `Tu as le budget, mais ton compte passera à découvert (Min: ${formatCurrency(lowestProjectedBalance)}). Attends une entrée d'argent.`;
+      score = 40;
+      if (firstDangerDate) {
+         const d = new Date(firstDangerDate).toLocaleDateString('fr-FR', {day: 'numeric', month: 'short'});
+         issues.push({ level: 'red', text: `Découvert prévu le ${d}` });
+      }
+  } 
+  // Cas 4 : Problème de LIFESTYLE
+  else if (!isBudgetOk && isCashflowOk) {
+      verdict = 'orange'; 
+      smartTitle = "Attention au budget";
+      smartMessage = "Ton compte le permet aujourd'hui, mais cet achat va trop réduire ton reste à vivre du mois.";
+      score = 45;
+      issues.push({ level: 'orange', text: "Reste à vivre sous le seuil de sécurité" });
+  } 
+  // Cas 5 : CATASTROPHE
+  else {
+      verdict = 'red';
+      smartTitle = "Impossible";
+      smartMessage = "Tu n'as ni le budget, ni la trésorerie. C'est un achat dangereux.";
+      score = 10;
+      issues.push({ level: 'red', text: "Double alerte : Budget et Trésorerie" });
+  }
+
+  // Règles additionnelles (Seulement pour le futur)
+  if (!isPast && paymentMode !== 'CASH_SAVINGS' && !isReimbursable) {
+      if (newSafetyMonths < rules.safetyMonths) {
+           issues.push({ level: 'orange', text: `Sécurité faible (${newSafetyMonths.toFixed(1)} mois).` });
+           score -= 10;
+      }
+      if (newEngagementRate > 45) {
+           issues.push({ level: 'orange', text: `Charges fixes élevées.` });
+           score -= 10;
+      }
+  }
 
   return { 
-      verdict, score, issues, tips, 
+      verdict, 
+      score: Math.max(0, score), 
+      isBudgetOk,
+      isCashflowOk,
+      smartTitle,
+      smartMessage,
+      issues, 
+      tips, 
       newMatelas, 
       newRV: newRemainingToLive, 
       newSafetyMonths, 
       newEngagementRate, 
-      realCost, creditCost, opportunityCost, timeToWork, smartTip,
-      lowestProjectedBalance 
+      realCost: round(realCost), 
+      creditCost: round(creditCost), 
+      opportunityCost: round(opportunityCost), 
+      timeToWork,
+      lowestProjectedBalance: round(lowestProjectedBalance),
+      projectedCurve
   };
 };
