@@ -10,56 +10,22 @@ import {
   PAYMENT_MODES,
   generateId,
   calculateFinancials,
-  GOAL_CATEGORIES,
 } from '@/app/lib/logic';
-import { calculateMonthlyEffort } from '@/app/lib/goals'; // NOUVEL IMPORT
+// Plus besoin d'importer goals ici, le simulateur utilise le profil global qui contient déjà les goals !
 
-// Imports Icônes
 import {
-  CheckCircle,
-  AlertTriangle,
-  XCircle,
-  Info,
-  Wallet,
-  TrendingDown,
-  ArrowLeft,
-  Save,
-  RefreshCcw,
-  Clock,
-  TrendingUp,
-  PiggyBank,
-  Settings,
-  Briefcase,
-  RefreshCw,
-  CalendarDays,
-  Target,
-  ShoppingBag,
-  Plane, 
-  Home, 
-  Car,
-  Heart,
-  ShieldAlert
+  CheckCircle, AlertTriangle, XCircle, Info, Wallet, TrendingDown,
+  ArrowLeft, Save, RefreshCcw, Settings, Briefcase, RefreshCw,
+  CalendarDays, Target, ShoppingBag
 } from 'lucide-react';
 
-// --- IMPORTS UI KIT ---
 import Card from '@/app/components/ui/Card';
 import Button from '@/app/components/ui/Button';
 import InputGroup from '@/app/components/ui/InputGroup';
 import Badge from '@/app/components/ui/Badge';
 
-// --- HELPERS ICONES ---
-const getGoalIcon = (catId: string) => {
-    switch(catId) {
-        case 'REAL_ESTATE': return <Home size={24} />;
-        case 'VEHICLE': return <Car size={24} />;
-        case 'TRAVEL': return <Plane size={24} />;
-        case 'WEDDING': return <Heart size={24} />;
-        case 'EMERGENCY': return <ShieldAlert size={24} />;
-        default: return <Target size={24} />;
-    }
-};
-
-// --- COMPOSANTS UI SPÉCIFIQUES ---
+// ... (Garde tes composants UI : ContextToggle, PurchaseRecap, DiagnosticCard tels quels) ...
+// Je ne les répète pas pour gagner de la place, copie-colle les depuis ton ancien fichier.
 
 const ContextToggle = ({ label, subLabel, icon: Icon, checked, onChange }: any) => (
   <label className={`flex items-center gap-4 p-4 border rounded-xl cursor-pointer transition-all duration-200 ${checked ? 'bg-indigo-50 border-indigo-200 ring-1 ring-indigo-200' : 'bg-white border-slate-200 hover:bg-slate-50'}`}>
@@ -77,7 +43,6 @@ const ContextToggle = ({ label, subLabel, icon: Icon, checked, onChange }: any) 
   </label>
 );
 
-// --- COMPOSANT RÉCAPITULATIF ACHAT ---
 const PurchaseRecap = ({ purchase }: { purchase: any }) => {
   const typeKey = purchase.type.toUpperCase();
   // @ts-ignore
@@ -100,7 +65,6 @@ const PurchaseRecap = ({ purchase }: { purchase: any }) => {
   )
 };
 
-// --- NOUVELLE CARTE DIAGNOSTIC ---
 const DiagnosticCard = ({ result }: { result: any }) => {
   if (!result) return null;
   const theme = {
@@ -190,28 +154,21 @@ const DiagnosticCard = ({ result }: { result: any }) => {
   );
 };
 
-
 // ============================================================================
-// PAGE PRINCIPALE
+// PAGE PRINCIPALE (NETTOYÉE)
 // ============================================================================
 
 export default function SimulatorPage() {
   const router = useRouter();
-  
-  // 1. DATA HOOKS
-  const { profile, history, saveDecision, saveProfile, isLoaded } = useFinancialData();
-  
+  const { profile, history, saveDecision, isLoaded } = useFinancialData();
   const stats = useMemo(() => calculateFinancials(profile), [profile]);
-  const isProfileEmpty = stats.monthlyIncome === 0 && stats.matelas === 0;
-
-  // 2. STATE LOCAL
-  const [step, setStep] = useState<'input' | 'result'>('input');
-  const [mode, setMode] = useState<'PURCHASE' | 'GOAL'>('PURCHASE');
-  const [isSaving, setIsSaving] = useState(false);
   
+  const isProfileEmpty = stats.monthlyIncome === 0 && stats.matelas === 0;
+  const [step, setStep] = useState<'input' | 'result'>('input');
+  const [isSaving, setIsSaving] = useState(false);
   const today = new Date().toISOString().split('T')[0];
 
-  // A. State Achat
+  // State Achat (Unique focus de cette page)
   const [purchase, setPurchase] = useState({
     name: '',
     type: 'need',
@@ -224,51 +181,21 @@ export default function SimulatorPage() {
     isPro: false,
   });
 
-  // B. State Objectif
-  const [goalData, setGoalData] = useState({
-      name: '',
-      category: 'REAL_ESTATE',
-      targetAmount: '',
-      currentSaved: '0',
-      deadline: '',
-      projectedYield: '3'
-  });
-
-  // 3. EFFETS & MEMOS
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, [step]);
 
-  // Calcul temps réel de l'effort d'épargne (Mode GOAL)
-  const monthlyEffort = useMemo(() => {
-      if (mode !== 'GOAL') return 0;
-      
-      // ✅ CORRECTION 1 : On récupère le rendement
-      const yieldVal = parseFloat(goalData.projectedYield) || 0;
-
-      return calculateMonthlyEffort({
-          ...goalData,
-          targetAmount: parseFloat(goalData.targetAmount) || 0,
-          currentSaved: parseFloat(goalData.currentSaved) || 0,
-          projectedYield: yieldVal,
-          // ✅ CORRECTION 1 : On active le mode investissement si taux > 0
-          isInvested: yieldVal > 0 
-      });
-  }, [goalData, mode]);
-
-  // Calcul du résultat (Mode PURCHASE)
   const result = useMemo(() => {
-    if (step === 'result' && mode === 'PURCHASE') {
+    if (step === 'result') {
       return analyzePurchaseImpact(stats, purchase, profile, history);
     }
     return null;
-  }, [step, mode, stats, purchase, profile, history]);
+  }, [step, stats, purchase, profile, history]);
 
-
-  // 4. HANDLERS
   const handleSavePurchase = async () => {
     if (!result) return;
     setIsSaving(true);
+    // Simulation d'attente pour l'UX
     await new Promise(resolve => setTimeout(resolve, 600));
 
     const decision = {
@@ -279,7 +206,6 @@ export default function SimulatorPage() {
     };
     
     saveDecision(decision);
-    
     setStep('input');
     setPurchase({
       name: '',
@@ -295,37 +221,6 @@ export default function SimulatorPage() {
     setIsSaving(false);
   };
 
-  const handleSaveGoal = async () => {
-      if (!goalData.name || !goalData.targetAmount) return;
-      setIsSaving(true);
-
-      // ✅ CORRECTION 2 : On récupère le rendement pour la sauvegarde
-      const yieldVal = parseFloat(goalData.projectedYield) || 0;
-
-      const newGoal = {
-          id: generateId(),
-          name: goalData.name,
-          category: goalData.category,
-          targetAmount: parseFloat(goalData.targetAmount),
-          currentSaved: parseFloat(goalData.currentSaved),
-          deadline: goalData.deadline,
-          projectedYield: yieldVal,
-          // ✅ CORRECTION 2 : On sauvegarde le flag isInvested
-          isInvested: yieldVal > 0
-      };
-
-      const updatedProfile = {
-          ...profile,
-          goals: [...(profile.goals || []), newGoal]
-      };
-
-      await saveProfile(updatedProfile);
-      setIsSaving(false);
-      router.push('/'); 
-  };
-
-
-  // 5. RENDER LOADER / EMPTY
   if (!isLoaded) return <div className="min-h-[50vh] flex items-center justify-center"><div className="animate-pulse h-12 w-12 bg-slate-200 rounded-full"></div></div>;
 
   if (isProfileEmpty) {
@@ -333,7 +228,7 @@ export default function SimulatorPage() {
       <div className="min-h-[60vh] flex flex-col items-center justify-center p-6 text-center animate-fade-in">
         <div className="p-4 bg-indigo-50 text-indigo-600 rounded-full mb-6"><Settings size={48} /></div>
         <h2 className="text-2xl font-bold text-slate-800 mb-3">Profil manquant</h2>
-        <p className="text-slate-500 max-w-md mb-8">Pour analyser tes projets, configure d&apos;abord ton profil.</p>
+        <p className="text-slate-500 max-w-md mb-8">Pour simuler un achat, nous avons besoin de connaître ton budget.</p>
         <Button onClick={() => router.push('/profile')}>Configurer mon Profil</Button>
       </div>
     );
@@ -343,38 +238,25 @@ export default function SimulatorPage() {
     ? "Date de la 1ère échéance" 
     : "Date de l'achat";
 
-
-  // ==========================================================================
-  // RENDER PRINCIPAL
-  // ==========================================================================
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start animate-fade-in">
       
-      {/* --- COLONNE GAUCHE (FORMULAIRES) --- */}
+      {/* --- COLONNE GAUCHE (FORMULAIRE) --- */}
       <div className="lg:col-span-7 xl:col-span-8 space-y-6">
         
-        {/* LE SWITCH MODE */}
+        {/* TITRE SIMPLE */}
         {step === 'input' && (
-             <div className="flex p-1 bg-white border border-slate-200 rounded-xl mb-6 shadow-sm">
-                <button 
-                    onClick={() => setMode('PURCHASE')}
-                    className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-lg text-sm font-bold transition-all ${mode === 'PURCHASE' ? 'bg-indigo-50 text-indigo-700 shadow-sm ring-1 ring-indigo-200' : 'text-slate-500 hover:bg-slate-50'}`}
-                >
-                    <ShoppingBag size={18} /> Dépense / Achat
-                </button>
-                <button 
-                    onClick={() => setMode('GOAL')}
-                    className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-lg text-sm font-bold transition-all ${mode === 'GOAL' ? 'bg-emerald-50 text-emerald-700 shadow-sm ring-1 ring-emerald-200' : 'text-slate-500 hover:bg-slate-50'}`}
-                >
-                    <Target size={18} /> Objectif / Épargne
-                </button>
-            </div>
+             <div className="mb-2">
+                 <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
+                     <ShoppingBag className="text-indigo-600"/> Simulateur d'Achat
+                 </h1>
+                 <p className="text-slate-500 text-sm mt-1">Est-ce que cet achat rentre dans ton budget sans casser tes objectifs ?</p>
+             </div>
         )}
 
-        {/* --- FORMULAIRE ACHAT (PURCHASE) --- */}
-        {step === 'input' && mode === 'PURCHASE' && (
+        {/* --- FORMULAIRE ACHAT --- */}
+        {step === 'input' && (
           <Card className="p-6 md:p-8">
-            <h2 className="text-2xl font-bold text-slate-800 mb-6">Décris ton achat</h2>
             <div className="space-y-6">
               <InputGroup label="C'est quoi ?" placeholder="iPhone, Réparation..." value={purchase.name} onChange={(v: string) => setPurchase({ ...purchase, name: v })} />
               
@@ -427,96 +309,8 @@ export default function SimulatorPage() {
           </Card>
         )}
 
-
-        {/* --- FORMULAIRE OBJECTIF (GOAL) --- */}
-        {step === 'input' && mode === 'GOAL' && (
-            <Card className="p-6 md:p-8 border-emerald-100 ring-4 ring-emerald-50/50">
-                <h2 className="text-2xl font-bold text-emerald-900 mb-6 flex items-center gap-2">
-                    <Target className="text-emerald-600"/>
-                    Nouveau Projet de Vie
-                </h2>
-
-                <div className="space-y-6">
-                    {/* 1. Catégorie */}
-                    <div>
-                        <label className="block text-sm font-medium text-slate-600 mb-3">Quel type de projet ?</label>
-                        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                            {Object.values(GOAL_CATEGORIES).map((cat: any) => (
-                                <div 
-                                    key={cat.id}
-                                    onClick={() => setGoalData({...goalData, category: cat.id})}
-                                    className={`cursor-pointer border-2 rounded-xl p-4 flex flex-col items-center justify-center gap-2 text-center transition-all ${goalData.category === cat.id ? 'border-emerald-500 bg-emerald-50 text-emerald-800' : 'border-slate-100 hover:border-emerald-200 hover:bg-slate-50'}`}
-                                >
-                                    <div className={`p-2 rounded-full ${goalData.category === cat.id ? 'bg-emerald-100 text-emerald-600' : 'bg-white text-slate-400'}`}>
-                                        {getGoalIcon(cat.id)}
-                                    </div>
-                                    <div className="font-bold text-sm">{cat.label}</div>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-
-                    {/* 2. Nom */}
-                    <InputGroup label="Nom du projet" placeholder="Ex: Apport Maison, Voyage Japon..." value={goalData.name} onChange={(v: string) => setGoalData({...goalData, name: v})} />
-
-                    {/* 3. Chiffres */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <InputGroup label="Montant Cible" type="number" suffix="€" placeholder="20000" value={goalData.targetAmount} onChange={(v: string) => setGoalData({...goalData, targetAmount: v})} />
-                        <InputGroup label="Date butoir" type="date" value={goalData.deadline} onChange={(v: string) => setGoalData({...goalData, deadline: v})} />
-                    </div>
-
-                    {/* 4. Avancé */}
-                    <div className="p-4 bg-slate-50 rounded-lg border border-slate-100">
-                         <div className="flex items-center gap-2 mb-3">
-                             <TrendingUp size={16} className="text-slate-400"/>
-                             <span className="text-sm font-bold text-slate-600">Options avancées</span>
-                         </div>
-                         <div className="grid grid-cols-2 gap-4">
-                            <InputGroup label="J'ai déjà (Apport)" type="number" suffix="€" value={goalData.currentSaved} onChange={(v: string) => setGoalData({...goalData, currentSaved: v})} />
-                            <InputGroup label="Rendement annuel (%)" type="number" suffix="%" value={goalData.projectedYield} onChange={(v: string) => setGoalData({...goalData, projectedYield: v})} />
-                         </div>
-                         <p className="text-[10px] text-slate-400 mt-2">Laisser à 0% pour une épargne simple sur compte courant.</p>
-                    </div>
-
-                    {/* 5. LE COACH (Calcul temps réel) */}
-                    {monthlyEffort > 0 && (
-                        <div className="mt-6 bg-emerald-50 border border-emerald-100 rounded-xl p-5 animate-fade-in">
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <h4 className="text-emerald-900 font-bold text-lg">Effort requis</h4>
-                                    <p className="text-emerald-700 text-sm opacity-80">Pour atteindre l'objectif à temps</p>
-                                </div>
-                                <div className="text-right">
-                                    <span className="text-3xl font-black text-emerald-600 tracking-tight">
-                                        {Math.round(monthlyEffort)} €
-                                    </span>
-                                    <span className="text-sm font-bold text-emerald-600 uppercase"> / mois</span>
-                                </div>
-                            </div>
-                            
-                            {/* Analyse rapide */}
-                            <div className="mt-3 pt-3 border-t border-emerald-200/50 flex items-center gap-2 text-sm text-emerald-800">
-                                {monthlyEffort > stats.capacityToSave 
-                                    ? <><AlertTriangle size={16} className="text-amber-500"/> Attention, c'est supérieur à ta capacité actuelle ({Math.round(stats.capacityToSave)}€).</>
-                                    : <><CheckCircle size={16} className="text-emerald-500"/> C'est réaliste (Capacité: {Math.round(stats.capacityToSave)}€).</>
-                                }
-                            </div>
-                        </div>
-                    )}
-
-                    <Button 
-                        onClick={handleSaveGoal} 
-                        className="w-full bg-emerald-600 hover:bg-emerald-700 shadow-lg shadow-emerald-100 text-lg py-4"
-                        disabled={!goalData.name || !goalData.targetAmount || isSaving}
-                    >
-                        {isSaving ? "Création..." : "🚀 Créer mon objectif"}
-                    </Button>
-                </div>
-            </Card>
-        )}
-
-        {/* --- RÉSULTAT (UNIQUEMENT POUR PURCHASE) --- */}
-        {step === 'result' && result && mode === 'PURCHASE' && (
+        {/* --- RÉSULTAT --- */}
+        {step === 'result' && result && (
           <div className="space-y-6 animate-fade-in">
             <button onClick={() => setStep('input')} className="text-slate-500 flex items-center gap-1 text-sm font-medium hover:text-indigo-600 transition-colors">
               <ArrowLeft size={16} /> Modifier la saisie
@@ -527,14 +321,13 @@ export default function SimulatorPage() {
         )}
       </div>
 
-
-      {/* --- COLONNE DROITE (DASHBOARD LATÉRAL) --- */}
+      {/* --- COLONNE DROITE (CONTEXTE FINANCIER) --- */}
       <div className="lg:col-span-5 xl:col-span-4 lg:sticky lg:top-24 space-y-6">
         
-        {/* CARTE SITUATION ACTUELLE */}
+        {/* Rappel du contexte */}
         <Card className="p-6 bg-white border-slate-100 shadow-sm">
           <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2">
-            <Wallet size={20} className="text-slate-400" /> Situation Mensuelle
+            <Wallet size={20} className="text-slate-400" /> Mon Contexte
           </h3>
           <div className="space-y-4">
             <div className="flex justify-between items-center p-3 bg-slate-50 rounded-lg">
@@ -542,7 +335,7 @@ export default function SimulatorPage() {
                 <span className="font-bold text-slate-700">{formatCurrency(stats.monthlyIncome)}</span>
             </div>
             
-            {/* Si des projets existent, on les montre ici */}
+            {/* L'utilisateur voit que ses goals sont déjà déduits ! */}
             {stats.totalGoalsEffort > 0 && (
                 <div className="flex justify-between items-center p-3 bg-emerald-50 border border-emerald-100 rounded-lg">
                     <span className="text-emerald-700 text-sm font-bold flex items-center gap-2"><Target size={14}/> Épargne Projets</span>
@@ -557,8 +350,8 @@ export default function SimulatorPage() {
           </div>
         </Card>
 
-        {/* --- BLOC D'IMPACT (Seulement en mode Resultat Achat) --- */}
-        {step === 'result' && result && mode === 'PURCHASE' && (
+        {/* --- BLOC D'IMPACT (Seulement en mode Resultat) --- */}
+        {step === 'result' && result && (
           <div className="space-y-4 animate-fade-in">
             <Card className="p-6 border-indigo-100 shadow-md bg-white relative overflow-hidden">
               <div className="absolute top-0 left-0 w-1 h-full bg-indigo-500"></div>
@@ -581,7 +374,7 @@ export default function SimulatorPage() {
               </div>
             </Card>
 
-            {/* --- MINI GRAPHIQUE 30 JOURS --- */}
+            {/* MINI GRAPH */}
             {result.projectedCurve && result.projectedCurve.length > 0 && (
               <Card className="p-4 border-slate-200 bg-white overflow-hidden">
                 <h3 className="text-xs font-bold text-slate-400 uppercase mb-3">Projection 30 Jours</h3>

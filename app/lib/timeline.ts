@@ -1,30 +1,17 @@
 import { 
   addDays, 
-  startOfDay, 
   isLastDayOfMonth, 
-  getDaysInMonth,
   addMonths,
-  isSameDay,
   format,
-  isBefore,
   startOfMonth,
   differenceInDays,
-  parseISO
 } from 'date-fns';
 import { fr } from 'date-fns/locale';
-import { generateId } from './utils';
-
-// Parsing sécurisé
-const safeFloat = (val: any) => {
-    if (val === null || val === undefined || val === '') return 0;
-    if (typeof val === 'number') return val;
-    const clean = String(val).replace(/[\s\u00A0]/g, '').replace(',', '.');
-    const parsed = parseFloat(clean);
-    return isNaN(parsed) ? 0 : parsed;
-};
+import { generateId, safeFloat } from './utils'; // ✅ Import de safeFloat
+import { Profile, FinancialItem } from './types'; // ✅ Import des types
 
 // Helper pour normaliser les clés de date (YYYY-MM-DD)
-const toDateKey = (date: Date | string) => {
+const toDateKey = (date: Date | string): string => {
     const d = typeof date === 'string' ? new Date(date) : date;
     return format(d, 'yyyy-MM-dd');
 };
@@ -40,7 +27,39 @@ const SPENDING_WEIGHTS = [
     2.3  // Samedi
 ];
 
-export const generateTimeline = (profile: any, history: any[], simulatedEvents: any[] = [], daysToProject = 730) => {
+// Interface locale pour un événement dans la timeline (interne au moteur)
+export interface TimelineEvent {
+    id?: string;
+    name: string;
+    type: string;
+    amount: number;
+    isSimulation?: boolean;
+    date?: string | Date;
+    status?: 'safe' | 'danger'; // Ajout pour le typage du retour
+}
+
+// Interface pour le retour structuré (Mois > Jours)
+export interface MonthData {
+    id: string;
+    label: string;
+    days: TimelineDay[];
+    stats: { balanceEnd: number };
+}
+
+export interface TimelineDay {
+    date: string;
+    dayOfMonth: number;
+    balance: number | null;
+    events: TimelineEvent[];
+    status: 'safe' | 'danger';
+}
+
+export const generateTimeline = (
+    profile: Profile, 
+    history: any[], // On garde any pour l'historique pour l'instant (structure DB complexe)
+    simulatedEvents: any[] = [], 
+    daysToProject = 730
+): MonthData[] => { // ✅ Typage du retour
   
   // 1. DÉFINITION DU "PRÉSENT" ET ANCRE
   const realToday = new Date();
@@ -55,6 +74,7 @@ export const generateTimeline = (profile: any, history: any[], simulatedEvents: 
   const startDateLoop = startOfMonth(anchorDate);
   startDateLoop.setHours(12, 0, 0, 0);
 
+  // TypeScript sait que currentBalance peut être string | number grâce au type Profile
   let currentBalance = safeFloat(profile.currentBalance);
 
   // --- PRÉPARATION DES DÉPENSES VARIABLES PONDÉRÉES ---
@@ -65,12 +85,14 @@ export const generateTimeline = (profile: any, history: any[], simulatedEvents: 
   // =================================================================================
   // 1. PRÉ-CLASSEMENT DES ÉVÉNEMENTS RÉCURRENTS
   // =================================================================================
-  const recurringByDay = new Map<number, any[]>();
+  const recurringByDay = new Map<number, TimelineEvent[]>();
 
-  const pushRecurring = (items: any[], type: string, defaultDay: number) => {
-      (items || []).forEach((item: any) => {
-          const day = parseInt(item.dayOfMonth) || defaultDay;
+  const pushRecurring = (items: FinancialItem[], type: string, defaultDay: number) => {
+      (items || []).forEach((item) => {
+          // TypeScript sait que item.dayOfMonth existe
+          const day = typeof item.dayOfMonth === 'string' ? parseInt(item.dayOfMonth) : (item.dayOfMonth || defaultDay);
           const amount = safeFloat(item.amount);
+          
           if (amount > 0) {
               if (!recurringByDay.has(day)) recurringByDay.set(day, []);
               recurringByDay.get(day)?.push({
@@ -86,8 +108,9 @@ export const generateTimeline = (profile: any, history: any[], simulatedEvents: 
   pushRecurring(profile.fixedCosts, 'expense', 5);
   pushRecurring(profile.subscriptions, 'expense', 10);
   pushRecurring(profile.credits, 'expense', 15);
-  (profile.savingsContributions || []).forEach((i: any) => {
-      const day = parseInt(i.dayOfMonth) || 20;
+  
+  (profile.savingsContributions || []).forEach((i) => {
+      const day = typeof i.dayOfMonth === 'string' ? parseInt(i.dayOfMonth) : (i.dayOfMonth || 20);
       const amount = safeFloat(i.amount);
       if(amount > 0) {
           if (!recurringByDay.has(day)) recurringByDay.set(day, []);
@@ -98,9 +121,9 @@ export const generateTimeline = (profile: any, history: any[], simulatedEvents: 
   // =================================================================================
   // 2. PRÉ-CLASSEMENT DE L'HISTORIQUE ET SIMULATIONS
   // =================================================================================
-  const oneOffEventsMap = new Map<string, any[]>();
+  const oneOffEventsMap = new Map<string, TimelineEvent[]>();
 
-  const addOneOffEvent = (date: Date | string, event: any) => {
+  const addOneOffEvent = (date: Date | string, event: TimelineEvent) => {
       const key = toDateKey(date);
       if (!oneOffEventsMap.has(key)) oneOffEventsMap.set(key, []);
       oneOffEventsMap.get(key)?.push(event);
@@ -142,7 +165,7 @@ export const generateTimeline = (profile: any, history: any[], simulatedEvents: 
   // =================================================================================
   // BOUCLE PRINCIPALE (OPTIMISÉE "SAFE BY DESIGN")
   // =================================================================================
-  const monthsMap = new Map();
+  const monthsMap = new Map<string, MonthData>(); // Typage de la Map
   const daysFromStartToAnchor = differenceInDays(anchorDate, startDateLoop);
   const totalDays = Math.abs(daysFromStartToAnchor) + daysToProject;
   const anchorKey = toDateKey(anchorDate);
@@ -161,7 +184,7 @@ export const generateTimeline = (profile: any, history: any[], simulatedEvents: 
     const isBeforeAnchor = dateKey < anchorKey;
     const isAnchorDay = dateKey === anchorKey;
     
-    const eventsOfTheDay: any[] = [];
+    const eventsOfTheDay: TimelineEvent[] = [];
 
     // --- 1. SÉPARATION DES FLUX ---
     // On distingue ce qui rentre et ce qui sort pour appliquer des règles différentes le Jour J
@@ -170,7 +193,7 @@ export const generateTimeline = (profile: any, history: any[], simulatedEvents: 
     let simulationImpact = 0;    // Simulations (toujours appliquées)
 
     // Helper d'ajout intelligent
-    const addEvents = (events: any[]) => {
+    const addEvents = (events: TimelineEvent[]) => {
         if (!events) return;
         events.forEach(e => {
             eventsOfTheDay.push({ id: generateId(), ...e });
@@ -237,7 +260,7 @@ export const generateTimeline = (profile: any, history: any[], simulatedEvents: 
             stats: { balanceEnd: 0 }
         });
     }
-    const currentMonthData = monthsMap.get(monthKey);
+    const currentMonthData = monthsMap.get(monthKey)!; // ! indique à TS qu'on est sûr que ça existe
 
     // 4. Push du résultat
     currentMonthData.days.push({
