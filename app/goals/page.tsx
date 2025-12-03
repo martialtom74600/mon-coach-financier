@@ -3,11 +3,13 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useFinancialData } from '@/app/hooks/useFinancialData';
+// 👇 IMPORT DU MOTEUR
 import {
   calculateFinancials,
   formatCurrency,
   generateId,
   GOAL_CATEGORIES,
+  calculateMonthlyEffort, 
 } from '@/app/lib/logic';
 import { Goal } from '@/app/lib/types';
 
@@ -15,7 +17,7 @@ import {
   CheckCircle, AlertTriangle, XCircle, Wallet, TrendingUp,
   ArrowLeft, Save, Settings, Target, Plus, Trash2,
   CalendarDays, PiggyBank, LayoutGrid, ArrowRight, Banknote,
-  Clock, TrendingDown
+  Clock, TrendingDown, Scale
 } from 'lucide-react';
 
 import Card from '@/app/components/ui/Card';
@@ -24,7 +26,7 @@ import InputGroup from '@/app/components/ui/InputGroup';
 import Badge from '@/app/components/ui/Badge';
 
 // --- COMPOSANTS UI LOCAUX ---
-// (Je garde les mêmes composants pour la lisibilité)
+
 const ContextToggle = ({ label, subLabel, icon: Icon, checked, onChange }: any) => (
   <label className={`flex items-center gap-4 p-4 border rounded-xl cursor-pointer transition-all duration-200 ${checked ? 'bg-emerald-50 border-emerald-200 ring-1 ring-emerald-200' : 'bg-white border-slate-200 hover:bg-slate-50'}`}>
     <div className={`p-2 rounded-lg ${checked ? 'bg-emerald-100 text-emerald-600' : 'bg-slate-100 text-slate-400'}`}>
@@ -43,6 +45,7 @@ const ContextToggle = ({ label, subLabel, icon: Icon, checked, onChange }: any) 
 
 const GoalItemCard = ({ goal, onDelete }: { goal: any, onDelete: (id: string) => void }) => {
   const catInfo = GOAL_CATEGORIES[goal.category] || { label: 'Autre', icon: '🎯' };
+  
   return (
       <Card className="p-5 border-slate-200 bg-white group hover:border-emerald-200 transition-all">
           <div className="flex items-center justify-between gap-3">
@@ -76,6 +79,10 @@ const GoalItemCard = ({ goal, onDelete }: { goal: any, onDelete: (id: string) =>
   )
 };
 
+// ============================================================================
+// PAGE GOALS
+// ============================================================================
+
 export default function GoalsPage() {
   const router = useRouter();
   const { profile, saveProfile, isLoaded } = useFinancialData();
@@ -100,72 +107,119 @@ export default function GoalsPage() {
     if (!isInvested) setNewGoal(prev => ({ ...prev, projectedYield: '' }));
   }, [hasSavings, isInvested]);
 
-  // --- LOGIQUE DE SIMULATION AVANCÉE ("SOLVEUR") ---
+  // --- LOGIQUE DE SIMULATION CONNECTÉE AU MOTEUR ---
   const simulation = useMemo(() => {
       if (inputStep !== 'check') return null;
       
-      const target = parseFloat(newGoal.targetAmount as string) || 0;
-      const saved = parseFloat(newGoal.currentSaved as string) || 0;
-      const amountToSave = target - saved;
+      // 1. Préparation de l'objet Goal pour le moteur
+      const tempGoal: Goal = {
+          id: 'temp',
+          name: newGoal.name || '',
+          category: newGoal.category || 'OTHER',
+          targetAmount: parseFloat(newGoal.targetAmount as string) || 0,
+          currentSaved: parseFloat(newGoal.currentSaved as string) || 0,
+          deadline: newGoal.deadline || '',
+          projectedYield: parseFloat(newGoal.projectedYield as string) || 0,
+          isInvested: isInvested
+      };
 
-      const start = new Date();
-      const end = new Date(newGoal.deadline as string);
-      
-      // Calcul durée actuelle
-      let months = (end.getFullYear() - start.getFullYear()) * 12 + (end.getMonth() - start.getMonth());
-      if (months <= 0) months = 1; // Sécurité division par 0
-      
-      const monthlyEffort = Math.max(0, amountToSave / months);
+      // 2. APPEL AU MOTEUR (Calcul précis avec intérêts composés)
+      const monthlyEffort = calculateMonthlyEffort(tempGoal);
 
-      // Contexte financier global
+      // 3. Contexte financier global
       const capacity = stats.capacityToSave; 
       const currentCommitment = stats.totalGoalsEffort; 
-      const remainingCapacity = capacity - currentCommitment; // Ce qu'il reste VRAIMENT avant ce projet
+      const remainingCapacity = capacity - currentCommitment; // Ce qui reste pour ce projet
       
       const isPossible = remainingCapacity >= monthlyEffort;
       const newRemaining = remainingCapacity - monthlyEffort;
 
-      // --- LE CERVEAU DU SOLVEUR ---
-      let suggestion = null;
+      // Durée en mois (pour l'affichage)
+      const start = new Date();
+      const end = new Date(newGoal.deadline as string);
+      let months = (end.getFullYear() - start.getFullYear()) * 12 + (end.getMonth() - start.getMonth());
+      if (months <= 0) months = 1;
+
+      // 4. GÉNÉRATION DES SOLUTIONS (SOLVEUR)
+      const suggestions = [];
 
       if (!isPossible && remainingCapacity > 0) {
-          // Cas 1 : On a un peu de marge, mais pas assez pour cette date.
-          // Combien de mois faudrait-il avec la capacité restante ?
-          const neededMonths = Math.ceil(amountToSave / remainingCapacity);
           
-          // Calculer la nouvelle date
+          const target = tempGoal.targetAmount;
+          const saved = tempGoal.currentSaved;
+          const rate = (tempGoal.projectedYield || 0) / 100 / 12;
+          const missing = target - saved;
+
+          // --- SOLUTION 1 : LE TEMPS ---
+          // "Si je ne mets que ce qu'il me reste (remainingCapacity), combien de temps ça prend ?"
+          let neededMonths;
+          
+          if (rate > 0) {
+              // Formule NPER financière (Nombre de périodes)
+              // n = ln((FV * r / PMT) + 1) / ln(1 + r)
+              // Ici FV est le montant manquant qu'on veut atteindre
+              try {
+                  const num = Math.log(((missing * rate) / remainingCapacity) + 1);
+                  const den = Math.log(1 + rate);
+                  neededMonths = Math.ceil(num / den);
+              } catch (e) {
+                  neededMonths = 999; // Sécurité mathématique
+              }
+          } else {
+              neededMonths = Math.ceil(missing / remainingCapacity);
+          }
+
           const newDate = new Date();
           newDate.setMonth(newDate.getMonth() + neededMonths);
-          const suggestedDateStr = newDate.toISOString().split('T')[0];
+          
+          suggestions.push({
+              type: 'time',
+              label: 'Jouer la patience',
+              icon: Clock,
+              text: `Avec ton budget actuel (${formatCurrency(remainingCapacity)}/mois), tu peux y arriver en repoussant la fin de ${Math.max(0, neededMonths - months)} mois.`,
+              actionLabel: `Finir le ${newDate.toLocaleDateString()}`,
+              payload: { deadline: newDate.toISOString().split('T')[0] }
+          });
 
-          suggestion = {
-              type: 'extend_time',
-              label: 'Allonger la durée',
-              newMonths: neededMonths,
-              newDate: suggestedDateStr,
-              newEffort: remainingCapacity, // On sature la capacité
-              diffMonths: neededMonths - months
-          };
+          // --- SOLUTION 2 : L'ARGENT ---
+          // "Si je garde la date, combien je peux avoir au max avec mon budget ?"
+          // Formule FV (Future Value)
+          let maxPossibleTotal = 0;
+          if (rate > 0) {
+             // FV = PMT * (((1 + r)^n - 1) / r) + Saved * (1+r)^n
+             const fv_pmt = remainingCapacity * ((Math.pow(1 + rate, months) - 1) / rate);
+             const fv_saved = saved * Math.pow(1 + rate, months);
+             maxPossibleTotal = fv_pmt + fv_saved;
+          } else {
+             maxPossibleTotal = saved + (remainingCapacity * months);
+          }
+          
+          suggestions.push({
+              type: 'amount',
+              label: 'Réduire la cible',
+              icon: TrendingDown,
+              text: `Pour finir à cette date, ton budget te permet de viser ${formatCurrency(maxPossibleTotal)} (intérêts inclus).`,
+              actionLabel: `Viser ${formatCurrency(maxPossibleTotal)}`,
+              payload: { targetAmount: maxPossibleTotal.toFixed(0) }
+          });
       } 
       else if (!isPossible && remainingCapacity <= 0) {
-         // Cas 2 : On est déjà à sec ou en négatif avant même de commencer
-         suggestion = {
+         // Cas critique
+         suggestions.push({
              type: 'impossible',
              label: 'Budget saturé',
-             message: "Tu n'as plus aucune capacité d'épargne disponible."
-         };
+             icon: XCircle,
+             text: "Tu n'as plus aucune marge de manœuvre. Il faut réduire tes autres objectifs.",
+             isBlocking: true
+         });
       }
 
-      return { monthlyEffort, isPossible, newRemaining, months, remainingCapacity, suggestion };
-  }, [inputStep, newGoal, stats]);
+      return { monthlyEffort, isPossible, newRemaining, months, remainingCapacity, suggestions };
+  }, [inputStep, newGoal, stats, isInvested]); // Dépendances importantes
 
 
-  // Fonction pour appliquer la suggestion
-  const applySuggestion = () => {
-      if (simulation?.suggestion?.type === 'extend_time') {
-          setNewGoal({ ...newGoal, deadline: simulation.suggestion.newDate });
-          // Pas besoin de changer le step, le useEffect recalculera simulation automatiquement
-      }
+  const applySuggestion = (payload: any) => {
+      setNewGoal({ ...newGoal, ...payload });
   };
 
   const handleSaveGoal = async () => {
@@ -219,7 +273,7 @@ export default function GoalsPage() {
                 </h1>
                 <p className="text-slate-500 text-sm mt-1">
                     {step === 'input' && inputStep === 'check' 
-                        ? "Analyse de faisabilité..." 
+                        ? "Analyse des solutions..." 
                         : "Pilote tes projets et vérifie ta capacité."}
                 </p>
              </div>
@@ -230,7 +284,7 @@ export default function GoalsPage() {
              )}
         </div>
 
-        {/* INPUT FORM (inchangé, je l'ai compressé pour la lecture) */}
+        {/* INPUT FORM */}
         {step === 'input' && inputStep === 'form' && (
           <div className="animate-fade-in space-y-4">
              {hasGoals && <button onClick={() => setStep('list')} className="text-slate-500 flex items-center gap-1 text-sm font-medium hover:text-emerald-600 transition-colors"><ArrowLeft size={16} /> Retour à la liste</button>}
@@ -289,14 +343,14 @@ export default function GoalsPage() {
                     <div className={`${simulation.isPossible ? 'bg-emerald-600' : 'bg-amber-500'} p-6 text-white relative overflow-hidden`}>
                         <div className="relative z-10 flex items-center gap-4">
                             <div className="p-3 bg-white/20 backdrop-blur-md rounded-xl">
-                                {simulation.isPossible ? <CheckCircle size={32}/> : <AlertTriangle size={32}/>}
+                                {simulation.isPossible ? <CheckCircle size={32}/> : <Scale size={32}/>}
                             </div>
                             <div>
-                                <h2 className="text-xl font-bold">{simulation.isPossible ? "C'est réaliste !" : "Budget trop serré..."}</h2>
+                                <h2 className="text-xl font-bold">{simulation.isPossible ? "C'est réaliste !" : "Il faut ajuster..."}</h2>
                                 <p className="text-white/90 text-sm mt-1">
                                     {simulation.isPossible 
                                         ? "Cet objectif rentre dans ton budget mensuel." 
-                                        : `Tu dépasses ta capacité de ${formatCurrency(Math.abs(simulation.newRemaining))}.`}
+                                        : `Tu dépasses ta capacité de ${formatCurrency(Math.abs(simulation.newRemaining))}. Voici des solutions.`}
                                 </p>
                             </div>
                         </div>
@@ -319,23 +373,44 @@ export default function GoalsPage() {
                             </div>
                         </div>
 
-                        {/* 2. LE SOLVEUR INTELLIGENT (Apparaît si c'est pas bon) */}
-                        {!simulation.isPossible && simulation.suggestion?.type === 'extend_time' && (
-                            <div className="bg-amber-50 border border-amber-100 rounded-xl p-5 animate-fade-in">
-                                <h3 className="text-amber-900 font-bold flex items-center gap-2 mb-2">
-                                    <Clock size={18} /> Solution proposée : Jouons sur le temps
+                        {/* 2. LE CERVEAU : CHOIX DE SOLUTIONS */}
+                        {!simulation.isPossible && simulation.suggestions.length > 0 && !simulation.suggestions[0].isBlocking && (
+                            <div className="space-y-3">
+                                <h3 className="text-sm font-bold text-slate-700 uppercase tracking-wider flex items-center gap-2">
+                                    <Settings size={14} /> Options pour passer au vert :
                                 </h3>
-                                <p className="text-sm text-amber-800/80 mb-4">
-                                    En allongeant la durée de <strong>{simulation.suggestion.diffMonths} mois</strong>, tu pourrais atteindre ton objectif en ne payant que <strong>{formatCurrency(simulation.suggestion.newEffort)}/mois</strong> (ton maximum actuel).
-                                </p>
-                                <Button variant="secondary" onClick={applySuggestion} className="w-full bg-white border-amber-200 text-amber-900 hover:bg-amber-100">
-                                    Fixer la fin au {new Date(simulation.suggestion.newDate).toLocaleDateString()}
-                                </Button>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    {simulation.suggestions.map((option, i) => (
+                                        <div key={i} className="flex flex-col p-4 border border-slate-200 rounded-xl bg-slate-50 hover:border-indigo-200 transition-colors">
+                                            <div className="flex items-center gap-2 mb-2 font-bold text-slate-800">
+                                                <div className="p-1.5 bg-white rounded-lg text-indigo-600 shadow-sm border border-slate-100">
+                                                    <option.icon size={16} />
+                                                </div>
+                                                {option.label}
+                                            </div>
+                                            <p className="text-xs text-slate-500 mb-4 flex-1 leading-relaxed">
+                                                {option.text}
+                                            </p>
+                                            <Button size="sm" variant="secondary" onClick={() => applySuggestion(option.payload)} className="w-full bg-white border-slate-200 shadow-sm hover:bg-indigo-50 hover:text-indigo-700 hover:border-indigo-200">
+                                                {option.actionLabel}
+                                            </Button>
+                                        </div>
+                                    ))}
+                                </div>
                             </div>
+                        )}
+                        
+                        {/* Message Bloquant si aucune option */}
+                        {!simulation.isPossible && simulation.suggestions[0]?.isBlocking && (
+                             <div className="p-4 bg-rose-50 text-rose-800 rounded-xl text-sm border border-rose-100 flex gap-3">
+                                 <XCircle size={20} className="shrink-0"/>
+                                 {simulation.suggestions[0].text}
+                             </div>
                         )}
 
                         {/* 3. NUDGE D'AUTOMATISATION */}
                         <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-5 relative overflow-hidden">
+                             <div className="absolute top-0 left-0 w-1 h-full bg-indigo-500"></div>
                              <h3 className="text-indigo-900 font-bold flex items-center gap-2 mb-2">
                                 <Banknote size={18} /> Automatise ta réussite
                              </h3>
@@ -362,7 +437,7 @@ export default function GoalsPage() {
                         {/* 4. ACTIONS FINALES */}
                         <div className="pt-2">
                              <Button onClick={handleSaveGoal} disabled={isSaving} className={`w-full text-lg h-12 shadow-xl ${simulation.isPossible ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-slate-800 hover:bg-slate-900'}`}>
-                                 {isSaving ? "Configuration..." : simulation.isPossible ? "Valider et créer l'objectif" : "Forcer la création (Risqué)"}
+                                 {isSaving ? "Configuration..." : simulation.isPossible ? "Valider et créer l'objectif" : "Forcer la création (Déconseillé)"}
                              </Button>
                              {!simulation.isPossible && (
                                  <p className="text-center text-xs text-slate-400 mt-3 font-medium">
