@@ -4,15 +4,13 @@ import { useState, useMemo, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useFinancialData } from '@/app/hooks/useFinancialData';
 
-// 👇 IMPORTS DU MOTEUR & TYPES
+// 👇 IMPORTS LOGIQUE (Nettoyés : on ne garde que le nécessaire)
 import {
-  calculateMonthlyEffort,
-  analyzeGoalStrategies,
-  simulateGoalProjection,
   calculateFinancials,
   formatCurrency,
   generateId,
   GOAL_CATEGORIES,
+  simulateGoalScenario // ✅ La fonction magique qui remplace ton contrôleur local
 } from '@/app/lib/logic';
 import { Goal } from '@/app/lib/types';
 
@@ -21,7 +19,7 @@ import {
   CheckCircle, AlertTriangle, XCircle, Wallet, TrendingUp,
   ArrowLeft, Settings, Target, Plus, Trash2,
   CalendarDays, PiggyBank, LayoutGrid, ArrowRight, Banknote,
-  Clock, Scissors, Shuffle, Landmark
+  Clock, Scissors, Shuffle, Landmark, ShieldCheck
 } from 'lucide-react';
 
 // 👇 IMPORT GRAPHIQUE
@@ -35,104 +33,9 @@ import InputGroup from '@/app/components/ui/InputGroup';
 import Badge from '@/app/components/ui/Badge';
 
 // ============================================================================
-// 🧠 COUCHE CONTROLEUR / LOGIQUE (Devrait être dans app/lib/logic.ts)
+// HELPERS UI (Purement visuel ou mapping état)
 // ============================================================================
 
-/**
- * Prépare le contexte financier pour la page (Nettoyage des données brutes)
- */
-const prepareFinancialContext = (profile: any) => {
-    const stats = calculateFinancials(profile);
-    const isProfileEmpty = stats.monthlyIncome === 0 && stats.matelas === 0;
-    const currentGoalsCommitment = stats.totalGoalsEffort;
-    const hasGoals = stats.goalsBreakdown && stats.goalsBreakdown.length > 0;
-    
-    // Calcul de la capacité disponible AVANT le nouveau projet
-    const remainingCapacity = stats.capacityToSave - currentGoalsCommitment;
-
-    return { stats, isProfileEmpty, currentGoalsCommitment, hasGoals, remainingCapacity };
-};
-
-/**
- * Orchestre la simulation complète d'un objectif (Le "Cerveau")
- * Encapsule le Patch Temporel et les règles métier.
- */
-const runSimulationController = (
-    goalInput: Partial<Goal>, 
-    isInvested: boolean, 
-    context: ReturnType<typeof prepareFinancialContext>
-) => {
-    // 1. Normalisation de l'objet Goal
-    const tempGoal: Goal = {
-        id: 'temp',
-        name: goalInput.name || '',
-        category: goalInput.category || 'OTHER',
-        targetAmount: parseFloat(goalInput.targetAmount as string) || 0,
-        currentSaved: parseFloat(goalInput.currentSaved as string) || 0,
-        deadline: goalInput.deadline || '',
-        projectedYield: parseFloat(goalInput.projectedYield as string) || 0,
-        isInvested: isInvested
-    };
-
-    // 2. Calculs Moteur
-    const monthlyEffort = calculateMonthlyEffort(tempGoal);
-    const projectionData = simulateGoalProjection(tempGoal, monthlyEffort);
-
-    // 3. Patch Métier : Gestion des durées ultra-courtes (< 1 mois)
-    // Si le moteur mathématique renvoie 0 (car pas assez de temps pour itérer), on force la cohérence.
-    if (projectionData.summary.finalAmount === 0 && monthlyEffort > 0) {
-        const manualTotal = Math.round(monthlyEffort + (tempGoal.currentSaved || 0));
-        projectionData.summary.finalAmount = manualTotal;
-        projectionData.summary.totalPocket = manualTotal;
-        
-        if (projectionData.projection.length <= 1) {
-            projectionData.projection.push({
-                month: 1,
-                date: new Date(tempGoal.deadline),
-                balance: manualTotal,
-                contributed: manualTotal,
-                interests: 0
-            });
-        }
-    }
-
-    // 4. Estimation de la marge de manoeuvre (Budget Plaisir)
-    const estimatedDiscretionary = (context.stats.monthlyIncome - context.stats.fixedCosts) * 0.3; 
-
-    // 5. Diagnostic final
-    const diagnosis = analyzeGoalStrategies(
-        tempGoal,
-        monthlyEffort,
-        context.remainingCapacity,
-        estimatedDiscretionary,
-        context.stats.monthlyIncome,
-        context.stats.matelas
-    );
-
-    return { tempGoal, monthlyEffort, projectionData, diagnosis };
-};
-
-/**
- * Calcul les données d'affichage pour la Sidebar (Impact Mensuel)
- */
-const calculateSidebarMetrics = (
-    isSimulating: boolean, 
-    simulation: any, 
-    context: ReturnType<typeof prepareFinancialContext>
-) => {
-    const displayedGoalsEffort = (isSimulating && simulation) 
-        ? context.currentGoalsCommitment + simulation.monthlyEffort 
-        : context.currentGoalsCommitment;
-
-    const displayedRemaining = context.stats.capacityToSave - displayedGoalsEffort;
-    const isBudgetNegative = displayedRemaining < 0;
-
-    return { displayedGoalsEffort, displayedRemaining, isBudgetNegative };
-};
-
-/**
- * Applique une stratégie et retourne le nouvel état du formulaire
- */
 const applyStrategyToForm = (strategy: any, currentForm: Partial<Goal>) => {
     let updates: Partial<Goal> = {};
     let triggerSavings = false;
@@ -150,11 +53,6 @@ const applyStrategyToForm = (strategy: any, currentForm: Partial<Goal>) => {
 
     return { updates, triggerSavings };
 };
-
-
-// ============================================================================
-// COMPOSANTS UI (PRESENTATION PURE)
-// ============================================================================
 
 const ProjectionChart = ({ data }: { data: any[] }) => {
   if (!data || data.length === 0) return null;
@@ -278,40 +176,48 @@ export default function GoalsPage() {
   const router = useRouter();
   const { profile, saveProfile, isLoaded } = useFinancialData();
   
-  // 1. Initialisation du contexte financier via le Controleur
-  const context = useMemo(() => prepareFinancialContext(profile), [profile]);
-
-  const [step, setStep] = useState<'input' | 'list'>(context.hasGoals ? 'list' : 'input');
+  // 1. Récupération des stats via le Moteur (c'est lui qui fait les maths)
+  // stats contient maintenant : availableForProjects, securityBuffer, etc.
+  const stats = useMemo(() => calculateFinancials(profile), [profile]);
+  
+  // Helpers d'affichage simples
+  const isProfileEmpty = stats.monthlyIncome === 0 && stats.matelas === 0;
+  const hasGoals = stats.goalsBreakdown && stats.goalsBreakdown.length > 0;
+  
+  // État local de la page (UI uniquement)
+  const [step, setStep] = useState<'input' | 'list'>(hasGoals ? 'list' : 'input');
   const [inputStep, setInputStep] = useState<'form' | 'check'>('form');
   const [isSaving, setIsSaving] = useState(false);
-
+  
   const [newGoal, setNewGoal] = useState<Partial<Goal>>({
     name: '', category: 'REAL_ESTATE', targetAmount: '', currentSaved: '', deadline: '', projectedYield: '', transferDay: ''
   });
-
   const [hasSavings, setHasSavings] = useState(false);
   const [isInvested, setIsInvested] = useState(false);
 
   useEffect(() => { window.scrollTo({ top: 0, behavior: 'smooth' }); }, [step, inputStep]);
   
-  // Gestion purement UI des toggles (nettoyage des champs si désactivés)
   useEffect(() => {
     if (!hasSavings) setNewGoal(prev => ({ ...prev, currentSaved: '' }));
     if (!isInvested) setNewGoal(prev => ({ ...prev, projectedYield: '' }));
   }, [hasSavings, isInvested]);
 
-  // 2. Appel du Moteur de Simulation via le Controleur
+  // 2. Appel du Moteur de Simulation pour le scénario en cours
+  // C'est ici que toute la complexité a été déplacée (engine.ts)
   const simulation = useMemo(() => {
       if (inputStep !== 'check') return null;
-      return runSimulationController(newGoal, isInvested, context);
-  }, [inputStep, newGoal, isInvested, context]);
+      // On passe les stats complètes (qui contiennent le buffer déjà calculé)
+      return simulateGoalScenario(newGoal, profile, stats);
+  }, [inputStep, newGoal, profile, stats]);
 
-  // 3. Calcul des métriques d'affichage Sidebar via le Controleur
-  const sidebarMetrics = calculateSidebarMetrics(
-      inputStep === 'check', 
-      simulation, 
-      context
-  );
+  // 3. Calcul des métriques d'affichage pour la Sidebar
+  // On utilise 'availableForProjects' qui est la VRAIE marge après buffer
+  const displayedGoalsEffort = (inputStep === 'check' && simulation) 
+      ? stats.totalGoalsEffort + simulation.monthlyEffort 
+      : stats.totalGoalsEffort;
+
+  const displayedRemaining = stats.availableForProjects - (inputStep === 'check' && simulation ? simulation.monthlyEffort : 0);
+  const isBudgetNegative = displayedRemaining < 0;
 
   // --- Handlers UI ---
 
@@ -324,7 +230,6 @@ export default function GoalsPage() {
   const handleSaveGoal = async () => {
     if (!simulation) return;
     setIsSaving(true);
-    // Simulation délai réseau
     await new Promise(resolve => setTimeout(resolve, 800));
 
     const goalToAdd: Goal = {
@@ -338,7 +243,6 @@ export default function GoalsPage() {
     await saveProfile(updatedProfile);
     
     setIsSaving(false);
-    // Reset Form
     setNewGoal({ name: '', category: 'REAL_ESTATE', targetAmount: '', currentSaved: '', deadline: '', projectedYield: '', transferDay: '' });
     setHasSavings(false); setIsInvested(false);
     setInputStep('form'); setStep('list');
@@ -352,7 +256,7 @@ export default function GoalsPage() {
   };
 
   if (!isLoaded) return <div className="min-h-[50vh] flex items-center justify-center"><div className="animate-pulse h-12 w-12 bg-slate-200 rounded-full"></div></div>;
-  if (context.isProfileEmpty) return <div className="p-10 text-center">Profil manquant...</div>;
+  if (isProfileEmpty) return <div className="p-10 text-center">Profil manquant...</div>;
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start animate-fade-in pb-20">
@@ -381,7 +285,7 @@ export default function GoalsPage() {
         {/* INPUT FORM */}
         {step === 'input' && inputStep === 'form' && (
           <div className="animate-fade-in space-y-4">
-             {context.hasGoals && <button onClick={() => setStep('list')} className="text-slate-500 flex items-center gap-1 text-sm font-medium hover:text-emerald-600 transition-colors"><ArrowLeft size={16} /> Retour à la liste</button>}
+             {hasGoals && <button onClick={() => setStep('list')} className="text-slate-500 flex items-center gap-1 text-sm font-medium hover:text-emerald-600 transition-colors"><ArrowLeft size={16} /> Retour à la liste</button>}
             <Card className="p-6 md:p-8 border-emerald-100 shadow-md">
                 <div className="space-y-6">
                     <InputGroup label="Nom du projet" placeholder="Ex: Apport Maison..." value={newGoal.name} onChange={(v: string) => setNewGoal({ ...newGoal, name: v })} />
@@ -435,7 +339,6 @@ export default function GoalsPage() {
                 </button>
 
                 <Card className="overflow-hidden p-0 border-0 shadow-xl">
-                    {/* EN-TÊTE DYNAMIQUE */}
                     <div className={`p-6 text-white relative overflow-hidden transition-colors duration-500 ${
                         simulation.diagnosis.status === 'POSSIBLE' || simulation.diagnosis.status === 'DONE' ? 'bg-emerald-600' : 
                         simulation.diagnosis.status === 'HARD' ? 'bg-amber-500' : 'bg-slate-800'
@@ -455,8 +358,6 @@ export default function GoalsPage() {
                     </div>
 
                     <div className="p-6 bg-white space-y-8">
-                        
-                        {/* 1. CHIFFRES CLES */}
                         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 bg-slate-50 rounded-xl border border-slate-100 gap-4">
                             <div>
                                 <div className="text-xs text-slate-500 uppercase font-bold tracking-wider">Effort mensuel requis</div>
@@ -476,13 +377,11 @@ export default function GoalsPage() {
                             </div>
                         </div>
 
-                        {/* 2. GRAPHIQUE DE PROJECTION */}
                         <div>
                             <h3 className="text-sm font-bold text-slate-700 uppercase tracking-wider mb-2">Trajectoire prévue</h3>
                             <ProjectionChart data={simulation.projectionData.projection} />
                         </div>
 
-                        {/* 3. STRATÉGIES SUGGÉRÉES */}
                         {simulation.diagnosis.strategies.length > 0 && (
                             <div className="space-y-3 pt-4 border-t border-slate-100">
                                 <h3 className="text-sm font-bold text-slate-700 uppercase tracking-wider flex items-center gap-2">
@@ -516,7 +415,6 @@ export default function GoalsPage() {
                             </div>
                         )}
 
-                        {/* 4. AUTOMATISATION */}
                         <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-5 relative overflow-hidden">
                              <div className="absolute top-0 left-0 w-1 h-full bg-indigo-500"></div>
                              <h3 className="text-indigo-900 font-bold flex items-center gap-2 mb-2">
@@ -539,7 +437,6 @@ export default function GoalsPage() {
                              </div>
                         </div>
 
-                        {/* ACTIONS */}
                         <div className="pt-2">
                              <Button onClick={handleSaveGoal} disabled={isSaving} className={`w-full text-lg h-12 shadow-xl ${simulation.diagnosis.status !== 'IMPOSSIBLE' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-slate-800 hover:bg-slate-900'}`}>
                                  {isSaving ? "Création..." : simulation.diagnosis.status !== 'IMPOSSIBLE' ? "Valider et créer l'objectif" : "Forcer la création"}
@@ -553,17 +450,16 @@ export default function GoalsPage() {
              </div>
         )}
 
-        {/* LISTE DES OBJECTIFS */}
         {step === 'list' && (
           <div className="space-y-4 animate-fade-in">
-             {(!context.hasGoals) ? (
+             {(!hasGoals) ? (
                  <div className="text-center py-12 bg-white rounded-xl border border-dashed border-slate-300">
                     <LayoutGrid className="mx-auto text-slate-300 mb-3" size={48} />
                     <p className="text-slate-500 font-medium">Aucun objectif pour le moment.</p>
                     <Button variant="outline" className="mt-4" onClick={() => { setStep('input'); setInputStep('form'); }}>Créer mon premier objectif</Button>
                  </div>
              ) : (
-                context.stats.goalsBreakdown.map((goal: any) => (
+                stats.goalsBreakdown.map((goal: any) => (
                     <GoalItemCard key={goal.id} goal={goal} onDelete={handleDeleteGoal} />
                 ))
              )}
@@ -580,50 +476,61 @@ export default function GoalsPage() {
           <div className="space-y-4">
             <div className="flex justify-between items-center p-3 bg-slate-50 rounded-lg">
                 <span className="text-slate-500 text-sm font-medium">Revenus Net</span>
-                <span className="font-bold text-slate-700">{formatCurrency(context.stats.monthlyIncome)}</span>
+                <span className="font-bold text-slate-700">{formatCurrency(stats.monthlyIncome)}</span>
             </div>
-            <div className="flex justify-between items-center p-3 bg-emerald-50 border border-emerald-100 rounded-lg">
-                <div>
-                     <span className="text-emerald-900 text-sm font-bold block">Capacité d'épargne</span>
-                     <span className="text-[10px] text-emerald-600/70 uppercase font-bold tracking-wider">Le carburant</span>
+            
+            <div className="p-3 bg-emerald-50 border border-emerald-100 rounded-lg space-y-2">
+                <div className="flex justify-between items-center">
+                    <div>
+                        <span className="text-emerald-900 text-sm font-bold block">Capacité d'épargne</span>
+                        <span className="text-[10px] text-emerald-600/70 uppercase font-bold tracking-wider">Le carburant</span>
+                    </div>
+                    <span className="font-bold text-emerald-700 text-xl">{formatCurrency(stats.capacityToSave)}</span>
                 </div>
-                <span className="font-bold text-emerald-700 text-xl">{formatCurrency(context.stats.capacityToSave)}</span>
+                
+                {/* 🔒 Visualisation de la sécurité (calculée par le moteur) */}
+                {stats.securityBuffer > 0 && (
+                    <div className="flex items-center gap-2 text-xs text-emerald-600 pt-2 border-t border-emerald-100">
+                        <ShieldCheck size={12} />
+                        Dont <span className="font-bold">{formatCurrency(stats.securityBuffer)}</span> réservés pour la sécurité
+                    </div>
+                )}
             </div>
-             {context.stats.matelas > 0 && (
+
+             {stats.matelas > 0 && (
                 <div className="flex justify-between items-center p-3 bg-indigo-50 border border-indigo-100 rounded-lg">
                     <div>
                         <span className="text-indigo-900 text-sm font-bold block">Épargne dispo</span>
                         <span className="text-[10px] text-indigo-600/70 uppercase font-bold tracking-wider">Le stock</span>
                     </div>
-                    <span className="font-bold text-indigo-700">{formatCurrency(context.stats.matelas)}</span>
+                    <span className="font-bold text-indigo-700">{formatCurrency(stats.matelas)}</span>
                 </div>
              )}
           </div>
         </Card>
 
         <Card className="p-6 border-indigo-100 shadow-md bg-white relative overflow-hidden">
-            <div className={`absolute top-0 left-0 w-1 h-full ${sidebarMetrics.isBudgetNegative ? 'bg-rose-500' : 'bg-emerald-500'}`}></div>
+            <div className={`absolute top-0 left-0 w-1 h-full ${isBudgetNegative ? 'bg-rose-500' : 'bg-emerald-500'}`}></div>
             <h3 className="font-bold text-indigo-900 mb-4 flex items-center gap-2"><Landmark size={20} /> Impact Mensuel</h3>
             
             <div className="space-y-4">
             <div>
                 <div className="text-xs text-slate-400 font-bold uppercase mb-1">Effort actuel pour projets</div>
                 <div className="flex justify-between items-end">
-                {/* Plus de logique ici, juste l'affichage de la valeur calculée en amont */}
-                <div className="font-bold text-slate-800 text-2xl">{formatCurrency(sidebarMetrics.displayedGoalsEffort)}</div>
-                <Badge color={sidebarMetrics.isBudgetNegative ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-700'}>/ mois</Badge>
+                <div className="font-bold text-slate-800 text-2xl">{formatCurrency(displayedGoalsEffort)}</div>
+                <Badge color={isBudgetNegative ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-700'}>/ mois</Badge>
                 </div>
             </div>
             <div className="h-px bg-slate-100"></div>
             <div>
                 <div className="text-xs text-slate-400 font-bold uppercase mb-1">Marge restante</div>
-                <div className={`font-bold text-xl ${sidebarMetrics.isBudgetNegative ? 'text-rose-600' : 'text-slate-600'}`}>
-                    {formatCurrency(sidebarMetrics.displayedRemaining)}
+                <div className={`font-bold text-xl ${isBudgetNegative ? 'text-rose-600' : 'text-slate-600'}`}>
+                    {formatCurrency(displayedRemaining)}
                 </div>
                 <p className="text-xs text-slate-400 mt-1 leading-snug">
-                    {sidebarMetrics.isBudgetNegative 
+                    {isBudgetNegative 
                         ? "Attention : Tes projets coûtent plus cher que ce que tu peux épargner." 
-                        : "Excellent : Tu finances tes projets et tu gardes une marge."}
+                        : "Excellent : Tu finances tes projets et tu gardes une marge de sécurité."}
                 </p>
             </div>
             </div>

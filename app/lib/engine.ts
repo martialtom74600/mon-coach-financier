@@ -1,4 +1,3 @@
-// app/lib/engine.ts
 import { differenceInMonths, isValid, addMonths } from 'date-fns';
 import { Profile, Goal, SimulationResult, GoalDiagnosis, GoalStrategy, safeFloat, calculateListTotal, CONSTANTS, GOAL_CATEGORIES, PERSONA_PRESETS } from './definitions';
 
@@ -178,7 +177,15 @@ export const computeFinancialPlan = (profile: Profile): SimulationResult => {
   // Si projets pleins -> capacityToSave - maxProjectBudget = Le Buffer
   const realCashflow = Math.max(0, capacityToSave - totalAllocated);
 
-  // 4. Calcul des KPIs pour le Dashboard
+  // 4. Calculs des KPIs avancés pour le Dashboard & Simulation
+  const securityBuffer = Math.round(capacityToSave * CONSTANTS.BUFFER_RATIO);
+  
+  // Capacité Max pour les projets (Capacity - Buffer)
+  const maxProjectBudget = Math.max(0, capacityToSave * (1 - CONSTANTS.BUFFER_RATIO));
+  
+  // Ce qu'il reste de disponible pour de NOUVEAUX projets (Capacité Max - Ce qui est déjà pris)
+  const availableForProjects = Math.max(0, maxProjectBudget - totalAllocated);
+
   const matelas = safeFloat(profile.savings);
   const essentialMonthlyNeeds = mandatoryExpenses + (discretionaryExpenses * 0.5);
   
@@ -221,9 +228,77 @@ export const computeFinancialPlan = (profile: Profile): SimulationResult => {
       totalWealth,
       safetyMonths,
       engagementRate,
-      rules
+      rules,
+
+      // ✅ NOUVEAU : On exporte les données de sécurité pour le contrôleur de page
+      securityBuffer,
+      availableForProjects
     },
     allocations,
     freeCashFlow: realCashflow
   };
+};
+
+/**
+ * 🧠 NOUVELLE FONCTION EXPORTÉE : SIMULATEUR DE SCÉNARIO
+ * Centralise toute la logique de simulation d'un nouveau projet (patch temporel inclus)
+ * Utilise le contexte calculé par computeFinancialPlan
+ */
+export const simulateGoalScenario = (
+  goalInput: Partial<Goal>,
+  profile: Profile,
+  financialContext: SimulationResult['budget']
+) => {
+    // 1. Normalisation de l'input
+    const tempGoal: Goal = {
+        id: 'temp',
+        name: goalInput.name || '',
+        category: goalInput.category || 'OTHER',
+        targetAmount: parseFloat(goalInput.targetAmount as string) || 0,
+        currentSaved: parseFloat(goalInput.currentSaved as string) || 0,
+        deadline: goalInput.deadline || '',
+        projectedYield: parseFloat(goalInput.projectedYield as string) || 0,
+        isInvested: !!goalInput.isInvested
+    };
+
+    // 2. Calculs Moteur (Effort & Projection)
+    const monthlyEffort = calculateMonthlyEffort(tempGoal);
+    const projectionData = simulateGoalProjection(tempGoal, monthlyEffort);
+
+    // 3. Patch Métier : Gestion des durées ultra-courtes (< 1 mois)
+    // Si la durée est trop courte pour la boucle de projection, on force la cohérence visuelle.
+    if (projectionData.summary.finalAmount === 0 && monthlyEffort > 0) {
+        const manualTotal = Math.round(monthlyEffort + (tempGoal.currentSaved || 0));
+        projectionData.summary.finalAmount = manualTotal;
+        projectionData.summary.totalPocket = manualTotal;
+        
+        // Ajout artificiel du point final pour le graphique
+        if (projectionData.projection.length <= 1) {
+            projectionData.projection.push({
+                month: 1,
+                date: new Date(tempGoal.deadline),
+                balance: manualTotal,
+                contributed: manualTotal,
+                interests: 0
+            });
+        }
+    }
+
+    // 4. Estimation de la marge de manoeuvre (Budget Plaisir)
+    // Utilisé pour calibrer la sévérité des conseils
+    const estimatedDiscretionary = (financialContext.monthlyIncome - financialContext.fixed) * 0.3; 
+
+    // 5. Diagnostic final
+    // IMPORTANT : On utilise 'availableForProjects' qui tient DÉJÀ compte du buffer et des autres projets
+    // C'est ici que se joue la validation "Hard" ou "Impossible"
+    const diagnosis = analyzeGoalStrategies(
+        tempGoal,
+        monthlyEffort,
+        financialContext.availableForProjects, // <-- LE FIX : On compare à la vraie disponibilité
+        estimatedDiscretionary,
+        financialContext.monthlyIncome,
+        financialContext.matelas
+    );
+
+    return { tempGoal, monthlyEffort, projectionData, diagnosis };
 };

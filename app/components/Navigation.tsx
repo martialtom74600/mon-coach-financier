@@ -96,12 +96,12 @@ export default function Navigation() {
           {/* Ajout du lien Objectifs ici */}
           <Link href="/goals" className={getLinkClass('/goals')}>
             <Target size={20} />
-            <span>Mes Objectifs</span>
+            <span>Mes objectifs</span>
           </Link>
 
           <Link href="/simulator" className={getLinkClass('/simulator')}>
             <PlusCircle size={20} />
-            <span>Simulateur Achat</span>
+            <span>Simulateur achat</span>
           </Link>
 
           <Link href="/history" className={getLinkClass('/history')}>

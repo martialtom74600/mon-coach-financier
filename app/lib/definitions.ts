@@ -90,6 +90,7 @@ export interface Goal {
   
   monthlyNeed?: number;
   diagnosis?: GoalDiagnosis;
+  monthlyContribution?: number; // Ajouté pour le typage du moteur
 }
 
 export interface Household { adults: number | string; children: number | string; }
@@ -171,13 +172,26 @@ export interface SimulationResult {
       fixed: number; 
       capacity: number; 
       remainingToLive: number; 
-      totalRecurring: number; // Pour compatibilité
-      monthlyIncome: number; // Pour compatibilité
-      mandatoryExpenses: number; // Pour compatibilité
-      discretionaryExpenses: number; // Pour compatibilité
-      capacityToSave: number; // Pour compatibilité
-      matelas: number; // Pour compatibilité
-      rules: PersonaRules; // Pour compatibilité
+      totalRecurring: number; 
+      monthlyIncome: number; 
+      mandatoryExpenses: number; 
+      discretionaryExpenses: number; 
+      capacityToSave: number; 
+      matelas: number; 
+      rules: PersonaRules; 
+
+      // ✅ CHAMPS AJOUTÉS POUR LA SÉCURITÉ & PROJETS
+      securityBuffer: number; 
+      availableForProjects: number;
+
+      profitableExpenses: number;
+      totalGoalsEffort: number;
+      realCashflow: number;
+      
+      investments: number;
+      totalWealth: number;
+      safetyMonths: number;
+      engagementRate: number;
   };
   freeCashFlow: number; 
 }
