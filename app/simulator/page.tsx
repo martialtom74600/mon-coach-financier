@@ -11,7 +11,6 @@ import {
   generateId,
   calculateFinancials,
 } from '@/app/lib/logic';
-// Plus besoin d'importer goals ici, le simulateur utilise le profil global qui contient déjà les goals !
 
 import {
   CheckCircle, AlertTriangle, XCircle, Info, Wallet, TrendingDown,
@@ -24,8 +23,7 @@ import Button from '@/app/components/ui/Button';
 import InputGroup from '@/app/components/ui/InputGroup';
 import Badge from '@/app/components/ui/Badge';
 
-// ... (Garde tes composants UI : ContextToggle, PurchaseRecap, DiagnosticCard tels quels) ...
-// Je ne les répète pas pour gagner de la place, copie-colle les depuis ton ancien fichier.
+// --- COMPOSANTS UI LOCAUX ---
 
 const ContextToggle = ({ label, subLabel, icon: Icon, checked, onChange }: any) => (
   <label className={`flex items-center gap-4 p-4 border rounded-xl cursor-pointer transition-all duration-200 ${checked ? 'bg-indigo-50 border-indigo-200 ring-1 ring-indigo-200' : 'bg-white border-slate-200 hover:bg-slate-50'}`}>
@@ -155,12 +153,14 @@ const DiagnosticCard = ({ result }: { result: any }) => {
 };
 
 // ============================================================================
-// PAGE PRINCIPALE (NETTOYÉE)
+// PAGE PRINCIPALE
 // ============================================================================
 
 export default function SimulatorPage() {
   const router = useRouter();
   const { profile, history, saveDecision, isLoaded } = useFinancialData();
+  
+  // Utilise l'engine v2 pour calculer les stats (incluant le fix des goals)
   const stats = useMemo(() => calculateFinancials(profile), [profile]);
   
   const isProfileEmpty = stats.monthlyIncome === 0 && stats.matelas === 0;
@@ -246,12 +246,12 @@ export default function SimulatorPage() {
         
         {/* TITRE SIMPLE */}
         {step === 'input' && (
-             <div className="mb-2">
-                 <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-                     <ShoppingBag className="text-indigo-600"/> Simulateur d'Achat
-                 </h1>
-                 <p className="text-slate-500 text-sm mt-1">Est-ce que cet achat rentre dans ton budget sans casser tes objectifs ?</p>
-             </div>
+              <div className="mb-2">
+                  <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
+                      <ShoppingBag className="text-indigo-600"/> Simulateur d'Achat
+                  </h1>
+                  <p className="text-slate-500 text-sm mt-1">Est-ce que cet achat rentre dans ton budget sans casser tes objectifs ?</p>
+              </div>
         )}
 
         {/* --- FORMULAIRE ACHAT --- */}
@@ -332,10 +332,11 @@ export default function SimulatorPage() {
           <div className="space-y-4">
             <div className="flex justify-between items-center p-3 bg-slate-50 rounded-lg">
                 <span className="text-slate-500 text-sm font-medium">Revenus</span>
+                {/* DYNAMIQUE */}
                 <span className="font-bold text-slate-700">{formatCurrency(stats.monthlyIncome)}</span>
             </div>
             
-            {/* L'utilisateur voit que ses goals sont déjà déduits ! */}
+            {/* DYNAMIQUE : N'apparait que si totalGoalsEffort > 0 (ce qui dépend de tes goals et du buffer engine) */}
             {stats.totalGoalsEffort > 0 && (
                 <div className="flex justify-between items-center p-3 bg-emerald-50 border border-emerald-100 rounded-lg">
                     <span className="text-emerald-700 text-sm font-bold flex items-center gap-2"><Target size={14}/> Épargne Projets</span>
@@ -345,6 +346,7 @@ export default function SimulatorPage() {
 
             <div className="flex justify-between items-center p-3 bg-indigo-50 border border-indigo-100 rounded-lg">
                 <span className="text-indigo-900 text-sm font-bold">Reste à vivre</span>
+                {/* DYNAMIQUE : Vient directement de engine.ts (contient le buffer invisible) */}
                 <span className="font-bold text-indigo-700 text-xl">{formatCurrency(stats.remainingToLive)}</span>
             </div>
           </div>
@@ -360,6 +362,7 @@ export default function SimulatorPage() {
                 <div>
                   <div className="text-xs text-slate-400 font-bold uppercase mb-1">Nouveau Matelas</div>
                   <div className="flex justify-between items-end">
+                    {/* DYNAMIQUE : Calculé par analyzePurchaseImpact */}
                     <div className="font-bold text-slate-800 text-2xl">{formatCurrency(result.newMatelas)}</div>
                     <Badge color={result.newSafetyMonths < 3 ? 'bg-orange-100 text-orange-700' : 'bg-emerald-100 text-emerald-700'}>
                         {result.newSafetyMonths.toFixed(1)} mois sécu
@@ -374,7 +377,7 @@ export default function SimulatorPage() {
               </div>
             </Card>
 
-            {/* MINI GRAPH */}
+            {/* MINI GRAPH DYNAMIQUE */}
             {result.projectedCurve && result.projectedCurve.length > 0 && (
               <Card className="p-4 border-slate-200 bg-white overflow-hidden">
                 <h3 className="text-xs font-bold text-slate-400 uppercase mb-3">Projection 30 Jours</h3>
