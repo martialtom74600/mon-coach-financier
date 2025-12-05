@@ -13,6 +13,7 @@ import { calculateFinancials, formatCurrency } from '@/app/lib/logic';
 import Card from '@/app/components/ui/Card';
 import Button from '@/app/components/ui/Button';
 import Badge from '@/app/components/ui/Badge';
+import FinancialDoctor from '@/app/components/FinancialDoctor'; // <--- NOUVEL IMPORT
 
 import {
   TrendingUp,
@@ -26,8 +27,8 @@ import {
   CreditCard,
   ShoppingCart,
   Settings,
-  Target,     // NOUVEAU
-  Calendar    // NOUVEAU
+  Target,
+  Calendar
 } from 'lucide-react';
 
 // ============================================================================
@@ -104,7 +105,6 @@ const BudgetRow = ({ label, icon: Icon, amount, total, color, subtext = null }: 
     );
 };
 
-// --- NOUVEAU COMPOSANT : CARTE OBJECTIF ---
 const GoalCard = ({ goal }: { goal: any }) => {
     const percent = Math.min(100, (goal.currentSaved / goal.targetAmount) * 100);
     return (
@@ -163,21 +163,25 @@ function DashboardView() {
     );
   }
 
+  // --- LOGIQUE SCORE (Gardée pour la jauge visuelle à gauche) ---
   const safetyRatio = Math.min(1, stats.safetyMonths / (stats.rules.safetyMonths || 3));
   const debtRatio = stats.engagementRate / (stats.rules.maxDebt || 33);
   const debtScore = Math.max(0, 50 * (1 - (debtRatio * 0.5)));
-  const finalScore = Math.round((safetyRatio * 50) + debtScore);
-  const currentLevel = getLevel(finalScore);
+  // Le score du FinancialDoctor est plus précis, mais on garde celui-ci pour la jauge visuelle simple
+  const visualScore = Math.round((safetyRatio * 50) + debtScore); 
+  const currentLevel = getLevel(visualScore);
 
   return (
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start animate-fade-in">
+        
+        {/* --- COLONNE GAUCHE (Indicateurs Clés) --- */}
         <div className="lg:col-span-4 space-y-6">
             <Card className={`p-6 flex flex-col items-center justify-center text-center relative ${currentLevel.border} border-t-4`}>
                 <div className="flex justify-between w-full items-center mb-4 px-2">
                     <h3 className="font-bold text-slate-800 flex items-center gap-2"><Activity size={18} className="text-slate-400"/> Santé Financière</h3>
                     <Badge color={`${currentLevel.bg.replace('bg-', 'bg-opacity-20 text-')} border-none`}>{currentLevel.label}</Badge>
                 </div>
-                <div className="mb-6 relative z-10"><LevelGauge score={finalScore} level={currentLevel} /></div>
+                <div className="mb-6 relative z-10"><LevelGauge score={visualScore} level={currentLevel} /></div>
                 <div className="grid grid-cols-2 gap-3 w-full text-center">
                     <div className="bg-slate-50 rounded-lg p-3">
                         <div className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Sécurité</div>
@@ -192,7 +196,7 @@ function DashboardView() {
             
             <Button onClick={() => router.push('/simulator')} className="w-full shadow-lg py-4"><Zap size={20} /> Simuler un nouvel achat</Button>
             
-            {/* NOUVEAU BLOC : OBJECTIFS (Si présents) */}
+            {/* BLOC OBJECTIFS (Si présents) */}
             {stats.goalsBreakdown && stats.goalsBreakdown.length > 0 && (
                 <div className="space-y-3">
                     <div className="flex items-center justify-between px-1">
@@ -233,7 +237,13 @@ function DashboardView() {
             </Card>
         </div>
 
+        {/* --- COLONNE CENTRALE / DROITE --- */}
         <div className="lg:col-span-8 space-y-6">
+            
+            {/* 🔥 LE DOCTEUR FINANCIER (Priorité Haute) 🔥 */}
+            {/* S'affiche uniquement si le diagnostic est disponible */}
+            {stats.diagnosis && <FinancialDoctor diagnosis={stats.diagnosis} />}
+
             <Card className="p-6 md:p-8">
                 <h2 className="text-lg font-bold text-slate-800 mb-6 flex items-center gap-2"><Wallet className="text-indigo-600" /> Ton Budget Mensuel</h2>
                 <div className="space-y-2">
@@ -246,7 +256,7 @@ function DashboardView() {
                         <BudgetRow label="Épargne Projets" icon={Target} amount={stats.totalGoalsEffort} total={stats.monthlyIncome} color={{ bg: 'bg-emerald-100', text: 'text-emerald-600', bar: 'bg-emerald-500' }} subtext="Immo, Voyage..." />
                     )}
                     
-                    {/* On affiche les investissements manuels (hors projets) s'il y en a */}
+                    {/* Investissements manuels (hors projets) */}
                     {stats.profitableExpenses - stats.totalGoalsEffort > 0 && (
                         <BudgetRow label="Investissements Libres" icon={TrendingUp} amount={stats.profitableExpenses - stats.totalGoalsEffort} total={stats.monthlyIncome} color={{ bg: 'bg-purple-100', text: 'text-purple-600', bar: 'bg-purple-500' }} subtext="Épargne active" />
                     )}
@@ -269,6 +279,7 @@ function DashboardView() {
                     </div>
                 </div>
             </Card>
+            
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 h-auto">
                 <Card className="p-6 border-t-4 border-t-amber-500 h-full flex flex-col justify-between">
                     <div>
@@ -312,9 +323,9 @@ function DashboardView() {
   );
 }
 
-// ... LE RESTE DU FICHIER (AuthScreen, Home) RESTE IDENTIQUE ...
-// Je te le remets pas pour éviter de saturer, tu peux garder la fin de ton fichier actuel.
-// Mais pour être complet si tu copies/colles tout :
+// ============================================================================
+// 3. AUTH & HOME (Partagé)
+// ============================================================================
 
 function AuthScreen() {
     const searchParams = useSearchParams();

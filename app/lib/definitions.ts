@@ -12,26 +12,25 @@ export const CONSTANTS = {
   INVESTMENT_RATE: 0.07,
   INFLATION_RATE: 0.02,
   WEALTHY_THRESHOLD: 12,
-  BUFFER_RATIO: 0.10, // 10% de marge de sécurité (Règle Absolue Moteur)
+  BUFFER_RATIO: 0.10, // 10% de marge de sécurité
 };
 
-// Configuration enrichie pour le moteur Waterfall (Priorité 1 à 4)
 export const GOAL_CATEGORIES = {
-  SAFETY:      { id: 'SAFETY',      priority: 1, label: 'Matelas de Sécurité', icon: '🛡️', description: 'Épargne de précaution (Livrets)' },
-  REAL_ESTATE: { id: 'REAL_ESTATE', priority: 2, label: 'Immobilier',          icon: '🏠', description: 'Achat résidence ou locatif' },
-  DEBT:        { id: 'DEBT',        priority: 2, label: 'Dette',               icon: '💳', description: 'Remboursement anticipé' },
+  SAFETY:      { id: 'SAFETY',      priority: 1, label: 'Matelas de Sécurité', icon: '🛡️', description: 'Épargne de précaution' },
+  REAL_ESTATE: { id: 'REAL_ESTATE', priority: 2, label: 'Immobilier',          icon: '🏠', description: 'Achat résidence' },
+  DEBT:        { id: 'DEBT',        priority: 2, label: 'Dette',               icon: '💳', description: 'Remboursement' },
   VEHICLE:     { id: 'VEHICLE',     priority: 3, label: 'Véhicule',            icon: '🚗', description: 'Voiture, Moto' },
-  TRAVEL:      { id: 'TRAVEL',      priority: 3, label: 'Voyage',              icon: '✈️', description: 'Vacances, Tour du monde' },
-  WEDDING:     { id: 'WEDDING',     priority: 3, label: 'Événement',           icon: '💍', description: 'Mariage, Naissance' },
+  TRAVEL:      { id: 'TRAVEL',      priority: 3, label: 'Voyage',              icon: '✈️', description: 'Vacances' },
+  WEDDING:     { id: 'WEDDING',     priority: 3, label: 'Événement',           icon: '💍', description: 'Mariage' },
   OTHER:       { id: 'OTHER',       priority: 3, label: 'Autre Projet',        icon: '🎯', description: 'Divers' },
-  FINANCE:     { id: 'FINANCE',     priority: 4, label: 'Bourse / Crypto',     icon: '📈', description: 'Investissement pur' },
+  FINANCE:     { id: 'FINANCE',     priority: 4, label: 'Bourse / Crypto',     icon: '📈', description: 'Investissement' },
   RETIREMENT:  { id: 'RETIREMENT',  priority: 4, label: 'Retraite',            icon: '🌴', description: 'Long terme' },
 } as const;
 
 export const PURCHASE_TYPES = {
-  NEED:   { id: 'need',   label: 'Besoin Vital',    description: 'Nourriture, Santé, Réparation', color: 'bg-blue-100 text-blue-700 border-blue-200' },
-  USEFUL: { id: 'useful', label: 'Confort / Utile', description: 'Gain de temps, Travail',        color: 'bg-emerald-100 text-emerald-700 border-emerald-200' },
-  DESIRE: { id: 'desire', label: 'Envie / Plaisir', description: 'Gadget, Mode, Sortie',          color: 'bg-purple-100 text-purple-700 border-purple-200' },
+  NEED:   { id: 'need',   label: 'Besoin Vital',    description: 'Nourriture, Santé', color: 'bg-blue-100 text-blue-700 border-blue-200' },
+  USEFUL: { id: 'useful', label: 'Confort / Utile', description: 'Gain de temps',     color: 'bg-emerald-100 text-emerald-700 border-emerald-200' },
+  DESIRE: { id: 'desire', label: 'Envie / Plaisir', description: 'Loisirs, Mode',     color: 'bg-purple-100 text-purple-700 border-purple-200' },
 };
 
 export const PAYMENT_MODES = {
@@ -43,7 +42,7 @@ export const PAYMENT_MODES = {
 };
 
 // ============================================================================
-// 2. TYPES (MODÈLES DE DONNÉES)
+// 2. TYPES
 // ============================================================================
 
 export type GoalCategoryKey = keyof typeof GOAL_CATEGORIES;
@@ -87,10 +86,9 @@ export interface Goal {
   projectedYield: number | string;
   isInvested?: boolean;
   transferDay?: number;
-  
   monthlyNeed?: number;
   diagnosis?: GoalDiagnosis;
-  monthlyContribution?: number; // Ajouté pour le typage du moteur
+  monthlyContribution?: number;
 }
 
 export interface Household { adults: number | string; children: number | string; }
@@ -103,22 +101,18 @@ export interface Profile {
   household: Household;
   updatedAt?: string;
   balanceDate?: string;
-
   savings: number | string;
   investments: number | string;
   investmentYield: number | string; 
   currentBalance: number | string;
-
   monthlyIncome?: number; 
   variableCosts: number | string;
-
   incomes: FinancialItem[];
   fixedCosts: FinancialItem[];
   subscriptions: FinancialItem[];
   credits: FinancialItem[];
   savingsContributions: FinancialItem[];
   annualExpenses: FinancialItem[];
-  
   goals?: Goal[];
 }
 
@@ -147,13 +141,33 @@ export interface AnalysisResult {
   issues: any[];
   tips: any[];
   projectedCurve: { date: string; value: number }[];
-  
   newSafetyMonths: number;
   newEngagementRate: number;
   realCost: number;
   creditCost: number;
   opportunityCost: number;
   timeToWork: number;
+}
+
+// --- NOUVEAU : TYPES DU DOCTEUR FINANCIER ---
+export type OpportunityLevel = 'CRITICAL' | 'WARNING' | 'INFO' | 'SUCCESS';
+export type OpportunityType = 'SAVINGS' | 'DEBT' | 'INVESTMENT' | 'BUDGET';
+
+export interface OptimizationOpportunity {
+  id: string;
+  type: OpportunityType;
+  level: OpportunityLevel;
+  title: string;
+  message: string;
+  actionLabel?: string;
+  potentialGain?: number;
+}
+
+export interface DeepAnalysis {
+  globalScore: number;
+  tags: string[];
+  ratios: { needs: number; wants: number; savings: number; };
+  opportunities: OptimizationOpportunity[];
 }
 
 export interface SimulationResult {
@@ -179,25 +193,22 @@ export interface SimulationResult {
       capacityToSave: number; 
       matelas: number; 
       rules: PersonaRules; 
-
-      // ✅ CHAMPS AJOUTÉS POUR LA SÉCURITÉ & PROJETS
       securityBuffer: number; 
       availableForProjects: number;
-
       profitableExpenses: number;
       totalGoalsEffort: number;
       realCashflow: number;
-      
       investments: number;
       totalWealth: number;
       safetyMonths: number;
       engagementRate: number;
   };
   freeCashFlow: number; 
+  diagnosis?: DeepAnalysis; // ✅ ESSENTIEL POUR L'AFFICHAGE
 }
 
 // ============================================================================
-// 3. OBJETS COMPLEXES (PERSONAS & INITIAL)
+// 3. OBJETS COMPLEXES
 // ============================================================================
 
 export const PERSONA_PRESETS: Record<string, { id: string, label: string, description: string, rules: PersonaRules }> = {
@@ -215,7 +226,7 @@ export const INITIAL_PROFILE: Profile = {
 };
 
 // ============================================================================
-// 4. UTILITAIRES (HELPERS)
+// 4. UTILITAIRES
 // ============================================================================
 
 export const generateId = (): string => Math.random().toString(36).substr(2, 9);

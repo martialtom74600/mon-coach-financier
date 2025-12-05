@@ -11,6 +11,7 @@ import {
 } from '@/app/lib/logic';
 
 import AccordionSection from '@/app/components/AccordionSection';
+import FinancialDoctor from '@/app/components/FinancialDoctor'; // <--- NOUVEAU
 
 import {
   Save, Wallet, Tv, Landmark,
@@ -417,20 +418,50 @@ export default function ProfilePage() {
           {/* --- ACTE 4 : LIFESTYLE (LE VERDICT) --- */}
           {currentStep === 4 && (
               <div className="space-y-8 animate-slide-up">
+                  
+                  {/* ON INJECTE LE DOCTEUR ICI */}
+                  {stats.diagnosis && (
+                    <div className="bg-white rounded-3xl p-1 border border-slate-200 shadow-sm">
+                        <FinancialDoctor diagnosis={stats.diagnosis} />
+                    </div>
+                  )}
+
+                  {/* Ancien bloc "Verdict" ajusté */}
                   <div className="bg-gradient-to-br from-indigo-900 to-slate-900 rounded-3xl p-8 text-white shadow-2xl relative overflow-hidden">
                       <div className="relative z-10">
-                          <h3 className="text-2xl font-bold mb-6 flex items-center gap-3"><Zap className="text-indigo-400" /> Le Verdict</h3>
+                          <h3 className="text-2xl font-bold mb-6 flex items-center gap-3"><Zap className="text-indigo-400" /> Vos Chiffres Clés</h3>
                           <div className="grid md:grid-cols-2 gap-12 items-center">
                               <div>
-                                  <p className="text-indigo-200 text-sm mb-4">Une fois tout payé, il te reste :</p>
+                                  <p className="text-indigo-200 text-sm mb-4">Reste à vivre (Plaisir + Courses) :</p>
                                   <div className="text-5xl font-black tracking-tight text-white mb-8">{formatCurrency(stats.remainingToLive)}</div>
-                                  <p className="text-indigo-100 font-medium mb-3">Budget <strong>Plaisirs / Courses</strong> ?</p>
-                                  <div className="relative"><input type="text" value={formData.variableCosts || ''} onChange={(e) => updateForm({ ...formData, variableCosts: parseNumber(e.target.value) })} className="w-full p-4 pl-6 pr-12 bg-white/10 border border-white/20 rounded-2xl text-3xl font-bold text-white placeholder:text-white/30 focus:bg-white/20 outline-none backdrop-blur-sm transition-all shadow-inner" placeholder="0" /><span className="absolute right-6 top-1/2 -translate-y-1/2 text-indigo-200 font-medium">€</span></div>
+                                  
+                                  <p className="text-indigo-100 font-medium mb-3 text-sm">Ajuster ce budget plaisir ?</p>
+                                  <div className="relative">
+                                    <input 
+                                        type="text" 
+                                        value={formData.variableCosts || ''} 
+                                        onChange={(e) => updateForm({ ...formData, variableCosts: parseNumber(e.target.value) })} 
+                                        className="w-full p-4 pl-6 pr-12 bg-white/10 border border-white/20 rounded-2xl text-2xl font-bold text-white placeholder:text-white/30 focus:bg-white/20 outline-none backdrop-blur-sm transition-all shadow-inner" 
+                                        placeholder="0" 
+                                    />
+                                    <span className="absolute right-6 top-1/2 -translate-y-1/2 text-indigo-200 font-medium">€</span>
+                                  </div>
                               </div>
+                              
                               <div className="bg-white/10 backdrop-blur-md rounded-2xl p-6 border border-white/10">
-                                  <div className="flex justify-between items-center mb-4"><span className="text-xs font-bold uppercase tracking-wider text-indigo-300">Capacité d&apos;épargne réelle</span>{stats.capacityToSave > 0 ? <CheckCircle size={16} className="text-emerald-400" /> : <AlertTriangle size={16} className="text-rose-400" />}</div>
-                                  <div className={`text-4xl font-black mb-2 ${stats.capacityToSave > 0 ? 'text-emerald-300' : 'text-rose-300'}`}>{formatCurrency(stats.capacityToSave)}</div>
-                                  <div className="w-full h-3 bg-white/20 rounded-full mt-4 overflow-hidden flex"><div className={`h-full transition-all duration-500 ${stats.capacityToSave >= 0 ? 'bg-emerald-500' : 'bg-rose-500'}`} style={{ width: stats.monthlyIncome > 0 ? `${Math.min(100, Math.max(0, (stats.capacityToSave / stats.monthlyIncome) * 100))}%` : '0%' }}></div></div>
+                                  <div className="flex justify-between items-center mb-4">
+                                    <span className="text-xs font-bold uppercase tracking-wider text-indigo-300">Taux d'épargne</span>
+                                    {stats.capacityToSave > 0 ? <CheckCircle size={16} className="text-emerald-400" /> : <AlertTriangle size={16} className="text-rose-400" />}
+                                  </div>
+                                  <div className={`text-4xl font-black mb-2 ${stats.capacityToSave > 0 ? 'text-emerald-300' : 'text-rose-300'}`}>
+                                    {formatCurrency(stats.capacityToSave)}
+                                  </div>
+                                  <div className="w-full h-3 bg-white/20 rounded-full mt-4 overflow-hidden flex">
+                                    <div 
+                                        className={`h-full transition-all duration-500 ${stats.capacityToSave >= 0 ? 'bg-emerald-500' : 'bg-rose-500'}`} 
+                                        style={{ width: stats.monthlyIncome > 0 ? `${Math.min(100, Math.max(0, (stats.capacityToSave / stats.monthlyIncome) * 100))}%` : '0%' }}
+                                    ></div>
+                                  </div>
                               </div>
                           </div>
                       </div>
