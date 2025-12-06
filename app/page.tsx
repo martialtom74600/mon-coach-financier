@@ -16,44 +16,77 @@ import FinancialDoctor from '@/app/components/FinancialDoctor'; // Le nouveau co
 
 import {
   TrendingUp,
-  TrendingDown,
   ArrowRight,
   Zap,
   Layers,
   Wallet,
-  CreditCard,
-  ShoppingCart,
   Settings,
   Target,
-  Calendar
+  Calendar,
+  Activity
 } from 'lucide-react';
 
 // ============================================================================
-// 1. HELPERS (Composants visuels légers pour le Dashboard)
+// 1. HELPERS VISUELS
 // ============================================================================
 
-const BudgetRow = ({ label, icon: Icon, amount, total, color, subtext = null }: any) => {
-    const percent = total > 0 ? Math.round((amount / total) * 100) : 0;
-    return (
-        <div className="flex items-center gap-4 p-3 hover:bg-slate-50 rounded-xl transition-colors cursor-default group">
-            <div className={`p-2.5 rounded-xl ${color.bg} ${color.text} group-hover:scale-110 transition-transform`}>
-                <Icon size={20} />
+// 🆕 NOUVEAU : LE WATERFALL (Remplaçant moderne des BudgetRows)
+const CashflowWaterfall = ({ stats }: { stats: any }) => {
+  // Sécurité division par zéro
+  const income = Math.max(1, stats.monthlyIncome);
+  
+  // Calcul des parts (en %)
+  const fixedPct = (stats.mandatoryExpenses / income) * 100;
+  const lifePct = (stats.discretionaryExpenses / income) * 100;
+  const goalsPct = (stats.totalGoalsEffort / income) * 100;
+  // Le "Libre" est le reste mathématique (peut être 0 si tout est mangé)
+  const freePct = Math.max(0, 100 - fixedPct - lifePct - goalsPct);
+
+  return (
+    <Card className="p-6 md:p-8 border-slate-200">
+      <h2 className="text-lg font-bold text-slate-800 mb-6 flex items-center gap-2">
+          <Wallet className="text-indigo-600" /> Anatomie de tes revenus
+      </h2>
+
+      <div className="py-2">
+        {/* BARRE EMPILÉE (STACKED BAR) */}
+        <div className="flex h-8 w-full rounded-xl overflow-hidden bg-slate-100 shadow-inner relative">
+            <div style={{ width: `${fixedPct}%` }} className="bg-slate-400 border-r border-white/20 transition-all duration-1000" title="Charges Fixes"></div>
+            <div style={{ width: `${lifePct}%` }} className="bg-indigo-400 border-r border-white/20 transition-all duration-1000" title="Vie Courante"></div>
+            <div style={{ width: `${goalsPct}%` }} className="bg-emerald-400 border-r border-white/20 transition-all duration-1000" title="Projets"></div>
+            <div style={{ width: `${freePct}%` }} className="bg-emerald-600 transition-all duration-1000" title="Cashflow Libre"></div>
+        </div>
+
+        {/* LÉGENDE CONNECTÉE */}
+        <div className="mt-6 grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="p-3 bg-slate-50 rounded-xl border border-slate-100 text-center flex flex-col justify-center">
+                <div className="text-[10px] uppercase font-bold text-slate-400 mb-1 tracking-wider">Fixe</div>
+                <div className="font-black text-slate-700 text-lg">{formatCurrency(stats.mandatoryExpenses)}</div>
+                <div className="text-[9px] text-slate-400 mt-0.5">{Math.round(fixedPct)}%</div>
             </div>
-            <div className="flex-1">
-                <div className="flex justify-between items-center mb-1">
-                    <span className="font-bold text-slate-700 text-sm">{label}</span>
-                    <span className="font-bold text-slate-800">{formatCurrency(amount)}</span>
-                </div>
-                <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden flex items-center">
-                    <div className={`h-full ${color.bar}`} style={{ width: `${percent}%` }}></div>
-                </div>
-                <div className="flex justify-between mt-1">
-                    <span className="text-[10px] text-slate-400 font-medium">{percent}% du revenu</span>
-                    {subtext && <span className="text-[10px] text-slate-500 font-medium">{subtext}</span>}
-                </div>
+            
+            <div className="p-3 bg-indigo-50 rounded-xl border border-indigo-100 text-center flex flex-col justify-center">
+                <div className="text-[10px] uppercase font-bold text-indigo-400 mb-1 tracking-wider">Plaisir</div>
+                <div className="font-black text-indigo-700 text-lg">{formatCurrency(stats.discretionaryExpenses)}</div>
+                <div className="text-[9px] text-indigo-400/70 mt-0.5">{Math.round(lifePct)}%</div>
+            </div>
+            
+            <div className="p-3 bg-emerald-50 rounded-xl border border-emerald-100 text-center flex flex-col justify-center">
+                <div className="text-[10px] uppercase font-bold text-emerald-600 mb-1 tracking-wider">Projets</div>
+                <div className="font-black text-emerald-700 text-lg">{formatCurrency(stats.totalGoalsEffort)}</div>
+                <div className="text-[9px] text-emerald-600/70 mt-0.5">{Math.round(goalsPct)}%</div>
+            </div>
+            
+            <div className="p-3 bg-emerald-100 rounded-xl border border-emerald-200 text-center shadow-sm flex flex-col justify-center relative overflow-hidden">
+                <div className="absolute top-0 right-0 p-4 bg-white opacity-20 rounded-full blur-xl"></div>
+                <div className="text-[10px] uppercase font-bold text-emerald-800 mb-1 tracking-wider relative z-10">Libre</div>
+                <div className="font-black text-emerald-900 text-lg relative z-10">+{formatCurrency(stats.realCashflow)}</div>
+                <div className="text-[9px] text-emerald-800/60 mt-0.5 relative z-10">{Math.round(freePct)}%</div>
             </div>
         </div>
-    );
+      </div>
+    </Card>
+  );
 };
 
 const GoalCard = ({ goal }: { goal: any }) => {
@@ -91,7 +124,7 @@ const GoalCard = ({ goal }: { goal: any }) => {
 };
 
 // ============================================================================
-// 2. DASHBOARD (VUE CONNECTÉE - VERSION ÉPURÉE)
+// 2. DASHBOARD (VUE CONNECTÉE)
 // ============================================================================
 
 function DashboardView() {
@@ -118,57 +151,17 @@ function DashboardView() {
   return (
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start animate-fade-in">
         
-        {/* --- COLONNE PRINCIPALE (CENTRE - 8 colonnes) --- 
-            FOCUS : Santé immédiate et Budget du mois
-        */}
+        {/* --- COLONNE PRINCIPALE (CENTRE - 8 colonnes) --- */}
         <div className="lg:col-span-8 space-y-8">
             
-            {/* 1. LE DOCTEUR (La star du dashboard) */}
+            {/* 1. LE DOCTEUR (Composant Intelligent) */}
             {stats.diagnosis && <FinancialDoctor diagnosis={stats.diagnosis} />}
 
-            {/* 2. LE BUDGET (Le détail opérationnel) */}
-            <Card className="p-6 md:p-8 border-slate-200">
-                <h2 className="text-lg font-bold text-slate-800 mb-6 flex items-center gap-2"><Wallet className="text-indigo-600" /> Flux du Mois</h2>
-                <div className="space-y-2">
-                    <BudgetRow label="Revenus Nets" icon={Wallet} amount={stats.monthlyIncome} total={stats.monthlyIncome} color={{ bg: 'bg-emerald-100', text: 'text-emerald-600', bar: 'bg-emerald-500' }} />
-                    
-                    <div className="h-px bg-slate-100 my-4 mx-4"></div>
-                    
-                    <BudgetRow label="Charges Fixes" icon={CreditCard} amount={stats.mandatoryExpenses} total={stats.monthlyIncome} color={{ bg: 'bg-slate-100', text: 'text-slate-600', bar: 'bg-slate-500' }} subtext="Loyer, factures, crédits..." />
-                    
-                    {stats.totalGoalsEffort > 0 && (
-                        <BudgetRow label="Épargne Projets" icon={Target} amount={stats.totalGoalsEffort} total={stats.monthlyIncome} color={{ bg: 'bg-emerald-100', text: 'text-emerald-600', bar: 'bg-emerald-500' }} subtext="Objectifs définis" />
-                    )}
-                    
-                    {(stats.profitableExpenses - stats.totalGoalsEffort) > 0 && (
-                        <BudgetRow label="Investissements Libres" icon={TrendingUp} amount={stats.profitableExpenses - stats.totalGoalsEffort} total={stats.monthlyIncome} color={{ bg: 'bg-purple-100', text: 'text-purple-600', bar: 'bg-purple-500' }} subtext="Hors projets" />
-                    )}
-
-                    <BudgetRow label="Vie Courante" icon={ShoppingCart} amount={stats.discretionaryExpenses} total={stats.monthlyIncome} color={{ bg: 'bg-indigo-100', text: 'text-indigo-600', bar: 'bg-indigo-500' }} subtext="Courses, plaisirs..." />
-                    
-                    <div className="h-px bg-slate-100 my-6 mx-4"></div>
-                    
-                    <div className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-200">
-                        <div className="flex items-center gap-3">
-                            <div className={`p-2 rounded-full ${stats.capacityToSave > 0 ? 'bg-emerald-500 text-white' : 'bg-rose-500 text-white'}`}>
-                                {stats.capacityToSave > 0 ? <TrendingUp size={20} /> : <TrendingDown size={20} />}
-                            </div>
-                            <div>
-                                <div className="font-bold text-slate-800 text-sm">Reste à Épargner</div>
-                                <div className="text-[10px] text-slate-500 font-medium uppercase">Potentiel Cashflow</div>
-                            </div>
-                        </div>
-                        <div className={`text-2xl font-black ${stats.capacityToSave > 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
-                            {formatCurrency(stats.capacityToSave)}
-                        </div>
-                    </div>
-                </div>
-            </Card>
+            {/* 2. LE FLUX VISUEL (Nouveau Waterfall) */}
+            <CashflowWaterfall stats={stats} />
         </div>
 
-        {/* --- COLONNE SECONDAIRE (DROITE - 4 colonnes) --- 
-            FOCUS : Patrimoine, Actions et Objectifs
-        */}
+        {/* --- COLONNE SECONDAIRE (DROITE - 4 colonnes) --- */}
         <div className="lg:col-span-4 space-y-6">
             
             {/* 1. ACTION RAPIDE */}
@@ -176,7 +169,7 @@ function DashboardView() {
                 <Zap size={20} /> Simuler un achat
             </Button>
 
-            {/* 2. PATRIMOINE (La "Big Picture") */}
+            {/* 2. PATRIMOINE */}
             <Card className="p-6 bg-white border border-slate-200 shadow-sm relative overflow-hidden group">
                 <div className="absolute top-0 right-0 p-20 bg-indigo-50 rounded-full opacity-50 blur-3xl transform translate-x-10 -translate-y-10 group-hover:bg-indigo-100 transition-colors pointer-events-none"></div>
                 <div className="relative z-10">
@@ -201,7 +194,7 @@ function DashboardView() {
                 </div>
             </Card>
             
-            {/* 3. OBJECTIFS (Rappel Compact) */}
+            {/* 3. OBJECTIFS */}
             {stats.goalsBreakdown && stats.goalsBreakdown.length > 0 && (
                 <div className="space-y-3">
                     <div className="flex items-center justify-between px-1">
@@ -233,13 +226,8 @@ function AuthScreen() {
     const isSignUpMode = searchParams.get('mode') === 'signup';
     const router = useRouter(); 
 
-    const switchToSignIn = () => {
-        router.replace('/?mode=login');
-    };
-
-    const switchToSignUp = () => {
-        router.replace('/?mode=signup');
-    };
+    const switchToSignIn = () => { router.replace('/?mode=login'); };
+    const switchToSignUp = () => { router.replace('/?mode=signup'); };
   
     return (
       <div className="min-h-screen w-full bg-slate-50 flex md:grid md:grid-cols-2">
@@ -272,21 +260,14 @@ function AuthScreen() {
                     routing="virtual" 
                     appearance={{
                       baseTheme: clerkAppearanceHybrid,
-                      elements: {
-                        footerActionLink: "cursor-pointer text-indigo-600 hover:text-indigo-700 font-bold"
-                      }
+                      elements: { footerActionLink: "cursor-pointer text-indigo-600 hover:text-indigo-700 font-bold" }
                     }} 
                     signInUrl="/?mode=login" 
                     afterSignInUrl="/"
                 >
                     <div className="cl-footer-action-custom text-sm text-center mt-6">
                         <span className="text-slate-500">Vous avez déjà un compte ?</span>
-                        <a 
-                           onClick={switchToSignIn} 
-                           className="cursor-pointer text-indigo-600 hover:text-indigo-700 font-bold ml-1"
-                        >
-                            S'identifier
-                        </a>
+                        <a onClick={switchToSignIn} className="cursor-pointer text-indigo-600 hover:text-indigo-700 font-bold ml-1">S'identifier</a>
                     </div>
                 </SignUp>
               ) : (
@@ -295,21 +276,14 @@ function AuthScreen() {
                     routing="virtual" 
                     appearance={{
                         baseTheme: clerkAppearanceHybrid,
-                        elements: {
-                            footerActionLink: "cursor-pointer text-indigo-600 hover:text-indigo-700 font-bold"
-                        }
+                        elements: { footerActionLink: "cursor-pointer text-indigo-600 hover:text-indigo-700 font-bold" }
                     }}
                     signUpUrl="/?mode=signup" 
                     afterSignUpUrl="/"
                 >
                     <div className="cl-footer-action-custom text-sm text-center mt-6">
                         <span className="text-slate-500">Vous n'avez pas encore de compte ?</span>
-                        <a 
-                           onClick={switchToSignUp} 
-                           className="cursor-pointer text-indigo-600 hover:text-indigo-700 font-bold ml-1"
-                        >
-                            S'inscrire
-                        </a>
+                        <a onClick={switchToSignUp} className="cursor-pointer text-indigo-600 hover:text-indigo-700 font-bold ml-1">S'inscrire</a>
                     </div>
                 </SignIn>
               )}

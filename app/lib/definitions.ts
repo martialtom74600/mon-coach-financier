@@ -114,6 +114,9 @@ export interface Profile {
   savingsContributions: FinancialItem[];
   annualExpenses: FinancialItem[];
   goals?: Goal[];
+  // Nouveaux champs pour le split variable (optionnels pour compatibilité)
+  foodBudget?: number | string;
+  funBudget?: number | string;
 }
 
 export interface Purchase {
@@ -149,9 +152,18 @@ export interface AnalysisResult {
   timeToWork: number;
 }
 
-// --- NOUVEAU : TYPES DU DOCTEUR FINANCIER ---
+// --- NOUVEAU : TYPES DU DOCTEUR FINANCIER & ACTIONS ---
+
 export type OpportunityLevel = 'CRITICAL' | 'WARNING' | 'INFO' | 'SUCCESS';
 export type OpportunityType = 'SAVINGS' | 'DEBT' | 'INVESTMENT' | 'BUDGET';
+
+// Structure pour le contenu éducatif (Modale)
+export interface ActionGuide {
+  title: string;
+  definition: string;
+  steps: string[];
+  tips: string[];
+}
 
 export interface OptimizationOpportunity {
   id: string;
@@ -161,6 +173,9 @@ export interface OptimizationOpportunity {
   message: string;
   actionLabel?: string;
   potentialGain?: number;
+  // Câblage des actions :
+  link?: string;        // Redirection interne (ex: /profile)
+  guide?: ActionGuide;  // Ouverture modale éducative
 }
 
 export interface DeepAnalysis {
@@ -168,6 +183,12 @@ export interface DeepAnalysis {
   tags: string[];
   ratios: { needs: number; wants: number; savings: number; };
   opportunities: OptimizationOpportunity[];
+  // Ajout des projections pour l'affichage V5
+  projections?: { 
+    wealth10y: number; 
+    wealth20y: number; 
+    fireYear: number; 
+  };
 }
 
 export interface SimulationResult {
@@ -204,7 +225,7 @@ export interface SimulationResult {
       engagementRate: number;
   };
   freeCashFlow: number; 
-  diagnosis?: DeepAnalysis; // ✅ ESSENTIEL POUR L'AFFICHAGE
+  diagnosis?: DeepAnalysis; 
 }
 
 // ============================================================================
