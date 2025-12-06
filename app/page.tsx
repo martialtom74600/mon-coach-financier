@@ -19,74 +19,15 @@ import {
   ArrowRight,
   Zap,
   Layers,
-  Wallet,
   Settings,
   Target,
-  Calendar
+  Calendar,
+  Activity
 } from 'lucide-react';
 
 // ============================================================================
 // 1. HELPERS VISUELS
 // ============================================================================
-
-// LE WATERFALL (Visualisation des flux)
-const CashflowWaterfall = ({ stats }: { stats: any }) => {
-  // Sécurité division par zéro
-  const income = Math.max(1, stats.monthlyIncome);
-  
-  // Calcul des parts (en %)
-  const fixedPct = (stats.mandatoryExpenses / income) * 100;
-  const lifePct = (stats.discretionaryExpenses / income) * 100;
-  const goalsPct = (stats.totalGoalsEffort / income) * 100;
-  // Le "Libre" est le reste mathématique (peut être 0 si tout est mangé)
-  const freePct = Math.max(0, 100 - fixedPct - lifePct - goalsPct);
-
-  return (
-    <Card className="p-6 md:p-8 border-slate-200">
-      <h2 className="text-lg font-bold text-slate-800 mb-6 flex items-center gap-2">
-          <Wallet className="text-indigo-600" /> Anatomie de tes revenus
-      </h2>
-
-      <div className="py-2">
-        {/* BARRE EMPILÉE (STACKED BAR) */}
-        <div className="flex h-8 w-full rounded-xl overflow-hidden bg-slate-100 shadow-inner relative">
-            <div style={{ width: `${fixedPct}%` }} className="bg-slate-400 border-r border-white/20 transition-all duration-1000" title="Charges Fixes"></div>
-            <div style={{ width: `${lifePct}%` }} className="bg-indigo-400 border-r border-white/20 transition-all duration-1000" title="Vie Courante"></div>
-            <div style={{ width: `${goalsPct}%` }} className="bg-emerald-400 border-r border-white/20 transition-all duration-1000" title="Projets"></div>
-            <div style={{ width: `${freePct}%` }} className="bg-emerald-600 transition-all duration-1000" title="Cashflow Libre"></div>
-        </div>
-
-        {/* LÉGENDE CONNECTÉE */}
-        <div className="mt-6 grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="p-3 bg-slate-50 rounded-xl border border-slate-100 text-center flex flex-col justify-center">
-                <div className="text-[10px] uppercase font-bold text-slate-400 mb-1 tracking-wider">Fixe</div>
-                <div className="font-black text-slate-700 text-lg">{formatCurrency(stats.mandatoryExpenses)}</div>
-                <div className="text-[9px] text-slate-400 mt-0.5">{Math.round(fixedPct)}%</div>
-            </div>
-            
-            <div className="p-3 bg-indigo-50 rounded-xl border border-indigo-100 text-center flex flex-col justify-center">
-                <div className="text-[10px] uppercase font-bold text-indigo-400 mb-1 tracking-wider">Plaisir</div>
-                <div className="font-black text-indigo-700 text-lg">{formatCurrency(stats.discretionaryExpenses)}</div>
-                <div className="text-[9px] text-indigo-400/70 mt-0.5">{Math.round(lifePct)}%</div>
-            </div>
-            
-            <div className="p-3 bg-emerald-50 rounded-xl border border-emerald-100 text-center flex flex-col justify-center">
-                <div className="text-[10px] uppercase font-bold text-emerald-600 mb-1 tracking-wider">Projets</div>
-                <div className="font-black text-emerald-700 text-lg">{formatCurrency(stats.totalGoalsEffort)}</div>
-                <div className="text-[9px] text-emerald-600/70 mt-0.5">{Math.round(goalsPct)}%</div>
-            </div>
-            
-            <div className="p-3 bg-emerald-100 rounded-xl border border-emerald-200 text-center shadow-sm flex flex-col justify-center relative overflow-hidden">
-                <div className="absolute top-0 right-0 p-4 bg-white opacity-20 rounded-full blur-xl"></div>
-                <div className="text-[10px] uppercase font-bold text-emerald-800 mb-1 tracking-wider relative z-10">Libre</div>
-                <div className="font-black text-emerald-900 text-lg relative z-10">+{formatCurrency(stats.realCashflow)}</div>
-                <div className="text-[9px] text-emerald-800/60 mt-0.5 relative z-10">{Math.round(freePct)}%</div>
-            </div>
-        </div>
-      </div>
-    </Card>
-  );
-};
 
 const GoalCard = ({ goal }: { goal: any }) => {
     const percent = Math.min(100, (goal.currentSaved / goal.targetAmount) * 100);
@@ -155,9 +96,8 @@ function DashboardView() {
             
             {/* 1. LE DOCTEUR (Composant Intelligent avec Actions) */}
             {stats.diagnosis && <FinancialDoctor diagnosis={stats.diagnosis} />}
-
-            {/* 2. LE FLUX VISUEL (Waterfall) */}
-            <CashflowWaterfall stats={stats} />
+            
+            {/* L'ancienne section "Anatomie des revenus" a été retirée comme demandé. */}
         </div>
 
         {/* --- COLONNE SECONDAIRE (DROITE - 4 colonnes) --- */}
