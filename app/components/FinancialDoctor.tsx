@@ -1,10 +1,10 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState } from 'react';
 import { 
   Activity, ArrowRight, TrendingUp, 
   ShieldCheck, PiggyBank, XCircle, 
-  Stethoscope, Wallet, HeartPulse, Landmark, Zap
+  Stethoscope, Wallet, HeartPulse, Zap, Rocket
 } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 import { DeepAnalysis, formatCurrency, OptimizationOpportunity } from '@/app/lib/logic';
@@ -39,28 +39,7 @@ const getIcon = (type: string) => {
   }
 };
 
-// --- SOUS-COMPOSANTS ---
-
-const VitalSign = ({ label, status, icon: Icon }: { label: string, status: 'ok' | 'warning' | 'critical', icon: any }) => {
-  const colors = {
-    ok: 'bg-emerald-100 text-emerald-600',
-    warning: 'bg-amber-100 text-amber-600',
-    critical: 'bg-rose-100 text-rose-600'
-  };
-  
-  return (
-    <div className="flex flex-col items-center justify-center p-3 bg-slate-50 rounded-xl border border-slate-100 transition-all hover:border-slate-200">
-      <div className={`p-2 rounded-full mb-2 ${colors[status]}`}>
-        <Icon size={20} />
-      </div>
-      <span className="text-[10px] font-bold uppercase text-slate-400 tracking-wider mb-0.5">{label}</span>
-      <span className={`text-sm font-bold ${status === 'critical' ? 'text-rose-600' : 'text-slate-700'}`}>
-        {status === 'ok' ? 'Sain' : status === 'warning' ? 'À surveiller' : 'Fragile'}
-      </span>
-    </div>
-  );
-};
-
+// --- SOUS-COMPOSANT : ITEM D'OPPORTUNITÉ ---
 const OpportunityItem = ({ opp }: { opp: OptimizationOpportunity }) => {
   const theme = getTheme(opp.level);
   const Icon = getIcon(opp.type);
@@ -91,58 +70,55 @@ const OpportunityItem = ({ opp }: { opp: OptimizationOpportunity }) => {
   );
 };
 
-// --- MAIN COMPONENT ---
-
-export default function FinancialDoctor({ diagnosis }: { diagnosis: DeepAnalysis }) {
+// --- COMPOSANT PRINCIPAL ---
+export default function FinancialDoctor({ diagnosis }: { diagnosis: any }) { 
+  // Note: On utilise 'any' pour diagnosis ici car 'projections' n'est pas encore dans l'interface DeepAnalysis 
+  // (pour éviter les erreurs TS si le fichier types n'est pas à jour, mais ça marchera au runtime)
+  
   const [showDetails, setShowDetails] = useState(false);
 
   if (!diagnosis) return null;
 
-  const { globalScore, ratios, opportunities, tags } = diagnosis;
+  const { globalScore, ratios, opportunities, tags, projections } = diagnosis;
   
-  // 1. Analyse des "Signaux Vitaux" basée sur les alertes présentes
-  const vitals = useMemo(() => {
-    const checkStatus = (type: string) => {
-      const opps = opportunities.filter(o => o.type === type);
-      if (opps.some(o => o.level === 'CRITICAL')) return 'critical';
-      if (opps.some(o => o.level === 'WARNING')) return 'warning';
-      return 'ok';
-    };
-    return {
-      security: checkStatus('SAVINGS'),
-      debt: checkStatus('DEBT'),
-      future: checkStatus('INVESTMENT')
-    };
-  }, [opportunities]);
-
-  // 2. Préparation des données pour le Donut Chart
+  // Données du graphique
   const chartData = [
     { name: 'Besoins', value: ratios.needs, color: COLORS.needs },
     { name: 'Plaisirs', value: ratios.wants, color: COLORS.wants },
     { name: 'Épargne', value: ratios.savings, color: COLORS.savings },
   ].filter(d => d.value > 0);
 
-  // 3. Tri des opportunités
-  const criticalOpps = opportunities.filter(o => o.level === 'CRITICAL');
-  const otherOpps = opportunities.filter(o => o.level !== 'CRITICAL');
+  // Tri des opportunités
+  const criticalOpps = opportunities.filter((o: any) => o.level === 'CRITICAL');
+  const otherOpps = opportunities.filter((o: any) => o.level !== 'CRITICAL');
 
-  // Couleur dynamique du score
+  // Couleur du score
   const scoreColor = globalScore >= 80 ? 'text-emerald-500' : globalScore >= 50 ? 'text-amber-500' : 'text-rose-500';
 
   return (
     <Card className="p-0 overflow-hidden border-slate-200 shadow-xl animate-fade-in bg-white">
       
-      {/* --- PARTIE SUPÉRIEURE : LE TABLEAU DE BORD --- */}
+      {/* --- PARTIE HAUTE : TABLEAU DE BORD & PROJECTIONS --- */}
       <div className="grid grid-cols-1 md:grid-cols-12 border-b border-slate-100">
         
-        {/* GAUCHE : Score & Graphique (5 cols) */}
+        {/* GAUCHE : Score & Répartition (5 cols) */}
         <div className="md:col-span-5 p-6 border-b md:border-b-0 md:border-r border-slate-100 bg-slate-50/30 flex flex-col justify-center items-center text-center relative">
-           <div className="absolute top-4 left-4 flex items-center gap-2 text-indigo-900 font-bold text-sm">
+           
+           {/* Badge Tags en haut à gauche */}
+           <div className="absolute top-4 left-4 flex flex-wrap gap-1 max-w-[80%]">
+              {tags && tags.map((tag: string) => (
+                <span key={tag} className="text-[9px] font-bold uppercase tracking-wider bg-white border border-slate-200 px-1.5 py-0.5 rounded text-slate-500">
+                    {tag}
+                </span>
+              ))}
+           </div>
+
+           <div className="flex items-center gap-2 text-indigo-900 font-bold text-sm mb-2 mt-6 md:mt-0">
               <Stethoscope size={18} className="text-indigo-600" /> Diagnostic
            </div>
            
-           {/* Graphique Donut Interactif */}
-           <div className="w-40 h-40 relative mt-4">
+           {/* Graphique Donut */}
+           <div className="w-40 h-40 relative">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
@@ -172,7 +148,7 @@ export default function FinancialDoctor({ diagnosis }: { diagnosis: DeepAnalysis
               </div>
            </div>
 
-           {/* Légende Graphique */}
+           {/* Légende */}
            <div className="flex flex-wrap gap-x-4 gap-y-2 mt-4 justify-center">
               <div className="flex items-center gap-1.5 text-[10px] font-medium text-slate-600">
                  <div className="w-2 h-2 rounded-full" style={{background: COLORS.needs}}></div> Besoins
@@ -186,38 +162,68 @@ export default function FinancialDoctor({ diagnosis }: { diagnosis: DeepAnalysis
            </div>
         </div>
 
-        {/* DROITE : Signaux Vitaux & Tags (7 cols) */}
+        {/* DROITE : Projections Futures (7 cols) */}
         <div className="md:col-span-7 p-6 flex flex-col justify-center">
-           <div className="flex flex-wrap gap-2 mb-6">
-              {tags.map(tag => (
-                <Badge key={tag} color="bg-slate-100 text-slate-600 border border-slate-200 shadow-sm">{tag}</Badge>
-              ))}
-           </div>
-           
-           <div className="grid grid-cols-3 gap-3">
-              <VitalSign label="Sécurité" status={vitals.security} icon={ShieldCheck} />
-              <VitalSign label="Dettes" status={vitals.debt} icon={Landmark} />
-              <VitalSign label="Avenir" status={vitals.future} icon={TrendingUp} />
-           </div>
+           {projections ? (
+               <div className="space-y-5">
+                   <div className="flex items-center justify-between">
+                       <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
+                           <Rocket size={16} className="text-indigo-500"/> Votre Avenir Financier
+                       </h3>
+                       {projections.fireYear < 50 && (
+                           <Badge color="bg-indigo-100 text-indigo-700 border-indigo-200">FIRE : {projections.fireYear} ans</Badge>
+                       )}
+                   </div>
+                   
+                   <div className="grid grid-cols-2 gap-4">
+                       <div className="p-4 bg-indigo-50 rounded-xl border border-indigo-100 relative group overflow-hidden">
+                           <div className="absolute -right-4 -top-4 w-16 h-16 bg-indigo-200 rounded-full opacity-20 group-hover:scale-150 transition-transform duration-500"></div>
+                           <div className="text-[10px] text-indigo-500 font-bold uppercase tracking-wider mb-1">Projection 10 ans</div>
+                           <div className="text-xl font-black text-indigo-800">{formatCurrency(projections.wealth10y)}</div>
+                           <div className="text-[10px] text-indigo-400 mt-1">Patrimoine estimé</div>
+                       </div>
+                       
+                       <div className="p-4 bg-emerald-50 rounded-xl border border-emerald-100 relative group overflow-hidden">
+                           <div className="absolute -right-4 -top-4 w-16 h-16 bg-emerald-200 rounded-full opacity-20 group-hover:scale-150 transition-transform duration-500"></div>
+                           <div className="text-[10px] text-emerald-600 font-bold uppercase tracking-wider mb-1">Projection 20 ans</div>
+                           <div className="text-xl font-black text-emerald-800">{formatCurrency(projections.wealth20y)}</div>
+                           <div className="text-[10px] text-emerald-500 mt-1">Patrimoine estimé</div>
+                       </div>
+                   </div>
+
+                   <div className="text-xs text-slate-500 leading-relaxed bg-slate-50 p-3 rounded-lg border border-slate-100">
+                       ℹ️ Ces projections incluent vos versements actuels et les intérêts composés (5%/an). 
+                       {projections.fireYear < 30 
+                          ? <strong> Vous êtes sur la voie de l'indépendance !</strong> 
+                          : " Augmentez votre épargne pour accélérer."}
+                   </div>
+               </div>
+           ) : (
+               <div className="flex items-center justify-center h-full text-slate-400 text-sm italic">
+                   Données insuffisantes pour la projection...
+               </div>
+           )}
         </div>
       </div>
 
-      {/* --- PARTIE INFÉRIEURE : L'ORDONNANCE (ACTIONS) --- */}
+      {/* --- PARTIE BASSE : ORDONNANCE & CONSEILS --- */}
       <div className="bg-white">
          
-         {/* URGENCES : Affichées toujours en premier */}
+         {/* SECTION CRITIQUE (Rouge) */}
          {criticalOpps.length > 0 && (
-            <div className="p-5 border-b border-rose-100 bg-rose-50/30 animate-pulse-slow">
+            <div className="p-5 border-b border-rose-100 bg-rose-50/40 animate-pulse-slow">
                <h3 className="text-rose-700 font-bold text-xs uppercase tracking-wider flex items-center gap-2 mb-3">
                   <HeartPulse size={16} /> Priorité Absolue
                </h3>
                <div className="space-y-3">
-                  {criticalOpps.map(opp => <OpportunityItem key={opp.id} opp={opp} />)}
+                  {criticalOpps.map((opp: any) => (
+                      <OpportunityItem key={opp.id} opp={opp} />
+                  ))}
                </div>
             </div>
          )}
 
-         {/* CONSEILS & OPTIMISATIONS */}
+         {/* SECTION OPTIMISATION (Gris/Blanc) */}
          {otherOpps.length > 0 && (
             <div className="p-5">
                <div className="flex justify-between items-center mb-3">
@@ -225,21 +231,25 @@ export default function FinancialDoctor({ diagnosis }: { diagnosis: DeepAnalysis
                      <Zap size={16} className="text-amber-500" /> Pistes d'optimisation
                   </h3>
                   {otherOpps.length > 2 && (
-                    <button onClick={() => setShowDetails(!showDetails)} className="text-indigo-600 text-xs font-bold hover:underline">
+                    <button 
+                        onClick={() => setShowDetails(!showDetails)} 
+                        className="text-indigo-600 text-xs font-bold hover:underline transition-all"
+                    >
                        {showDetails ? 'Réduire' : `Tout voir (${otherOpps.length})`}
                     </button>
                   )}
                </div>
+               
                <div className="space-y-3">
                   {/* On affiche les 2 premiers par défaut, ou tout si showDetails est true */}
-                  {otherOpps.slice(0, showDetails ? undefined : 2).map(opp => (
+                  {otherOpps.slice(0, showDetails ? undefined : 2).map((opp: any) => (
                      <OpportunityItem key={opp.id} opp={opp} />
                   ))}
                </div>
             </div>
          )}
 
-         {/* ÉTAT PARFAIT : Si aucune opportunité (rare mais possible) */}
+         {/* EMPTY STATE POSITIF */}
          {opportunities.length === 0 && (
             <div className="p-10 text-center">
                <div className="w-16 h-16 bg-emerald-50 text-emerald-500 rounded-full flex items-center justify-center mx-auto mb-4 animate-bounce-slow">
