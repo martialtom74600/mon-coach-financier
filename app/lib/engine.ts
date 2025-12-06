@@ -11,29 +11,29 @@ import {
 // ============================================================================
 const FINANCIAL_KNOWLEDGE = {
   RATES: { 
-    INFLATION: 0.025,    // 2.5% : Pour calculer la perte de pouvoir d'achat
-    LIVRET_A: 0.03,      // 3.0% : Taux sans risque de base
-    LEP: 0.05,           // 5.0% : Taux boosté sous condition de revenus
-    MARKET_AVG: 0.07,    // 7.0% : Rendement moyen Bourse/Immo long terme
-    SAFE_WITHDRAWAL: 0.04 // 4.0% : Règle pour la rente (FIRE)
+    INFLATION: 0.025,    // 2.5%
+    LIVRET_A: 0.03,      // 3.0%
+    LEP: 0.05,           // 5.0%
+    MARKET_AVG: 0.07,    // 7.0%
+    SAFE_WITHDRAWAL: 0.04 // 4.0%
   },
   THRESHOLDS: { 
-    LEP_INCOME_SINGLE: 22000, // Revenu Fiscal de Référence approx (1 part)
-    LEP_INCOME_COUPLE: 34000, // Revenu Fiscal de Référence approx (2 parts)
-    HCSF_DEBT_RATIO: 35,      // 35% max endettement (Règle Banque de France)
-    RICH_INCOME: 4000,        // Seuil "Aisé" (Net avant impôt)
-    POOR_INCOME: 1600,        // Seuil "Modeste"
-    SURVIVAL_BUFFER: 1000     // Minimum vital absolu sur un livret
+    LEP_INCOME_SINGLE: 22000, 
+    LEP_INCOME_COUPLE: 34000, 
+    HCSF_DEBT_RATIO: 35,      
+    RICH_INCOME: 4000,        
+    POOR_INCOME: 1600,        
+    SURVIVAL_BUFFER: 1000     
   },
   TAX_BRACKETS: [ 
     { t: 11294, r: 0.11 }, 
-    { t: 28797, r: 0.30 }, // Seuil critique : ici la défiscalisation devient puissante
+    { t: 28797, r: 0.30 }, 
     { t: 82341, r: 0.41 }, 
     { t: 177106, r: 0.45 } 
   ]
 };
 
-// 🆕 NOUVEAU : GUIDES PÉDAGOGIQUES (Pour les boutons d'action)
+// GUIDES PÉDAGOGIQUES
 const ACTION_GUIDES = {
   LEP: {
     title: "Ouvrir un Livret d'Épargne Populaire (LEP)",
@@ -82,12 +82,10 @@ const ACTION_GUIDES = {
 };
 
 // ============================================================================
-// 2. MODULES DE CALCUL (Les Algorithmes)
+// 2. MODULES DE CALCUL
 // ============================================================================
 
-// A. FISCALITÉ : Estime le Taux Marginal d'Imposition (TMI)
 const estimateTMI = (netIncome: number, parts: number = 1) => {
-    // On approxime le net imposable (0.9 * net perçu pour l'abattement 10%)
     const q = (netIncome * 12 * 0.9) / parts; 
     for (let i = FINANCIAL_KNOWLEDGE.TAX_BRACKETS.length - 1; i >= 0; i--) {
         if (q > FINANCIAL_KNOWLEDGE.TAX_BRACKETS[i].t) return FINANCIAL_KNOWLEDGE.TAX_BRACKETS[i].r;
@@ -95,18 +93,14 @@ const estimateTMI = (netIncome: number, parts: number = 1) => {
     return 0;
 };
 
-// B. PROJECTION : Calculateur FIRE (Liberté Financière)
 const calculateFIRE = (annualExpenses: number, currentWealth: number, monthlySavings: number) => {
     if (monthlySavings <= 0) return { years: 99, date: null };
-    // Règle des 4% : Il faut 25x ses dépenses annuelles pour être rentier
     const target = annualExpenses / FINANCIAL_KNOWLEDGE.RATES.SAFE_WITHDRAWAL;
-    
     if (currentWealth >= target) return { years: 0, date: new Date() };
     
     let wealth = currentWealth;
     let months = 0;
-    // Simulation mois par mois avec intérêts composés
-    while (wealth < target && months < 600) { // Limite à 50 ans pour éviter boucle infinie
+    while (wealth < target && months < 600) { 
         wealth += monthlySavings;
         wealth *= (1 + (FINANCIAL_KNOWLEDGE.RATES.MARKET_AVG / 12));
         months++;
@@ -114,21 +108,18 @@ const calculateFIRE = (annualExpenses: number, currentWealth: number, monthlySav
     return { years: Math.round(months / 12), date: addMonths(new Date(), months), target };
 };
 
-// C. PROJECTION : Patrimoine Futur
 const simulateFutureWealth = (start: number, monthly: number, years: number) => {
-    const r = 0.05 / 12; // Hypothèse prudente (Mixte Sécurisé/Risqué)
+    const r = 0.05 / 12; 
     let total = start;
     for(let i=0; i < years * 12; i++) total = (total + monthly) * (1 + r);
     return Math.round(total);
 };
 
-// D. TEMPS : Impact de l'inflation
 const calculateInflationImpact = (amt: number, date: Date) => {
     const years = differenceInMonths(date, new Date()) / 12;
     return years <= 0 ? amt : amt * Math.pow(1 + FINANCIAL_KNOWLEDGE.RATES.INFLATION, years);
 };
 
-// E. TEMPS : Durée nécessaire pour atteindre un but
 const calculateCompoundMonths = (target: number, pmt: number, rate: number) => {
     if (pmt <= 0) return 999;
     if (rate <= 0) return Math.ceil(target / pmt);
@@ -136,40 +127,28 @@ const calculateCompoundMonths = (target: number, pmt: number, rate: number) => {
     try { return Math.ceil(Math.log(((target * r) / pmt) + 1) / Math.log(1 + r)); } catch { return 999; }
 };
 
-// 🆕 F. SIMULATION TEMPORELLE (CASHFLOW TIMELINE) - "Logique de Dingue"
 export const simulateCashflowTimeline = (profile: Profile, capacityToSave: number) => {
-  const months = 60; // Vision 5 ans
+  const months = 60; 
   let currentCash = safeFloat(profile.savings) + safeFloat(profile.currentBalance);
-  // On ne prend en compte que les objectifs avec une date valide
   const goals = (profile.goals || []).filter(g => g.deadline && g.targetAmount);
   
   for (let i = 1; i <= months; i++) {
     const date = addMonths(new Date(), i);
-    
-    // 1. L'argent rentre (Capacité d'épargne)
     currentCash += capacityToSave;
-
-    // 2. L'argent sort (Objectifs qui tombent ce mois-là)
     const goalsHit = goals.filter(g => isSameMonth(new Date(g.deadline), date));
     
     for (const g of goalsHit) {
-      // On simule le paiement de l'objectif
       currentCash -= safeFloat(g.targetAmount);
-      
-      if (currentCash < -500) { // Tolérance de 500€ de découvert
-         return { 
-           date, 
-           goalName: g.name, 
-           deficit: Math.abs(currentCash) 
-         };
+      if (currentCash < -500) { 
+          return { date, goalName: g.name, deficit: Math.abs(currentCash) };
       }
     }
   }
-  return null; // Pas de crash détecté
+  return null;
 };
 
 // ============================================================================
-// 3. GESTION DES OBJECTIFS (Simulateur Achat/Projet)
+// 3. GESTION DES OBJECTIFS
 // ============================================================================
 export const calculateMonthlyEffort = (goal: Goal): number => {
   if (!goal.targetAmount || !goal.deadline) return 0;
@@ -224,10 +203,7 @@ export const analyzeGoalStrategies = (goal: Goal, effort: number, capacity: numb
     if (status === 'HARD') {
         const deposit = Math.min(globalSavings, target * 0.3);
         if (globalSavings > 1000) strategies.push({ type: 'BUDGET', title: "Apport", message: `Injecter ${Math.round(deposit)}€ d'épargne.`, value: deposit, actionLabel: "Simuler" });
-        
-        if (!goal.isInvested && differenceInMonths(new Date(goal.deadline), new Date()) > 24) 
-            strategies.push({ type: 'HYBRID', title: 'Placer', message: `Placer cet argent à 4%+.`, actionLabel: "Activer intérêts" });
-
+        if (!goal.isInvested && differenceInMonths(new Date(goal.deadline), new Date()) > 24) strategies.push({ type: 'HYBRID', title: 'Placer', message: `Placer cet argent à 4%+.`, actionLabel: "Activer intérêts" });
         const months = calculateCompoundMonths(target - safeFloat(goal.currentSaved), capacity, safeFloat(goal.projectedYield));
         if (months < 360) strategies.push({ type: 'TIME', title: 'Patienter', message: `Possible en ${addMonths(new Date(), months).toLocaleDateString('fr-FR', {month:'short', year:'2-digit'})}.`, value: addMonths(new Date(), months).toISOString() });
     }
@@ -250,7 +226,7 @@ export const distributeGoals = (goals: Goal[], capacity: number) => {
 };
 
 // ============================================================================
-// 4. ORCHESTRATEUR (Calcul du Plan)
+// 4. ORCHESTRATEUR
 // ============================================================================
 export const computeFinancialPlan = (profile: Profile): SimulationResult => {
   const income = calculateListTotal(profile.incomes);
@@ -258,7 +234,9 @@ export const computeFinancialPlan = (profile: Profile): SimulationResult => {
   const discretionary = safeFloat(profile.variableCosts);
   const manualSavings = calculateListTotal(profile.savingsContributions);
   
+  // Capacité d'épargne AVANT les virements d'épargne
   const capacityToSave = Math.max(0, income - fixed - discretionary);
+  
   const { allocations, totalAllocated } = distributeGoals(profile.goals || [], capacityToSave);
   const realCashflow = Math.max(0, capacityToSave - totalAllocated);
   
@@ -288,7 +266,7 @@ export const simulateGoalScenario = (goalInput: any, profile: any, context: any)
 };
 
 // ============================================================================
-// 🔥 5. LE DOCTEUR FINANCIER V11 (OMNISCIENT) 🔥
+// 🔥 5. LE DOCTEUR FINANCIER V12 (VERSION AUDIT PUR) 🔥
 // ============================================================================
 export const analyzeProfileHealth = (profile: Profile, context: SimulationResult['budget']): DeepAnalysis => {
   const opps: OptimizationOpportunity[] = [];
@@ -306,7 +284,6 @@ export const analyzeProfileHealth = (profile: Profile, context: SimulationResult
   const invested = safeFloat(profile.investments);
   const totalWealth = context.totalWealth;
 
-  // --- A. CONTEXTE (Qui est l'utilisateur ?) ---
   const adults = Math.max(1, safeFloat(profile.household?.adults));
   const children = Math.max(0, safeFloat(profile.household?.children));
   const parts = adults + (children * 0.5) + (children >= 3 ? 0.5 : 0);
@@ -316,54 +293,41 @@ export const analyzeProfileHealth = (profile: Profile, context: SimulationResult
   const isWealthy = totalIncome > (FINANCIAL_KNOWLEDGE.THRESHOLDS.RICH_INCOME + (children * 500));
   
   const monthlyBurnRate = context.fixed + Math.min(context.discretionaryExpenses, 800);
-  const totalOut = context.fixed + context.discretionaryExpenses + context.profitableExpenses;
-  const cashflow = totalIncome - totalOut;
-  const isDeficit = cashflow < -50; 
+  
+  // 1. Dépenses réelles (sans épargne)
+  const realExpenses = context.fixed + context.discretionaryExpenses;
+  // 2. Cashflow opérationnel (Vivre au-dessus de ses moyens ?)
+  const operationalCashflow = totalIncome - realExpenses;
+  const isLivingAboveMeans = operationalCashflow < 0;
+  // 3. Cashflow net (après épargne programmée)
+  const netCashflow = operationalCashflow - context.profitableExpenses;
+  const isOverSaving = !isLivingAboveMeans && netCashflow < 0;
 
-  // --- B. PROJECTIONS FUTURES (L'Oracle) ---
   const fireData = calculateFIRE((context.fixed + context.discretionaryExpenses) * 12, totalWealth, context.capacityToSave);
   const wealth10y = simulateFutureWealth(totalWealth, context.capacityToSave, 10);
   const wealth20y = simulateFutureWealth(totalWealth, context.capacityToSave, 20);
   
-  // 🆕 DÉTECTION CRASH FUTUR (Logique de Dingue)
-  const futureCrash = simulateCashflowTimeline(profile, context.capacityToSave);
-  if (futureCrash) {
-      opps.push({
-          id: 'future_crash', type: 'BUDGET', level: 'CRITICAL',
-          title: `Crash prévu en ${futureCrash.date.toLocaleDateString('fr-FR', {month:'long', year:'numeric'})}`,
-          message: `Attention : Le projet "${futureCrash.goalName}" va vous mettre à découvert de ${formatCurrency(futureCrash.deficit)}. Vous n'épargnez pas assez vite.`,
-          actionLabel: 'Décaler ce projet',
-          link: '/goals'
-      });
-      tags.push("Crash Prévisible");
-  }
+  // --- DIAGNOSTIC (SANS LIENS DE NAVIGATION) ---
 
-  // ========================================================================
-  // C. DIAGNOSTIC PAR PRIORITÉ
-  // ========================================================================
-
-  // 1. URGENCE VITALE (Coupe-circuits)
-  if (isDeficit) {
+  // 1. URGENCE VITALE
+  if (isLivingAboveMeans) {
       opps.push({
           id: 'deficit_alert', type: 'BUDGET', level: 'CRITICAL',
           title: 'Hémorragie Financière',
-          message: `STOP ! Vous dépensez ${formatCurrency(Math.abs(cashflow))} de plus que vous ne gagnez. À ce rythme, votre épargne sera siphonnée. Il faut réduire les dépenses variables immédiatement.`,
-          actionLabel: 'Réduire mes charges',
-          link: '/profile'
+          message: `STOP ! Vous vivez au-dessus de vos moyens (${formatCurrency(Math.abs(operationalCashflow))} de perte/mois). Votre épargne ne suffira pas à combler le trou éternellement.`,
+          // Pas de lien, juste le constat
       });
       tags.push("DANGER");
-  }
-
-  if (needsRatio > 70) {
+  } else if (isOverSaving) {
       opps.push({
-          id: 'needs_critical', type: 'BUDGET', level: 'CRITICAL',
-          title: 'Prison Budgétaire',
-          message: `Vos charges fixes (loyer, crédits) engloutissent ${needsRatio}% de vos revenus. C'est structurellement insoutenable. Vous travaillez uniquement pour payer vos factures.`,
-          link: '/profile'
+          id: 'oversaving_alert', type: 'BUDGET', level: 'WARNING',
+          title: 'Épargne trop agressive',
+          message: `Bravo pour votre épargne ! Mais attention, vos virements automatiques (${formatCurrency(context.profitableExpenses)}) mettent votre compte courant dans le rouge (-${formatCurrency(Math.abs(netCashflow))}). Ralentissez le rythme pour éviter les agios.`,
+          // Pas de lien
       });
   }
 
-  // 2. SÉCURITÉ (Survie vs Optimisation)
+  // 2. SÉCURITÉ
   const personaMultiplier = profile.persona === 'freelance' ? 1.5 : 0.8;
   const idealSafety = monthlyBurnRate * context.rules.safetyMonths * personaMultiplier;
   
@@ -371,16 +335,17 @@ export const analyzeProfileHealth = (profile: Profile, context: SimulationResult
     opps.push({
       id: 'safety_danger', type: 'SAVINGS', level: 'CRITICAL',
       title: 'Zone Rouge : 0 Sécurité',
-      message: `Vous vivez sans filet. Créez un fond d'urgence de 1000€ avant de dépenser 1€ de plus.`,
-      actionLabel: 'Créer un objectif Sécurité',
-      link: '/goals'
+      message: `Règle d'or : Avoir 1000€ de sécurité. Vous avez ${formatCurrency(savings)}. Une panne de voiture vous mettrait en danger immédiat.`,
+      actionLabel: `Sécuriser les ${formatCurrency(1000 - savings)} manquants`,
+      guide: ACTION_GUIDES.MATELAS // J'ai ajouté le guide ici au lieu d'un lien mort !
     });
-  } else if (savings < idealSafety && !isDeficit) {
+  } else if (savings < idealSafety && !isLivingAboveMeans) {
+    const manque = idealSafety - savings;
     opps.push({
       id: 'safety_build', type: 'SAVINGS', level: 'INFO',
       title: 'Renforcez la digue',
-      message: `Votre matelas (${(savings/monthlyBurnRate).toFixed(1)} mois) est un début. Pour votre profil, l'idéal de sérénité est à ${formatCurrency(idealSafety)}.`,
-      actionLabel: 'Méthode Matelas',
+      message: `Votre cible de sérénité est à ${formatCurrency(idealSafety)} (selon votre train de vie). Il vous manque ${formatCurrency(manque)} pour être totalement à l'abri.`,
+      actionLabel: 'Méthode du Matelas',
       guide: ACTION_GUIDES.MATELAS
     });
   } else if (savings > idealSafety * 1.5) {
@@ -389,14 +354,13 @@ export const analyzeProfileHealth = (profile: Profile, context: SimulationResult
      opps.push({
       id: 'safety_excess', type: 'INVESTMENT', level: 'WARNING',
       title: 'Perte de Pouvoir d\'Achat',
-      message: `Vous avez ${formatCurrency(excess)} qui dorment inutilement. L'inflation vous prend ~${Math.round(excess * 0.025)}€/an. Cet argent doit être investi pour rapporter.`,
-      actionLabel: 'Simuler un placement',
+      message: `Vous avez ${formatCurrency(excess)} qui dorment au-delà de votre sécurité nécessaire. L'inflation vous "vole" l'équivalent de ${formatCurrency(loss)} par an sur cette somme.`,
       potentialGain: Math.round(excess * 0.05),
-      link: '/simulator'
+      // Pas de lien "Simuler"
     });
   }
 
-  // 3. DETTES (La chasse aux toxiques)
+  // 3. DETTES
   const badDebts = profile.credits.filter(c => safeFloat(c.amount) > 0 && !c.name.toLowerCase().match(/(immo|maison|appart|scpi|locatif)/i));
   const totalBad = calculateListTotal(badDebts);
 
@@ -406,37 +370,34 @@ export const analyzeProfileHealth = (profile: Profile, context: SimulationResult
       opps.push({
           id: 'toxic_debt', type: 'DEBT', level: severity,
           title: 'Dette Toxique Détectée',
-          message: `Vous avez ${badDebts.length} crédits conso (${formatCurrency(totalBad)}/mois). Ils vous appauvrissent chaque mois. Remboursez-les en priorité.`,
+          message: `Vous remboursez ${formatCurrency(totalBad)}/mois de crédits conso. C'est de l'argent perdu. Utilisez votre épargne pour les solder et regagner ${formatCurrency(totalBad)} de pouvoir d'achat mensuel.`,
           actionLabel: 'Plan de remboursement',
           potentialGain: totalBad * 12,
           guide: ACTION_GUIDES.DETTE
       });
   }
 
-  // Levier Bancaire (Seulement pour les profils solides)
+  // Levier Bancaire
   if (debtRatio < 25 && savingsRatio > 15 && totalIncome > 2500 && isWealthy) {
       opps.push({
         id: 'leverage_opportunity', type: 'BUDGET', level: 'INFO',
         title: 'Levier Bancaire Inexploité',
-        message: `Votre solvabilité est excellente. Vous pourriez utiliser l'argent de la banque pour vous enrichir (Immobilier locatif) au lieu d'épargner uniquement votre salaire.`,
-        actionLabel: 'Simuler un projet',
-        link: '/simulator'
+        message: `Votre taux d'endettement est très faible (${Math.round(debtRatio)}%). La banque pourrait financer vos projets (Immobilier locatif) pour vous enrichir avec l'argent des autres.`,
+        // Pas de lien
       });
   }
 
-  // 4. OPTIMISATION DU CASH (Pour TOUS les profils)
-  // Cash Drag
+  // 4. OPTIMISATION DU CASH
   const maxCash = context.fixed * 1.2;
-  if (cash > maxCash && !isDeficit) {
+  if (cash > maxCash && !isLivingAboveMeans) {
        const overflow = cash - maxCash;
        const potential = Math.round(overflow * (isModest ? FINANCIAL_KNOWLEDGE.RATES.LEP : FINANCIAL_KNOWLEDGE.RATES.LIVRET_A));
        opps.push({
           id: 'cash_drag', type: 'BUDGET', level: 'INFO',
           title: 'Argent Improductif',
-          message: `Il y a ${formatCurrency(overflow)} en trop sur votre compte courant. C'est une perte sèche. Placez-les, c'est de l'argent gratuit.`,
+          message: `Il y a ${formatCurrency(overflow)} en trop sur votre compte courant. C'est une perte sèche de ~${potential}€/an d'intérêts potentiels.`,
           potentialGain: potential,
-          actionLabel: 'Créer un projet',
-          link: '/goals'
+          // Pas de lien
        });
   }
 
@@ -446,9 +407,8 @@ export const analyzeProfileHealth = (profile: Profile, context: SimulationResult
        opps.push({
           id: 'automate_savings', type: 'SAVINGS', level: 'WARNING',
           title: 'Le piège de la volonté',
-          message: `Vous épargnez "ce qu'il reste". Programmez un virement de ${formatCurrency(Math.round(context.capacityToSave * 0.7))} en début de mois pour sécuriser votre avenir sans y penser.`,
-          actionLabel: 'Programmer',
-          link: '/goals'
+          message: `Vous épargnez "ce qu'il reste". Programmez un virement de ${formatCurrency(Math.round(context.capacityToSave * 0.7))} dès le début du mois pour sécuriser votre avenir sans y penser.`,
+          // Pas de lien
        });
   }
 
@@ -457,56 +417,55 @@ export const analyzeProfileHealth = (profile: Profile, context: SimulationResult
        opps.push({
           id: 'lifestyle_creep', type: 'BUDGET', level: 'WARNING',
           title: 'Inflation du Train de Vie',
-          message: `Vos dépenses plaisir prennent ${wantsRatio}% de vos revenus (Cible: 30%). Vous consommez votre richesse future au lieu de la construire.`,
-          link: '/profile'
+          message: `La règle idéale est max 30% de plaisirs. Vous êtes à ${wantsRatio}%. C'est ${formatCurrency(context.discretionaryExpenses - (totalIncome * 0.3))} qui ne construisent pas votre avenir.`,
+          // Pas de lien
        });
   }
 
-  // 5. NIVEAU AVANCÉ (Fiscalité & Investissement)
+  // 5. NIVEAU AVANCÉ
   
-  // LEP (Pour le Modeste)
+  // LEP
   const isEligibleLEP = (totalIncome * 12) < (FINANCIAL_KNOWLEDGE.THRESHOLDS.LEP_INCOME_SINGLE * (parts > 1.5 ? 1.7 : 1));
   const hasLEP = profile.savingsContributions.some(s => s.name.match(/LEP|Populaire/i));
   if (isEligibleLEP && !hasLEP && savings > 500) {
       opps.push({
           id: 'lep_missing', type: 'INVESTMENT', level: 'SUCCESS',
           title: 'Cadeau Fiscal (LEP)',
-          message: `Vous avez droit au LEP (5% Net). C'est le placement le plus rentable et sûr du marché. Ouvrez-en un d'urgence, c'est mathématique.`,
+          message: `Avec vos revenus, vous avez droit au LEP (5% Net). Pour ${formatCurrency(savings)} placés, c'est ${formatCurrency(savings * 0.05)} d'intérêts/an garantis.`,
           potentialGain: Math.min(savings, 10000) * (FINANCIAL_KNOWLEDGE.RATES.LEP - FINANCIAL_KNOWLEDGE.RATES.LIVRET_A),
           actionLabel: 'Comment ouvrir un LEP ?',
           guide: ACTION_GUIDES.LEP
       });
   }
 
-  // Fiscalité (Pour le Riche)
+  // Fiscalité
   if (tmi >= 0.30 && context.capacityToSave > 500 && savings > idealSafety) {
       const taxSave = Math.round(1000 * tmi);
       opps.push({
           id: 'tax_optim', type: 'INVESTMENT', level: 'SUCCESS',
           title: `Réduisez vos impôts (TMI ${Math.round(tmi*100)}%)`,
-          message: `L'État est votre 1er poste de dépense. Avec le PER, 1000€ placés = ${taxSave}€ d'impôts en moins. Profitez de cet avantage.`,
-          potentialGain: taxSave * 3, // Sur une base de 3000€ placés
+          message: `L'État prend ${Math.round(tmi*100)}% de vos revenus marginaux. En plaçant sur un PER, l'État finance en réalité ${Math.round(tmi*100)}% de votre épargne via la déduction d'impôt.`,
+          potentialGain: taxSave * 3,
           actionLabel: 'Comprendre le PEA',
           guide: ACTION_GUIDES.PEA
       });
   }
 
-  // 6. ENCOURAGEMENT (Si le profil est Excellent)
+  // 6. ENCOURAGEMENT
   if (!opps.some(o => o.level === 'CRITICAL' || o.level === 'WARNING')) {
       if (savingsRatio < 20) {
           opps.push({
              id: 'push_20', type: 'SAVINGS', level: 'SUCCESS',
              title: 'Visez les 20%',
              message: `Votre situation est saine ! Prochain niveau : monter votre taux d'épargne à 20% (actuel: ${savingsRatio}%). C'est la clé de l'indépendance.`,
-             link: '/profile'
+             // Pas de lien
           });
       } else if (invested < totalWealth * 0.3 && !isModest) {
            opps.push({
              id: 'invest_more', type: 'INVESTMENT', level: 'INFO',
              title: 'Diversification',
              message: `Excellent épargnant, mais votre patrimoine est trop liquide. Visez 30% d'actifs investis (Bourse/Immo) pour dynamiser votre patrimoine sur le long terme.`,
-             actionLabel: 'Simuler un placement',
-             link: '/simulator'
+             // Pas de lien
           });
       } else {
           opps.push({
@@ -523,14 +482,13 @@ export const analyzeProfileHealth = (profile: Profile, context: SimulationResult
   if (wantsRatio > 30) score -= (wantsRatio - 30);
   if (safetyMonths < 3) score -= (3 - safetyMonths) * 10;
   if (debtRatio > 35) score -= 15;
-  if (isDeficit || needsRatio > 80 || savings < 100) {
-      score = Math.min(score, 40); // Plafond de verre pour les profils à risque
+  if (isLivingAboveMeans || needsRatio > 80 || savings < 100) {
+      score = Math.min(score, 40);
   }
   if (savingsRatio > 20) score += 5;
   if (invested > savings) score += 5;
 
-  // Tags
-  if (isDeficit) tags.push("Alerte");
+  if (isLivingAboveMeans) tags.push("Alerte");
   else if (savingsRatio > 30) tags.push("Fourmi");
   else if (wantsRatio > 45) tags.push("Cigale");
   
@@ -542,7 +500,6 @@ export const analyzeProfileHealth = (profile: Profile, context: SimulationResult
     globalScore: Math.max(0, Math.min(100, Math.round(score))),
     tags: [...new Set(tags)],
     ratios: { needs: needsRatio, wants: wantsRatio, savings: savingsRatio },
-    // Projections incluses pour l'affichage V5
     projections: { wealth10y, wealth20y, fireYear: fireData.years },
     opportunities: opps.sort((a, b) => {
         const levels: Record<string, number> = { 'CRITICAL': 0, 'WARNING': 1, 'INFO': 2, 'SUCCESS': 3 };

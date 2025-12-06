@@ -171,9 +171,9 @@ export interface OptimizationOpportunity {
   level: OpportunityLevel;
   title: string;
   message: string;
-  actionLabel?: string;
   potentialGain?: number;
-  // Câblage des actions :
+  // Ces champs sont maintenant OPTIONNELS (?) pour éviter les boutons morts
+  actionLabel?: string;
   link?: string;        // Redirection interne (ex: /profile)
   guide?: ActionGuide;  // Ouverture modale éducative
 }
@@ -184,7 +184,7 @@ export interface DeepAnalysis {
   ratios: { needs: number; wants: number; savings: number; };
   opportunities: OptimizationOpportunity[];
   // Ajout des projections pour l'affichage V5
-  projections?: { 
+  projections: { 
     wealth10y: number; 
     wealth20y: number; 
     fireYear: number; 
@@ -233,7 +233,7 @@ export interface SimulationResult {
 // ============================================================================
 
 export const PERSONA_PRESETS: Record<string, { id: string, label: string, description: string, rules: PersonaRules }> = {
-  STUDENT:    { id: 'student',    label: 'Étudiant(e)',           description: 'Budget serré, flexible.',       rules: { safetyMonths: 1, maxDebt: 40, minLiving: 100 } },
+  STUDENT:    { id: 'student',    label: 'Étudiant(e)',           description: 'Budget serré, flexible.',     rules: { safetyMonths: 1, maxDebt: 40, minLiving: 100 } },
   SALARIED:   { id: 'salaried',   label: 'Salarié / Stable',      description: 'Revenus réguliers.',            rules: { safetyMonths: 3, maxDebt: 35, minLiving: 300 } },
   FREELANCE:  { id: 'freelance',  label: 'Indépendant',           description: 'Revenus variables, risque.',    rules: { safetyMonths: 6, maxDebt: 30, minLiving: 500 } },
   RETIRED:    { id: 'retired',    label: 'Retraité(e)',           description: 'Revenus fixes, préservation.',  rules: { safetyMonths: 6, maxDebt: 25, minLiving: 400 } },

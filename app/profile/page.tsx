@@ -11,14 +11,13 @@ import {
 } from '@/app/lib/logic';
 
 import AccordionSection from '@/app/components/AccordionSection';
-import FinancialDoctor from '@/app/components/FinancialDoctor';
 
 import {
   Save, Wallet, Tv, Landmark,
   User, Briefcase, GraduationCap, Armchair, Baby, Minus, CheckCircle,
   Search, Info, CreditCard, PiggyBank, ArrowRight, ChevronLeft,
   Zap, Shield, Plus, XCircle, Loader2,
-  TrendingUp, Target, ShoppingCart, Coffee
+  TrendingUp, Target, ShoppingCart, Coffee, AlertTriangle
 } from 'lucide-react';
 
 import Card from '@/app/components/ui/Card';
@@ -400,17 +399,10 @@ export default function ProfilePage() {
               </div>
           )}
 
-          {/* --- ACTE 4 : LIFESTYLE (NOUVELLE VERSION SÉPARÉE) --- */}
+          {/* --- ACTE 4 : LIFESTYLE (SÉPARÉE) --- */}
           {currentStep === 4 && (
               <div className="space-y-8 animate-slide-up">
                   
-                  {/* ON INJECTE LE DOCTEUR EN PRIORITÉ */}
-                  {stats.diagnosis && (
-                    <div className="bg-white rounded-3xl p-1 border border-slate-200 shadow-sm">
-                        <FinancialDoctor diagnosis={stats.diagnosis} />
-                    </div>
-                  )}
-
                   {/* AJUSTEMENT DU BUDGET VARIABLE (SPLIT EN 2) */}
                   <Card className="p-6 border-slate-200">
                        <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
