@@ -11,14 +11,14 @@ import {
 } from '@/app/lib/logic';
 
 import AccordionSection from '@/app/components/AccordionSection';
-import FinancialDoctor from '@/app/components/FinancialDoctor'; // <--- NOUVEAU
+import FinancialDoctor from '@/app/components/FinancialDoctor';
 
 import {
   Save, Wallet, Tv, Landmark,
   User, Briefcase, GraduationCap, Armchair, Baby, Minus, CheckCircle,
   Search, Info, CreditCard, PiggyBank, ArrowRight, ChevronLeft,
-  Zap, Shield, Plus, XCircle, AlertTriangle, Loader2,
-  TrendingUp, Target
+  Zap, Shield, Plus, XCircle, Loader2,
+  TrendingUp, Target, ShoppingCart, Coffee
 } from 'lucide-react';
 
 import Card from '@/app/components/ui/Card';
@@ -116,7 +116,7 @@ export default function ProfilePage() {
   const [showInvestments, setShowInvestments] = useState(false);
   const isSavingRef = useRef(false); 
 
-  // 1. INITIALISATION (CORRIGÉE : Priorité au Mode)
+  // 1. INITIALISATION
   useEffect(() => {
     if (isLoaded && profile && !formData) {
         const cleanProfile = JSON.parse(JSON.stringify(profile));
@@ -129,8 +129,11 @@ export default function ProfilePage() {
         if (!cleanProfile.annualExpenses) cleanProfile.annualExpenses = [];
         if (!cleanProfile.savingsContributions) cleanProfile.savingsContributions = [];
 
-        // 🧠 INTELLIGENCE DE CHARGEMENT
-        // Si le mode est 'beginner', on force le nettoyage des fantômes
+        // Séparation Variable : Si variableCosts existe mais pas food/fun, on initialise
+        if (!cleanProfile.foodBudget) cleanProfile.foodBudget = Math.round(cleanProfile.variableCosts * 0.6) || 0;
+        if (!cleanProfile.funBudget) cleanProfile.funBudget = Math.round(cleanProfile.variableCosts * 0.4) || 0;
+
+        // Mode
         if (cleanProfile.mode === 'beginner') {
              cleanProfile.investments = 0;
              cleanProfile.investmentYield = 0;
@@ -139,7 +142,6 @@ export default function ProfilePage() {
         } else if (cleanProfile.mode === 'expert') {
              setShowInvestments(true);
         } else {
-             // Fallback pour les vieux profils sans mode défini
              const hasMoney = cleanProfile.investments > 0;
              const hasContrib = cleanProfile.savingsContributions.length > 0;
              setShowInvestments(hasMoney || hasContrib);
@@ -167,10 +169,15 @@ export default function ProfilePage() {
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, [hasChanges]);
 
-  // 2. STATS
+  // 2. STATS (Calculées à la volée)
   const stats = useMemo(() => {
     if (!formData) return null;
-    return calculateFinancials(formData);
+    // On recompose le variable total pour le moteur
+    const engineData = { 
+        ...formData, 
+        variableCosts: parseNumber(formData.foodBudget) + parseNumber(formData.funBudget)
+    };
+    return calculateFinancials(engineData);
   }, [formData]);
 
   if (!isLoaded || !formData || !stats) return <div className="min-h-[50vh] flex items-center justify-center"><div className="animate-pulse h-12 w-12 bg-slate-200 rounded-full"></div></div>;
@@ -184,49 +191,39 @@ export default function ProfilePage() {
       
       setFormData((prev: any) => {
           if (!willBeOn) {
-             // Nettoyage visuel immédiat si on éteint
              return { ...prev, investments: 0, investmentYield: 0, savingsContributions: [] };
           }
           return prev; 
       });
   };
 
-  // 4. SAUVEGARDE (La clé du système !)
+  // 4. SAUVEGARDE
   const handleSaveAndExit = async (e?: any) => {
     if (e && e.preventDefault) e.preventDefault();
-    
     if (isSaving) return;
     setIsSaving(true);
     isSavingRef.current = true;
 
     try {
-      const finalData = { ...formData };
+      // On consolide le variable
+      const finalData = { 
+          ...formData,
+          variableCosts: parseNumber(formData.foodBudget) + parseNumber(formData.funBudget),
+          balanceDate: new Date().toISOString()
+      };
 
-      // 
-      // ===============================================================
-      // POINT CRUCIAL : L'ANCRE TEMPORELLE
-      // On injecte la date actuelle pour dire au moteur : 
-      // "Le solde est à jour à cet instant précis."
-      // ===============================================================
-      finalData.balanceDate = new Date().toISOString(); 
-
-      // LOGIQUE D'ARBITRAGE : ON vs OFF
       if (showInvestments) {
           finalData.mode = 'expert';
           finalData.investments = parseNumber(finalData.investments);
           finalData.investmentYield = parseNumber(finalData.investmentYield);
       } else {
-          // OFF : On force le mode débutant et on écrase tout
           finalData.mode = 'beginner';
           finalData.investments = 0;
           finalData.investmentYield = 0;
           finalData.savingsContributions = [];
       }
 
-      // On force l'envoi immédiat
       await saveProfile(finalData, true);
-      
-      // On redirige avec rechargement forcé
       window.location.href = '/'; 
 
     } catch (error) { 
@@ -346,22 +343,14 @@ export default function ProfilePage() {
           {currentStep === 2 && (
               <div className="space-y-6 animate-slide-up">
                   <InfoBox>Indique ici tout ce qui rentre et tout ce qui part (obligatoirement) chaque mois.</InfoBox>
-                  
-                  {/* REVENUS */}
                   <AccordionSection mode={formData.mode} defaultOpen={true} title="Revenus Mensuels (Net)" icon={Wallet} colorClass="text-emerald-600" items={formData.incomes} onItemChange={(id, f, v) => updateItem('incomes', id, f, v)} onItemAdd={() => addItem('incomes')} onItemRemove={(id) => removeItem('incomes', id)} description="Salaires, Primes, Aides, Rentes..." />
-                  
-                  {/* CHARGES FIXES */}
                   <AccordionSection mode={formData.mode} defaultOpen={false} title="Charges Fixes (Loyer, Factures...)" icon={CreditCard} colorClass="text-slate-600" items={formData.fixedCosts} onItemChange={(id, f, v) => updateItem('fixedCosts', id, f, v)} onItemAdd={() => addItem('fixedCosts')} onItemRemove={(id) => removeItem('fixedCosts', id)} description="Loyer, Crédit Immo, Électricité, Assurances..." />
-                  
-                  {/* DETTES */}
                   <AccordionSection mode={formData.mode} defaultOpen={false} title="Crédits Conso / Dettes" icon={Landmark} colorClass="text-orange-600" items={formData.credits} onItemChange={(id, f, v) => updateItem('credits', id, f, v)} onItemAdd={() => addItem('credits')} onItemRemove={(id) => removeItem('credits', id)} description="Crédit Auto, Paiements en plusieurs fois..." />
-
-                   {/* ABONNEMENTS */}
-                   <AccordionSection mode={formData.mode} defaultOpen={false} title="Abonnements" icon={Tv} colorClass="text-purple-600" type="simple" items={formData.subscriptions} onItemChange={(id, f, v) => updateItem('subscriptions', id, f, v)} onItemAdd={() => addItem('subscriptions')} onItemRemove={(id) => removeItem('subscriptions', id)} description="Netflix, Spotify, Salle de sport..." />
+                  <AccordionSection mode={formData.mode} defaultOpen={false} title="Abonnements" icon={Tv} colorClass="text-purple-600" type="simple" items={formData.subscriptions} onItemChange={(id, f, v) => updateItem('subscriptions', id, f, v)} onItemAdd={() => addItem('subscriptions')} onItemRemove={(id) => removeItem('subscriptions', id)} description="Netflix, Spotify, Salle de sport..." />
               </div>
           )}
 
-          {/* --- ACTE 3 : LE PATRIMOINE (AVEC LE SWITCH) --- */}
+          {/* --- ACTE 3 : LE PATRIMOINE --- */}
           {currentStep === 3 && (
               <div className="space-y-6 animate-slide-up">
                   <div className="flex justify-between items-end"><h2 className="text-lg font-bold text-slate-800">Photo à l&apos;instant T</h2></div>
@@ -370,7 +359,6 @@ export default function ProfilePage() {
                   <div className={`grid grid-cols-1 md:grid-cols-2 gap-4`}>
                       <Card className="p-6 border-l-4 border-l-indigo-500">
                           <div className="flex items-center gap-2 mb-4"><div className="p-2 bg-indigo-50 text-indigo-600 rounded-lg"><CreditCard size={20} /></div><h3 className="font-bold text-slate-800">Compte Courant</h3></div>
-                          {/* Utilisation de type="text" pour accepter les virgules + parseNumber au changement */}
                           <div className="relative"><input type="text" value={formData.currentBalance} onChange={(e) => updateForm({ ...formData, currentBalance: parseNumber(e.target.value) })} className="w-full text-2xl font-bold text-slate-800 bg-slate-50 border border-slate-200 rounded-xl p-3 pl-4 focus:border-indigo-500 outline-none transition-all" placeholder="0" /><span className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold">€</span></div>
                       </Card>
                       <Card className="p-6 border-l-4 border-l-emerald-500">
@@ -383,7 +371,6 @@ export default function ProfilePage() {
 
                   {/* 2. LE SWITCH INVESTISSEMENT */}
                   <div className="bg-slate-50 rounded-2xl p-6 border border-slate-200">
-                      
                       <div className="flex items-center justify-between cursor-pointer" onClick={toggleInvestments}>
                           <div className="flex items-center gap-3">
                               <div className={`p-2 rounded-lg ${showInvestments ? 'bg-purple-100 text-purple-600' : 'bg-slate-200 text-slate-500'}`}><TrendingUp size={20} /></div>
@@ -397,13 +384,11 @@ export default function ProfilePage() {
                           </div>
                       </div>
 
-                      {/* 3. SECTION CACHÉE */}
                       {showInvestments && (
                           <div className="mt-6 pt-6 border-t border-slate-200 animate-slide-up">
                               <Card className="p-6 border-l-4 border-l-purple-500 bg-white shadow-sm mb-4">
                                   <div className="flex items-center gap-2 mb-4"><h3 className="font-bold text-slate-800">Montant total investi (Stock)</h3></div>
                                   <div className="flex gap-4 items-center">
-                                      {/* Utilisation de type="text" pour accepter les virgules + parseNumber au changement */}
                                       <div className="relative flex-1"><input type="text" value={formData.investments || ''} onChange={(e) => updateForm({ ...formData, investments: e.target.value })} className="w-full text-2xl font-bold text-slate-800 bg-slate-50 border border-slate-200 rounded-xl p-3 pl-4 focus:border-purple-500 outline-none transition-all" placeholder="0" /><span className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold">€</span></div>
                                       <div className="relative w-32"><input type="text" value={formData.investmentYield || ''} onChange={(e) => updateForm({ ...formData, investmentYield: e.target.value })} className="w-full text-xl font-bold text-purple-700 bg-purple-50 border border-purple-100 rounded-xl p-3 text-center outline-none" placeholder="5" /><span className="absolute right-2 top-1/2 -translate-y-1/2 text-purple-300 text-xs font-bold">% /an</span></div>
                                   </div>
@@ -415,57 +400,76 @@ export default function ProfilePage() {
               </div>
           )}
 
-          {/* --- ACTE 4 : LIFESTYLE (LE VERDICT) --- */}
+          {/* --- ACTE 4 : LIFESTYLE (NOUVELLE VERSION SÉPARÉE) --- */}
           {currentStep === 4 && (
               <div className="space-y-8 animate-slide-up">
                   
-                  {/* ON INJECTE LE DOCTEUR ICI */}
+                  {/* ON INJECTE LE DOCTEUR EN PRIORITÉ */}
                   {stats.diagnosis && (
                     <div className="bg-white rounded-3xl p-1 border border-slate-200 shadow-sm">
                         <FinancialDoctor diagnosis={stats.diagnosis} />
                     </div>
                   )}
 
-                  {/* Ancien bloc "Verdict" ajusté */}
-                  <div className="bg-gradient-to-br from-indigo-900 to-slate-900 rounded-3xl p-8 text-white shadow-2xl relative overflow-hidden">
-                      <div className="relative z-10">
-                          <h3 className="text-2xl font-bold mb-6 flex items-center gap-3"><Zap className="text-indigo-400" /> Vos Chiffres Clés</h3>
-                          <div className="grid md:grid-cols-2 gap-12 items-center">
-                              <div>
-                                  <p className="text-indigo-200 text-sm mb-4">Reste à vivre (Plaisir + Courses) :</p>
-                                  <div className="text-5xl font-black tracking-tight text-white mb-8">{formatCurrency(stats.remainingToLive)}</div>
-                                  
-                                  <p className="text-indigo-100 font-medium mb-3 text-sm">Ajuster ce budget plaisir ?</p>
-                                  <div className="relative">
+                  {/* AJUSTEMENT DU BUDGET VARIABLE (SPLIT EN 2) */}
+                  <Card className="p-6 border-slate-200">
+                       <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
+                          <Zap className="text-amber-500" /> Ajustement Train de Vie
+                       </h3>
+                       <p className="text-sm text-slate-500 mb-6">
+                           Pour affiner le diagnostic, séparez vos dépenses variables en deux catégories.
+                       </p>
+
+                       <div className="grid md:grid-cols-2 gap-6">
+                           
+                           {/* 1. COURSES & HYGIÈNE (Besoin) */}
+                           <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
+                               <div className="flex items-center gap-3 mb-3">
+                                   <div className="p-2 bg-indigo-100 text-indigo-600 rounded-lg"><ShoppingCart size={20}/></div>
+                                   <div>
+                                       <div className="font-bold text-slate-700">Alimentation & Quotidien</div>
+                                       <div className="text-xs text-slate-400">Courses, produits d'entretien...</div>
+                                   </div>
+                               </div>
+                               <div className="relative">
                                     <input 
                                         type="text" 
-                                        value={formData.variableCosts || ''} 
-                                        onChange={(e) => updateForm({ ...formData, variableCosts: parseNumber(e.target.value) })} 
-                                        className="w-full p-4 pl-6 pr-12 bg-white/10 border border-white/20 rounded-2xl text-2xl font-bold text-white placeholder:text-white/30 focus:bg-white/20 outline-none backdrop-blur-sm transition-all shadow-inner" 
+                                        value={formData.foodBudget || ''} 
+                                        onChange={(e) => updateForm({ ...formData, foodBudget: parseNumber(e.target.value) })} 
+                                        className="w-full text-2xl font-bold text-slate-800 bg-white border border-slate-200 rounded-xl p-3 pl-4 focus:border-indigo-500 outline-none transition-all" 
                                         placeholder="0" 
                                     />
-                                    <span className="absolute right-6 top-1/2 -translate-y-1/2 text-indigo-200 font-medium">€</span>
-                                  </div>
-                              </div>
-                              
-                              <div className="bg-white/10 backdrop-blur-md rounded-2xl p-6 border border-white/10">
-                                  <div className="flex justify-between items-center mb-4">
-                                    <span className="text-xs font-bold uppercase tracking-wider text-indigo-300">Taux d'épargne</span>
-                                    {stats.capacityToSave > 0 ? <CheckCircle size={16} className="text-emerald-400" /> : <AlertTriangle size={16} className="text-rose-400" />}
-                                  </div>
-                                  <div className={`text-4xl font-black mb-2 ${stats.capacityToSave > 0 ? 'text-emerald-300' : 'text-rose-300'}`}>
-                                    {formatCurrency(stats.capacityToSave)}
-                                  </div>
-                                  <div className="w-full h-3 bg-white/20 rounded-full mt-4 overflow-hidden flex">
-                                    <div 
-                                        className={`h-full transition-all duration-500 ${stats.capacityToSave >= 0 ? 'bg-emerald-500' : 'bg-rose-500'}`} 
-                                        style={{ width: stats.monthlyIncome > 0 ? `${Math.min(100, Math.max(0, (stats.capacityToSave / stats.monthlyIncome) * 100))}%` : '0%' }}
-                                    ></div>
-                                  </div>
-                              </div>
-                          </div>
-                      </div>
-                  </div>
+                                    <span className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold">€</span>
+                               </div>
+                           </div>
+
+                           {/* 2. LOISIRS & SORTIES (Plaisir) */}
+                           <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
+                               <div className="flex items-center gap-3 mb-3">
+                                   <div className="p-2 bg-purple-100 text-purple-600 rounded-lg"><Coffee size={20}/></div>
+                                   <div>
+                                       <div className="font-bold text-slate-700">Sorties & Plaisirs</div>
+                                       <div className="text-xs text-slate-400">Resto, shopping, verres...</div>
+                                   </div>
+                               </div>
+                               <div className="relative">
+                                    <input 
+                                        type="text" 
+                                        value={formData.funBudget || ''} 
+                                        onChange={(e) => updateForm({ ...formData, funBudget: parseNumber(e.target.value) })} 
+                                        className="w-full text-2xl font-bold text-slate-800 bg-white border border-slate-200 rounded-xl p-3 pl-4 focus:border-purple-500 outline-none transition-all" 
+                                        placeholder="0" 
+                                    />
+                                    <span className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold">€</span>
+                               </div>
+                           </div>
+                       </div>
+
+                       <div className="mt-6 p-4 bg-indigo-50 rounded-xl flex justify-between items-center">
+                           <span className="text-indigo-900 font-medium">Total Variable Estimé</span>
+                           <span className="text-2xl font-black text-indigo-700">{formatCurrency(stats.discretionaryExpenses)}</span>
+                       </div>
+                  </Card>
               </div>
           )}
 
