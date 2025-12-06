@@ -3,8 +3,10 @@
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { 
-  Activity, ArrowRight, TrendingUp, ShieldCheck, PiggyBank, XCircle, 
-  Stethoscope, Wallet, HeartPulse, Zap, Rocket, AlertOctagon, X, BookOpen, CheckSquare
+  Activity, ArrowRight, TrendingUp, 
+  ShieldCheck, PiggyBank, XCircle, 
+  Stethoscope, Wallet, HeartPulse, Zap, Rocket, AlertOctagon,
+  BookOpen, X, CheckSquare
 } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 import { formatCurrency, OptimizationOpportunity, ActionGuide } from '@/app/lib/logic';
@@ -39,39 +41,49 @@ const getIcon = (type: string) => {
   }
 };
 
-// --- NOUVEAU : MODALE PÉDAGOGIQUE ---
+// --- COMPOSANT : MODALE PÉDAGOGIQUE ---
 const EducationalModal = ({ guide, onClose }: { guide: ActionGuide, onClose: () => void }) => {
     if (!guide) return null;
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in" onClick={onClose}>
             <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden animate-slide-up" onClick={e => e.stopPropagation()}>
+                {/* Header Modale */}
                 <div className="bg-indigo-600 p-6 text-white flex justify-between items-start">
                     <div className="flex gap-4">
-                        <div className="p-2 bg-white/20 rounded-lg backdrop-blur-md shrink-0"><BookOpen size={24} /></div>
+                        <div className="p-2 bg-white/20 rounded-lg backdrop-blur-md shrink-0 border border-white/10">
+                            <BookOpen size={24} />
+                        </div>
                         <div>
                             <h3 className="text-xl font-bold leading-tight">{guide.title}</h3>
                             <p className="text-indigo-100 text-sm mt-1 leading-relaxed opacity-90">{guide.definition}</p>
                         </div>
                     </div>
-                    <button onClick={onClose} className="p-1 hover:bg-white/20 rounded-full transition-colors shrink-0"><X size={20} /></button>
+                    <button onClick={onClose} className="p-1 hover:bg-white/20 rounded-full transition-colors shrink-0">
+                        <X size={20} />
+                    </button>
                 </div>
                 
+                {/* Contenu Modale */}
                 <div className="p-6 space-y-6 max-h-[70vh] overflow-y-auto">
+                    {/* Les Étapes */}
                     <div>
                         <h4 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-3 flex items-center gap-2">
                             <CheckSquare size={16} className="text-emerald-500" /> Plan d'action
                         </h4>
-                        <ul className="space-y-3">
+                        <ul className="space-y-4">
                             {guide.steps.map((step, i) => (
                                 <li key={i} className="flex gap-3 text-sm text-slate-600 leading-relaxed">
-                                    <span className="flex-shrink-0 w-6 h-6 rounded-full bg-slate-100 text-slate-500 font-bold flex items-center justify-center text-xs">{i + 1}</span>
+                                    <span className="flex-shrink-0 w-6 h-6 rounded-full bg-indigo-50 text-indigo-600 font-bold flex items-center justify-center text-xs border border-indigo-100">
+                                        {i + 1}
+                                    </span>
                                     {step}
                                 </li>
                             ))}
                         </ul>
                     </div>
 
+                    {/* Les Tips */}
                     {guide.tips.length > 0 && (
                         <div className="bg-amber-50 border border-amber-100 rounded-xl p-4">
                             <h4 className="text-xs font-bold text-amber-800 uppercase tracking-wider mb-2 flex items-center gap-2">
@@ -79,7 +91,9 @@ const EducationalModal = ({ guide, onClose }: { guide: ActionGuide, onClose: () 
                             </h4>
                             <ul className="space-y-1">
                                 {guide.tips.map((tip, i) => (
-                                    <li key={i} className="text-xs text-amber-900/80">• {tip}</li>
+                                    <li key={i} className="text-xs text-amber-900/80 pl-2 border-l-2 border-amber-200">
+                                        {tip}
+                                    </li>
                                 ))}
                             </ul>
                         </div>
@@ -94,7 +108,7 @@ const EducationalModal = ({ guide, onClose }: { guide: ActionGuide, onClose: () 
     );
 };
 
-// --- SOUS-COMPOSANT : HERO ACTION (L'Action Prioritaire) ---
+// --- COMPOSANT : HERO ACTION (Prioritaire) ---
 const HeroAction = ({ opp, onAction }: { opp: OptimizationOpportunity, onAction: () => void }) => (
   <div className="mb-6 relative overflow-hidden rounded-2xl bg-gradient-to-br from-indigo-600 to-violet-700 p-6 text-white shadow-xl shadow-indigo-200 animate-slide-up">
     <div className="absolute top-0 right-0 -mt-8 -mr-8 h-32 w-32 rounded-full bg-white/10 blur-3xl"></div>
@@ -126,7 +140,7 @@ const HeroAction = ({ opp, onAction }: { opp: OptimizationOpportunity, onAction:
   </div>
 );
 
-// --- SOUS-COMPOSANT : ITEM STANDARD ---
+// --- COMPOSANT : ITEM STANDARD ---
 const OpportunityItem = ({ opp, onAction }: { opp: OptimizationOpportunity, onAction: () => void }) => {
   const theme = getTheme(opp.level);
   const Icon = getIcon(opp.type);
@@ -152,9 +166,11 @@ const OpportunityItem = ({ opp, onAction }: { opp: OptimizationOpportunity, onAc
             size="sm" 
             variant="secondary" 
             onClick={onAction}
-            className="h-8 text-xs bg-white border-slate-200 shadow-sm hover:bg-slate-50 text-slate-700 w-full sm:w-auto flex items-center justify-center gap-1"
+            className="h-8 text-xs bg-white border-slate-200 shadow-sm hover:bg-slate-50 text-slate-700 w-full sm:w-auto flex items-center justify-center gap-1.5"
           >
-            {opp.guide ? <BookOpen size={12}/> : null} {opp.actionLabel} <ArrowRight size={12} className="opacity-50" />
+            {opp.guide ? <BookOpen size={12} className="text-indigo-500"/> : null} 
+            {opp.actionLabel} 
+            {!opp.guide && <ArrowRight size={12} className="opacity-50" />}
           </Button>
         )}
       </div>
@@ -198,7 +214,7 @@ export default function FinancialDoctor({ diagnosis }: { diagnosis: any }) {
 
   return (
     <>
-      {/* MODALE (Affichée conditionnellement) */}
+      {/* MODALE (Affichée si un guide est sélectionné) */}
       {selectedGuide && <EducationalModal guide={selectedGuide} onClose={() => setSelectedGuide(null)} />}
 
       <Card className="p-0 overflow-hidden border-slate-200 shadow-xl animate-fade-in bg-white">
@@ -210,12 +226,11 @@ export default function FinancialDoctor({ diagnosis }: { diagnosis: any }) {
           </div>
         )}
 
-        {/* --- PARTIE HAUTE : TABLEAU DE BORD & PROJECTIONS --- */}
+        {/* --- PARTIE HAUTE : DIAGNOSTIC --- */}
         <div className="grid grid-cols-1 md:grid-cols-12 border-b border-slate-100">
           
-          {/* GAUCHE : Score & Répartition */}
+          {/* GAUCHE : Score & Répartition (5 cols) */}
           <div className="md:col-span-5 p-6 border-b md:border-b-0 md:border-r border-slate-100 bg-slate-50/30 flex flex-col justify-center items-center text-center relative">
-            {/* Badge Tags */}
             <div className="absolute top-4 left-4 flex flex-wrap gap-1 max-w-[80%]">
                 {tags && tags.map((tag: string) => (
                   <span key={tag} className="text-[9px] font-bold uppercase tracking-wider bg-white border border-slate-200 px-1.5 py-0.5 rounded text-slate-500">
@@ -228,6 +243,7 @@ export default function FinancialDoctor({ diagnosis }: { diagnosis: any }) {
                 <Stethoscope size={18} className="text-indigo-600" /> Santé Globale
             </div>
             
+            {/* Donut Chart */}
             <div className="w-40 h-40 relative">
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
@@ -257,6 +273,7 @@ export default function FinancialDoctor({ diagnosis }: { diagnosis: any }) {
                 </div>
             </div>
 
+            {/* Légende */}
             <div className="flex flex-wrap gap-x-4 gap-y-2 mt-4 justify-center">
                 <div className="flex items-center gap-1.5 text-[10px] font-medium text-slate-600">
                   <div className="w-2 h-2 rounded-full" style={{background: COLORS.needs}}></div> Besoins
@@ -270,7 +287,7 @@ export default function FinancialDoctor({ diagnosis }: { diagnosis: any }) {
             </div>
           </div>
 
-          {/* DROITE : Projections Futures */}
+          {/* DROITE : Projections Futures (7 cols) */}
           <div className="md:col-span-7 p-6 flex flex-col justify-center">
             {projections ? (
                 <div className="space-y-5">
@@ -314,7 +331,7 @@ export default function FinancialDoctor({ diagnosis }: { diagnosis: any }) {
           </div>
         </div>
 
-        {/* --- PARTIE BASSE : RESTE DES OPPORTUNITÉS --- */}
+        {/* --- PARTIE BASSE : AUTRES PISTES --- */}
         {otherOpps.length > 0 && (
           <div className="p-5 bg-white">
             <div className="flex justify-between items-center mb-3">

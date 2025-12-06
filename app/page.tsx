@@ -22,15 +22,14 @@ import {
   Wallet,
   Settings,
   Target,
-  Calendar,
-  Activity
+  Calendar
 } from 'lucide-react';
 
 // ============================================================================
 // 1. HELPERS VISUELS
 // ============================================================================
 
-// 🆕 NOUVEAU : LE WATERFALL (Remplaçant moderne des BudgetRows)
+// LE WATERFALL (Visualisation des flux)
 const CashflowWaterfall = ({ stats }: { stats: any }) => {
   // Sécurité division par zéro
   const income = Math.max(1, stats.monthlyIncome);
@@ -154,10 +153,10 @@ function DashboardView() {
         {/* --- COLONNE PRINCIPALE (CENTRE - 8 colonnes) --- */}
         <div className="lg:col-span-8 space-y-8">
             
-            {/* 1. LE DOCTEUR (Composant Intelligent) */}
+            {/* 1. LE DOCTEUR (Composant Intelligent avec Actions) */}
             {stats.diagnosis && <FinancialDoctor diagnosis={stats.diagnosis} />}
 
-            {/* 2. LE FLUX VISUEL (Nouveau Waterfall) */}
+            {/* 2. LE FLUX VISUEL (Waterfall) */}
             <CashflowWaterfall stats={stats} />
         </div>
 
