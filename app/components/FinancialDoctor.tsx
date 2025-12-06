@@ -2,215 +2,194 @@
 
 import React, { useState } from 'react';
 import { 
-  Sparkles, AlertTriangle, ArrowRight, TrendingUp, 
-  ShieldCheck, PiggyBank, ChevronRight, CheckCircle, 
-  XCircle, Info, ChevronLeft
+  Activity, AlertTriangle, ArrowRight, TrendingUp, 
+  ShieldCheck, PiggyBank, CheckCircle, XCircle, 
+  Stethoscope, PieChart, Info, Zap
 } from 'lucide-react';
-import { DeepAnalysis, formatCurrency } from '@/app/lib/logic';
+import { DeepAnalysis, formatCurrency, OptimizationOpportunity } from '@/app/lib/logic';
 import Button from '@/app/components/ui/Button';
 import Card from '@/app/components/ui/Card';
 import Badge from '@/app/components/ui/Badge';
 
-// --- STYLES PAR NIVEAU D'OPPORTUNITÉ (DA Cohérente) ---
-const getLevelTheme = (level: string) => {
-  switch (level) {
-    case 'CRITICAL': 
-      return { 
-        border: 'border-rose-100', 
-        bgHeader: 'bg-rose-50', 
-        iconColor: 'text-rose-600', 
-        iconBg: 'bg-white',
-        title: 'text-rose-900',
-        badge: 'bg-rose-100 text-rose-700' 
-      };
-    case 'WARNING': 
-      return { 
-        border: 'border-amber-100', 
-        bgHeader: 'bg-amber-50', 
-        iconColor: 'text-amber-600', 
-        iconBg: 'bg-white',
-        title: 'text-amber-900',
-        badge: 'bg-amber-100 text-amber-700' 
-      };
-    case 'SUCCESS': 
-      return { 
-        border: 'border-emerald-100', 
-        bgHeader: 'bg-emerald-50', 
-        iconColor: 'text-emerald-600', 
-        iconBg: 'bg-white',
-        title: 'text-emerald-900',
-        badge: 'bg-emerald-100 text-emerald-700' 
-      };
-    default: // INFO
-      return { 
-        border: 'border-indigo-100', 
-        bgHeader: 'bg-indigo-50', 
-        iconColor: 'text-indigo-600', 
-        iconBg: 'bg-white',
-        title: 'text-indigo-900',
-        badge: 'bg-indigo-100 text-indigo-700' 
-      };
-  }
-};
-
-const getCategoryIcon = (type: string) => {
+// --- ICONS & THEMES ---
+const getIcon = (type: string) => {
   switch (type) {
     case 'SAVINGS': return ShieldCheck;
     case 'DEBT': return XCircle;
     case 'INVESTMENT': return TrendingUp;
+    case 'BUDGET': return PieChart;
     default: return PiggyBank;
   }
 };
 
+const getTheme = (level: string) => {
+  switch (level) {
+    case 'CRITICAL': return { bg: 'bg-rose-50', border: 'border-rose-200', text: 'text-rose-800', icon: 'text-rose-600', badge: 'bg-rose-100 text-rose-700' };
+    case 'WARNING':  return { bg: 'bg-amber-50', border: 'border-amber-200', text: 'text-amber-800', icon: 'text-amber-600', badge: 'bg-amber-100 text-amber-700' };
+    case 'SUCCESS':  return { bg: 'bg-emerald-50', border: 'border-emerald-200', text: 'text-emerald-800', icon: 'text-emerald-600', badge: 'bg-emerald-100 text-emerald-700' };
+    default:         return { bg: 'bg-indigo-50', border: 'border-indigo-200', text: 'text-indigo-800', icon: 'text-indigo-600', badge: 'bg-indigo-100 text-indigo-700' };
+  }
+};
+
+// --- SOUS-COMPOSANTS ---
+
+const RatioBar = ({ label, value, ideal, color }: { label: string, value: number, ideal: string, color: string }) => (
+  <div className="flex-1">
+    <div className="flex justify-between text-[10px] uppercase font-bold text-slate-400 mb-1">
+      <span>{label}</span>
+      <span>Cible: {ideal}</span>
+    </div>
+    <div className="relative h-2 bg-slate-100 rounded-full overflow-hidden">
+      <div className={`absolute top-0 left-0 h-full rounded-full transition-all duration-1000 ${color}`} style={{ width: `${Math.min(100, value)}%` }}></div>
+    </div>
+    <div className="text-right mt-1 font-bold text-slate-700 text-xs">{value}%</div>
+  </div>
+);
+
+const OpportunityCard = ({ opp }: { opp: OptimizationOpportunity }) => {
+  const theme = getTheme(opp.level);
+  const Icon = getIcon(opp.type);
+
+  return (
+    <div className={`p-4 rounded-xl border ${theme.border} ${theme.bg} flex flex-col sm:flex-row gap-4 transition-all hover:shadow-sm`}>
+      <div className={`p-3 rounded-full bg-white shadow-sm h-fit w-fit ${theme.icon} shrink-0`}>
+        <Icon size={24} />
+      </div>
+      <div className="flex-1">
+        <div className="flex justify-between items-start mb-1">
+          <h4 className={`font-bold text-sm ${theme.text} flex items-center gap-2`}>
+            {opp.title}
+            {opp.potentialGain && (
+              <span className="text-[10px] bg-white px-2 py-0.5 rounded-full border border-current opacity-80">
+                +{formatCurrency(opp.potentialGain)}
+              </span>
+            )}
+          </h4>
+          <span className={`text-[10px] px-2 py-0.5 rounded font-bold uppercase ${theme.badge}`}>{opp.type}</span>
+        </div>
+        <p className="text-xs text-slate-600 leading-relaxed mb-3">
+          {opp.message}
+        </p>
+        {opp.actionLabel && (
+          <Button size="sm" variant="secondary" className="w-full sm:w-auto h-8 text-xs bg-white border-slate-200 shadow-sm hover:bg-slate-50">
+            {opp.actionLabel} <ArrowRight size={12} />
+          </Button>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// --- MAIN COMPONENT ---
+
 export default function FinancialDoctor({ diagnosis }: { diagnosis: DeepAnalysis }) {
-  const [activeTab, setActiveTab] = useState(0);
-  const opps = diagnosis.opportunities;
+  const [showDetails, setShowDetails] = useState(false);
 
   if (!diagnosis) return null;
 
-  // DA : Calcul dynamique de la couleur du score
-  const scoreColor = diagnosis.globalScore >= 80 ? 'text-emerald-600 border-emerald-200 bg-emerald-50' 
-    : diagnosis.globalScore >= 50 ? 'text-amber-600 border-amber-200 bg-amber-50' 
-    : 'text-rose-600 border-rose-200 bg-rose-50';
+  const { globalScore, ratios, opportunities, tags } = diagnosis;
+  
+  // Tri des opportunités : Critiques d'abord
+  const criticalOpps = opportunities.filter(o => o.level === 'CRITICAL');
+  const otherOpps = opportunities.filter(o => o.level !== 'CRITICAL');
 
-  const nextOpp = () => setActiveTab((prev) => (prev + 1) % opps.length);
-  const prevOpp = () => setActiveTab((prev) => (prev - 1 + opps.length) % opps.length);
+  const scoreColor = globalScore >= 80 ? 'text-emerald-600' : globalScore >= 50 ? 'text-amber-500' : 'text-rose-500';
+  const scoreBg = globalScore >= 80 ? 'bg-emerald-500' : globalScore >= 50 ? 'bg-amber-500' : 'bg-rose-500';
 
   return (
-    <div className="space-y-4 animate-fade-in mb-8">
+    <Card className="p-0 overflow-hidden border-slate-200 shadow-lg animate-fade-in">
       
-      {/* 1. HEADER DU COACH (Score & Profil) */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 px-1">
-        <div className="flex items-center gap-4">
-           {/* Jauge Score Circulaire (Style 'Badge géant') */}
-           <div className={`w-16 h-16 rounded-2xl flex items-center justify-center font-black text-2xl border-2 shadow-sm ${scoreColor}`}>
-              {diagnosis.globalScore}
-           </div>
-           
-           <div>
-              <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
-                 <Sparkles size={18} className="text-indigo-500 fill-indigo-100" /> 
-                 Analyse Coach
-              </h2>
-              <div className="flex flex-wrap gap-2 mt-1.5">
-                 {/* Affichage des Tags (Écureuil, Investisseur...) */}
-                 {diagnosis.tags.map(tag => (
-                    <Badge key={tag} color="bg-slate-100 text-slate-600 border border-slate-200 shadow-sm">{tag}</Badge>
-                 ))}
-              </div>
-           </div>
+      {/* 1. HEADER : LE DIAGNOSTIC VITAL */}
+      <div className="p-6 bg-white border-b border-slate-100">
+        <div className="flex justify-between items-start mb-6">
+          <div>
+            <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
+              <Stethoscope className="text-indigo-600" size={24} />
+              Diagnostic Financier
+            </h2>
+            <p className="text-sm text-slate-500 mt-1">Analyse basée sur {opportunities.length} points de contrôle.</p>
+          </div>
+          <div className="flex flex-col items-end">
+             <div className={`text-4xl font-black ${scoreColor} tracking-tighter`}>{globalScore}<span className="text-lg text-slate-300">/100</span></div>
+             <div className="flex gap-1 mt-1">
+                {tags.map(tag => (
+                  <Badge key={tag} size="sm" color="bg-slate-100 text-slate-600 border border-slate-200">{tag}</Badge>
+                ))}
+             </div>
+          </div>
+        </div>
+
+        {/* 2. BARRES DE RATIOS (50/30/20) */}
+        <div className="p-4 bg-slate-50 rounded-xl border border-slate-100 grid grid-cols-3 gap-4">
+           <RatioBar 
+              label="Besoins" 
+              value={ratios.needs} 
+              ideal="50%" 
+              color={ratios.needs > 60 ? 'bg-rose-500' : 'bg-indigo-500'} 
+           />
+           <RatioBar 
+              label="Plaisirs" 
+              value={ratios.wants} 
+              ideal="30%" 
+              color={ratios.wants > 40 ? 'bg-amber-500' : 'bg-purple-500'} 
+           />
+           <RatioBar 
+              label="Épargne" 
+              value={ratios.savings} 
+              ideal="20%" 
+              color={ratios.savings < 10 ? 'bg-rose-500' : 'bg-emerald-500'} 
+           />
         </div>
       </div>
 
-      {/* 2. CAROUSEL D'OPPORTUNITÉS (Design Card Premium) */}
-      {opps.length > 0 ? (
-        <div className="relative group">
-          <Card className="overflow-hidden p-0 border-slate-200 shadow-md hover:shadow-lg transition-shadow">
-            {opps.map((opp, index) => {
-              // On affiche uniquement la slide active
-              if (index !== activeTab) return null;
-              
-              const theme = getLevelTheme(opp.level);
-              const Icon = getCategoryIcon(opp.type);
-
-              return (
-                <div key={opp.id} className="flex flex-col md:flex-row animate-fade-in">
-                  
-                  {/* COLONNE GAUCHE : VISUEL & TITRE */}
-                  <div className={`p-6 md:w-5/12 flex flex-col justify-between ${theme.bgHeader} border-b md:border-b-0 md:border-r ${theme.border} relative overflow-hidden`}>
-                     {/* Décoration d'arrière plan */}
-                     <div className="absolute -right-6 -top-6 w-24 h-24 bg-white opacity-20 rounded-full blur-xl pointer-events-none"></div>
-                     
-                     <div>
-                        <div className="flex justify-between items-start mb-4">
-                            <div className={`w-12 h-12 rounded-xl ${theme.iconBg} flex items-center justify-center shadow-sm border border-white/50 ${theme.iconColor}`}>
-                                <Icon size={24} strokeWidth={2.5} />
-                            </div>
-                            <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-md bg-white/60 backdrop-blur-sm border border-white/40 ${theme.title}`}>
-                                {opp.type}
-                            </span>
-                        </div>
-                        
-                        <h3 className={`font-bold text-lg leading-tight ${theme.title} mb-1`}>{opp.title}</h3>
-                     </div>
-
-                     {/* Gain Potentiel (si existe) */}
-                     {opp.potentialGain ? (
-                        <div className="mt-6 pt-4 border-t border-black/5">
-                           <div className={`text-xs font-medium opacity-80 ${theme.title}`}>Gain estimé</div>
-                           <div className="text-2xl font-black tracking-tight text-slate-800">+{formatCurrency(opp.potentialGain)}</div>
-                        </div>
-                     ) : (
-                        // Espace vide pour aligner si pas de gain
-                        <div className="mt-6 pt-4 border-t border-transparent h-[62px]"></div>
-                     )}
-                  </div>
-
-                  {/* COLONNE DROITE : CONTENU & ACTION */}
-                  <div className="p-6 md:w-7/12 flex flex-col justify-center bg-white relative">
-                     <p className="text-slate-600 leading-relaxed text-sm font-medium mb-6">
-                        {opp.message}
-                     </p>
-
-                     <div className="flex items-center justify-between mt-auto pt-2">
-                        {/* Bouton Action Principal */}
-                        {opp.actionLabel ? (
-                           <Button size="sm" className="bg-slate-900 text-white hover:bg-indigo-600 shadow-none text-xs px-5 h-10 transition-colors">
-                              {opp.actionLabel} <ArrowRight size={14} className="ml-1" />
-                           </Button>
-                        ) : <span></span>}
-
-                        {/* Pagination (Points) */}
-                        <div className="flex gap-1.5 items-center">
-                           {opps.map((_, i) => (
-                              <button 
-                                 key={i} 
-                                 onClick={() => setActiveTab(i)}
-                                 className={`h-1.5 rounded-full transition-all duration-300 ${i === activeTab ? 'w-6 bg-slate-800' : 'w-1.5 bg-slate-200 hover:bg-slate-400'}`}
-                                 aria-label={`Voir opportunité ${i + 1}`}
-                              />
-                           ))}
-                        </div>
-                     </div>
-                  </div>
-                </div>
-              );
-            })}
-          </Card>
-
-          {/* FLÈCHES DE NAVIGATION (Desktop : au survol / Mobile : sur les côtés) */}
-          {opps.length > 1 && (
-            <>
-               <button 
-                  onClick={prevOpp}
-                  className="absolute -left-3 top-1/2 -translate-y-1/2 p-2 bg-white border border-slate-100 shadow-lg rounded-full text-slate-400 hover:text-indigo-600 hover:scale-110 transition-all z-10 hidden md:flex items-center justify-center opacity-0 group-hover:opacity-100"
-               >
-                  <ChevronLeft size={20} />
-               </button>
-               <button 
-                  onClick={nextOpp}
-                  className="absolute -right-3 top-1/2 -translate-y-1/2 p-2 bg-white border border-slate-100 shadow-lg rounded-full text-slate-400 hover:text-indigo-600 hover:scale-110 transition-all z-10 hidden md:flex items-center justify-center opacity-0 group-hover:opacity-100"
-               >
-                  <ChevronRight size={20} />
-               </button>
-            </>
-          )}
-        </div>
-      ) : (
-        /* ÉTAT VIDE (SUCCESS) : TOUT EST PARFAIT */
-        <Card className="p-6 bg-gradient-to-br from-emerald-500 to-teal-600 text-white border-none shadow-lg relative overflow-hidden">
-           <div className="absolute right-0 top-0 p-24 bg-white opacity-10 rounded-full blur-3xl transform translate-x-10 -translate-y-10"></div>
-           <div className="flex items-center gap-5 relative z-10">
-              <div className="p-3 bg-white/20 rounded-2xl backdrop-blur-md shadow-inner">
-                 <ShieldCheck size={32} className="text-white" />
-              </div>
-              <div>
-                 <h3 className="font-bold text-xl mb-1">Santé Financière Excellente !</h3>
-                 <p className="text-emerald-50 text-sm font-medium opacity-90">Aucune alerte critique. Continuez comme ça !</p>
-              </div>
+      {/* 3. URGENCES (Si Critiques) */}
+      {criticalOpps.length > 0 && (
+        <div className="p-6 bg-rose-50/50 border-b border-rose-100 space-y-4">
+           <div className="flex items-center gap-2 text-rose-700 font-bold text-sm uppercase tracking-wider">
+              <AlertTriangle size={16} /> Actions Requises Immédiatement
            </div>
-        </Card>
+           <div className="grid gap-3">
+              {criticalOpps.map(opp => <OpportunityCard key={opp.id} opp={opp} />)}
+           </div>
+        </div>
       )}
-    </div>
+
+      {/* 4. RECOMMANDATIONS (Accordion pour ne pas polluer si beaucoup) */}
+      {otherOpps.length > 0 && (
+        <div className="p-6 bg-white">
+           <div className="flex justify-between items-center mb-4">
+              <h3 className="font-bold text-slate-700 flex items-center gap-2 text-sm uppercase tracking-wider">
+                 <Zap size={16} className="text-amber-500" /> Pistes d'optimisation
+              </h3>
+              <button 
+                onClick={() => setShowDetails(!showDetails)} 
+                className="text-xs font-bold text-indigo-600 hover:underline"
+              >
+                {showDetails ? 'Réduire' : `Voir les ${otherOpps.length} conseils`}
+              </button>
+           </div>
+           
+           <div className={`grid gap-3 transition-all ${showDetails ? 'opacity-100' : 'opacity-100'}`}>
+              {/* On montre les 2 premiers par défaut, le reste si showDetails */}
+              {otherOpps.slice(0, showDetails ? undefined : 2).map(opp => (
+                 <OpportunityCard key={opp.id} opp={opp} />
+              ))}
+           </div>
+        </div>
+      )}
+
+      {/* 5. ÉTAT PARFAIT (Empty State positif) */}
+      {opportunities.length === 0 && (
+         <div className="p-8 text-center bg-emerald-50/50">
+            <div className="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-4">
+               <Activity size={32} />
+            </div>
+            <h3 className="text-emerald-900 font-bold text-lg">Santé de fer !</h3>
+            <p className="text-emerald-700/80 text-sm mt-1 max-w-xs mx-auto">
+               Tout est optimisé. Profitez de la vie ou augmentez vos objectifs d'investissement.
+            </p>
+         </div>
+      )}
+    </Card>
   );
 }

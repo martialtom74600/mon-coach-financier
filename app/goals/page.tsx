@@ -12,7 +12,7 @@ import {
   GOAL_CATEGORIES,
   simulateGoalScenario // ✅ La fonction magique qui remplace ton contrôleur local
 } from '@/app/lib/logic';
-import { Goal } from '@/app/lib/types';
+
 
 // 👇 IMPORTS ICONES
 import {

@@ -5,8 +5,6 @@ import {
   Target, Calendar, AlertTriangle, 
   CheckCircle, ArrowRight, PiggyBank, Clock, Trash2, Loader2
 } from 'lucide-react';
-import { Goal, GoalStrategy } from '@/app/lib/types';
-import { formatCurrency } from '@/app/lib/utils';
 import { useGoalManager } from '@/app/hooks/useGoalManager';
 import Card from '@/app/components/ui/Card';
 
