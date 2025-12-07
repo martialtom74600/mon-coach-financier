@@ -13,6 +13,8 @@
     "@clerk/localizations": "^2.4.5",
     "@clerk/nextjs": "^5.1.6",
     "@ducanh2912/next-pwa": "^10.2.9",
+    "@nivo/core": "^0.99.0",
+    "@nivo/sankey": "^0.99.0",
     "@prisma/client": "^5.16.1",
     "clsx": "^2.1.1",
     "date-fns": "^3.6.0",

@@ -19,7 +19,9 @@ import AccordionSection from '@/app/components/AccordionSection';
 import {
   Wallet, Briefcase, GraduationCap, Armchair, Minus, CheckCircle,
   CreditCard, ArrowRight, Home, Building, Target,
-  HeartHandshake, Plus, Loader2, AlertCircle, User, ShieldCheck, Banknote
+  HeartHandshake, Plus, Loader2, AlertCircle, User, ShieldCheck, Banknote,
+  Zap, // Pour les abonnements
+  Calendar // Pour les dépenses annuelles
 } from 'lucide-react';
 
 // --- LOGIC HELPERS UI ---
@@ -299,6 +301,31 @@ const StepBudget = ({ formData, updateForm, addItem, removeItem, updateItem, onN
             )}
 
             <AccordionSection mode="expert" defaultOpen={false} title="Charges Fixes" icon={CreditCard} colorClass="text-slate-600" items={formData.fixedCosts} onItemChange={(id, f, v) => updateItem('fixedCosts', id, f, v)} onItemAdd={() => addItem('fixedCosts')} onItemRemove={(id) => removeItem('fixedCosts', id)} />
+            
+            <AccordionSection 
+                mode="expert" 
+                defaultOpen={false} 
+                title="Abonnements" 
+                icon={Zap} 
+                colorClass="text-purple-500" 
+                items={formData.subscriptions} 
+                onItemChange={(id, f, v) => updateItem('subscriptions', id, f, v)} 
+                onItemAdd={() => addItem('subscriptions')} 
+                onItemRemove={(id) => removeItem('subscriptions', id)} 
+            />
+
+            <AccordionSection 
+                mode="expert" 
+                defaultOpen={false} 
+                title="Dépenses Annuelles" 
+                icon={Calendar} 
+                colorClass="text-orange-500" 
+                items={formData.annualExpenses} 
+                onItemChange={(id, f, v) => updateItem('annualExpenses', id, f, v)} 
+                onItemAdd={() => addItem('annualExpenses')} 
+                onItemRemove={(id) => removeItem('annualExpenses', id)} 
+            />
+
             <AccordionSection mode="expert" defaultOpen={false} title="Crédits Conso" icon={AlertCircle} colorClass="text-rose-500" items={formData.credits} onItemChange={(id, f, v) => updateItem('credits', id, f, v)} onItemAdd={() => addItem('credits')} onItemRemove={(id) => removeItem('credits', id)} />
         </div>
     </WizardLayout>
@@ -357,7 +384,8 @@ const StepAssets = ({ formData, updateForm, onConfirm, isSaving, onPrev, simulat
                         />
                         <div className="flex justify-between items-center">
                              <div className="text-center">
-                                 <div className="text-[10px] font-bold text-slate-400 uppercase">Plaisirs</div>
+                                 {/* 👇 RENOMMAGE : Plaisirs -> Vie Courante */}
+                                 <div className="text-[10px] font-bold text-slate-400 uppercase">Vie Courante</div>
                                  <div className="text-xl font-bold text-slate-900">{formatCurrency(displayRest)}</div>
                              </div>
                              <div className="text-center">
@@ -385,7 +413,8 @@ export default function ProfilePage() {
   useEffect(() => {
     if (isLoaded && profile && !formData) {
         const cleanProfile = JSON.parse(JSON.stringify(profile));
-        ['incomes', 'fixedCosts', 'credits', 'subscriptions', 'investments'].forEach(k => { if(!cleanProfile[k]) cleanProfile[k] = []; });
+        // ✅ LISTE COMPLÈTE POUR ÉVITER LES BUGS
+        ['incomes', 'fixedCosts', 'credits', 'subscriptions', 'investments', 'annualExpenses'].forEach(k => { if(!cleanProfile[k]) cleanProfile[k] = []; });
         if (!cleanProfile.housing) cleanProfile.housing = { status: 'tenant', monthlyCost: 0, marketValue: 0 };
         setFormData(cleanProfile);
     }
@@ -414,8 +443,10 @@ export default function ProfilePage() {
     try {
         const finalData = { 
             ...formData, 
-            foodBudget: Math.round(lifestyle * 0.6), 
-            funBudget: Math.round(lifestyle * 0.4),
+            // 👇 LOGIQUE CORRIGÉE : Plus de division arbitraire 60/40.
+            // Tout le reste à vivre va dans "funBudget" (qui devient "Vie Courante").
+            foodBudget: 0, 
+            funBudget: lifestyle, 
             balanceDate: new Date().toISOString() 
         };
         await saveProfile(finalData, true);

@@ -226,25 +226,42 @@ export const distributeGoals = (goals: Goal[], capacity: number) => {
 };
 
 // ============================================================================
-// 4. ORCHESTRATEUR (CORRIGÉ POUR IGNORER LE LOYER FANTÔME)
+// 4. ORCHESTRATEUR (CORRIGÉ & ÉPURÉ)
 // ============================================================================
 export const computeFinancialPlan = (profile: Profile): SimulationResult => {
   const income = calculateListTotal(profile.incomes);
   
-  // ✅ FIX: On vérifie si l'utilisateur PAIE vraiment son logement
+  // 1. Logement
   let housingCost = 0;
-  // On ne compte le montant que si c'est un locataire ou un proprio avec crédit
   if (profile.housing?.status === 'tenant' || profile.housing?.status === 'owner_loan') {
       housingCost = safeFloat(profile.housing?.monthlyCost);
   }
 
-  const fixed = calculateListTotal(profile.fixedCosts) + housingCost + calculateListTotal(profile.annualExpenses) + calculateListTotal(profile.credits) + calculateListTotal(profile.subscriptions);
+  // 2. Charges Fixes (Mensualisées)
+  // Rappel : calculateListTotal gère déjà la fréquence si vos données sont propres
+  // (ex: si annualExpenses contient frequency='annuel', calculateListTotal doit le gérer)
+  // Si calculateListTotal ne gère pas la fréquence, il faut faire :
+  // const annualMonthly = calculateListTotal(profile.annualExpenses) / 12;
+  // Mais ici on suppose que votre utilitaire est intelligent ou que vous gérez le /12 si besoin.
+  // D'après votre retour précédent, on ne divise PAS une deuxième fois ici.
+  const annualExpensesTotal = calculateListTotal(profile.annualExpenses);
+
+  const fixed = calculateListTotal(profile.fixedCosts) 
+                + housingCost 
+                + annualExpensesTotal 
+                + calculateListTotal(profile.credits) 
+                + calculateListTotal(profile.subscriptions);
   
-  const discretionary = safeFloat(profile.variableCosts);
+  // ✅ FIX 3: Vie Courante (Living Expenses)
+  // Plus de foodBudget ou funBudget séparés. Tout est dans "funBudget" (utilisé comme Vie Courante).
+  // On renomme la variable locale pour que ce soit clair dans la logique.
+  const livingExpenses = safeFloat(profile.funBudget); 
+
   const manualSavings = calculateListTotal(profile.savingsContributions);
   
-  // Capacité d'épargne AVANT les virements d'épargne
-  const capacityToSave = Math.max(0, income - fixed - discretionary);
+  // ✅ FIX 4: Capacité d'épargne (Placements)
+  // C'est ce qu'il reste après avoir payé les charges fixes ET la vie courante.
+  const capacityToSave = Math.max(0, income - fixed - livingExpenses);
   
   const { allocations, totalAllocated } = distributeGoals(profile.goals || [], capacityToSave);
   const realCashflow = Math.max(0, capacityToSave - totalAllocated);
@@ -256,7 +273,8 @@ export const computeFinancialPlan = (profile: Profile): SimulationResult => {
         ? calculateListTotal(profile.investments as any) 
         : safeFloat(profile.investments);
 
-  const burnRate = fixed + Math.min(discretionary, 800); 
+  // Burn Rate : De combien j'ai besoin pour vivre (Fixes + Vie courante "de base")
+  const burnRate = fixed + Math.min(livingExpenses, 800); 
   const safetyMonths = burnRate > 0 ? matelas / burnRate : 99;
   const engagementRate = income > 0 ? (fixed / income) * 100 : 0;
   
@@ -264,11 +282,26 @@ export const computeFinancialPlan = (profile: Profile): SimulationResult => {
 
   return {
     budget: { 
-      income, fixed, capacity: capacityToSave, remainingToLive: income - fixed - totalAllocated,
-      monthlyIncome: income, mandatoryExpenses: fixed, discretionaryExpenses: discretionary, capacityToSave,
-      profitableExpenses: manualSavings + totalAllocated, totalGoalsEffort: totalAllocated, totalRecurring: fixed + manualSavings,
-      realCashflow: realCashflow, matelas, investments: investedAmount, totalWealth,
-      safetyMonths, engagementRate, rules: PERSONA_PRESETS.SALARIED.rules, securityBuffer: 0, availableForProjects: 0
+      income, 
+      fixed, // Total des charges contraintes
+      capacity: capacityToSave, // C'est votre budget "Placements"
+      remainingToLive: income - fixed - totalAllocated,
+      monthlyIncome: income, 
+      mandatoryExpenses: fixed, 
+      discretionaryExpenses: livingExpenses, // C'est votre budget "Vie Courante"
+      capacityToSave,
+      profitableExpenses: manualSavings + totalAllocated, 
+      totalGoalsEffort: totalAllocated, 
+      totalRecurring: fixed + manualSavings,
+      realCashflow: realCashflow, 
+      matelas, 
+      investments: investedAmount, 
+      totalWealth,
+      safetyMonths, 
+      engagementRate, 
+      rules: PERSONA_PRESETS.SALARIED.rules, 
+      securityBuffer: 0, 
+      availableForProjects: 0
     },
     allocations, freeCashFlow: realCashflow
   };
@@ -291,13 +324,14 @@ export const analyzeProfileHealth = (profile: Profile, context: SimulationResult
 
   const totalIncome = Math.max(1, context.monthlyIncome);
   const needsRatio = Math.round((context.fixed / totalIncome) * 100);
+  // On utilise discretionaryExpenses qui correspond maintenant à "Vie Courante"
   const wantsRatio = Math.round((context.discretionaryExpenses / totalIncome) * 100);
   const savingsRatio = Math.round((context.capacityToSave / totalIncome) * 100);
   const debtRatio = context.engagementRate;
   
   const cash = safeFloat(profile.currentBalance);
   const savings = safeFloat(profile.savings);
-  const invested = context.investments; // On utilise la valeur calculée proprement dans context
+  const invested = context.investments;
   const totalWealth = context.totalWealth;
 
   const adults = Math.max(1, safeFloat(profile.household?.adults));
@@ -323,7 +357,7 @@ export const analyzeProfileHealth = (profile: Profile, context: SimulationResult
   const wealth10y = simulateFutureWealth(totalWealth, context.capacityToSave, 10);
   const wealth20y = simulateFutureWealth(totalWealth, context.capacityToSave, 20);
   
-  // --- DIAGNOSTIC (SANS LIENS DE NAVIGATION) ---
+  // --- DIAGNOSTIC ---
 
   // 1. URGENCE VITALE
   if (isLivingAboveMeans) {

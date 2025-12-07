@@ -32,6 +32,10 @@ export function useFinancialData() {
              fixedCosts: savedProfile.fixedCosts || [],
              credits: savedProfile.credits || [],
              subscriptions: savedProfile.subscriptions || [],
+             
+             // 👇 AJOUT INDISPENSABLE POUR LES DÉPENSES ANNUELLES 👇
+             annualExpenses: savedProfile.annualExpenses || [],
+
              // On prépare le terrain pour la suite :
              investments: savedProfile.investments || [],
           };
