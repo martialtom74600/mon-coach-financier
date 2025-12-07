@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useUser } from '@clerk/nextjs';
 import { INITIAL_PROFILE } from '@/app/lib/logic'; 
 
@@ -10,11 +10,12 @@ export function useFinancialData() {
   const [profile, setProfile] = useState<any>(INITIAL_PROFILE);
   const [history, setHistory] = useState<any[]>([]); 
   const [isLoadingData, setIsLoadingData] = useState(true);
-  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
+  // 1. RÉCUPÉRATION DES DONNÉES (BLINDÉE)
   const fetchData = useCallback(async () => {
     if (!user) return;
     try {
+      // Le timestamp ?t=... force le rafraichissement (pas de cache vieux)
       const res = await fetch(`/api/user?t=${Date.now()}`);
       if (res.ok) {
         const data = await res.json();
@@ -22,22 +23,22 @@ export function useFinancialData() {
         if (data) {
           const { history: savedHistory, ...savedProfile } = data;
 
-          // --- SANITIZATION : On force les tableaux à être des tableaux ---
-          // Cela évite les crashs si la BDD renvoie null pour une liste
+          // --- NETTOYAGE ANTI-CRASH ---
+          // On s'assure que tout est bien un tableau pour ne jamais planter l'écran
           const cleanProfile = {
-             ...INITIAL_PROFILE, // Valeurs par défaut
-             ...savedProfile,    // Valeurs de la BDD
-             // Sécurité pour les listes :
-             incomes: savedProfile.incomes || [],
-             fixedCosts: savedProfile.fixedCosts || [],
-             credits: savedProfile.credits || [],
-             subscriptions: savedProfile.subscriptions || [],
+             ...INITIAL_PROFILE,
+             ...savedProfile,
+             incomes: Array.isArray(savedProfile.incomes) ? savedProfile.incomes : [],
+             fixedCosts: Array.isArray(savedProfile.fixedCosts) ? savedProfile.fixedCosts : [],
+             credits: Array.isArray(savedProfile.credits) ? savedProfile.credits : [],
+             subscriptions: Array.isArray(savedProfile.subscriptions) ? savedProfile.subscriptions : [],
+             annualExpenses: Array.isArray(savedProfile.annualExpenses) ? savedProfile.annualExpenses : [],
              
-             // 👇 AJOUT INDISPENSABLE POUR LES DÉPENSES ANNUELLES 👇
-             annualExpenses: savedProfile.annualExpenses || [],
-
-             // On prépare le terrain pour la suite :
-             investments: savedProfile.investments || [],
+             // Migration intelligente (Ancien vs Nouveau format investissement)
+             investments: Array.isArray(savedProfile.investments) ? savedProfile.investments : [],
+             investedAmount: typeof savedProfile.investments === 'number' 
+                ? savedProfile.investments 
+                : (savedProfile.investedAmount || 0),
           };
 
           setProfile(cleanProfile);
@@ -54,12 +55,14 @@ export function useFinancialData() {
     }
   }, [user]);
 
+  // Chargement au démarrage
   useEffect(() => {
     if (!isClerkLoaded) return;
     if (!user) { setIsLoadingData(false); return; }
     fetchData();
   }, [isClerkLoaded, user, fetchData]);
 
+  // Fonction interne pour parler à la BDD
   const pushToDB = async (dataToSave: any) => {
     if (!user) return;
     try {
@@ -68,50 +71,43 @@ export function useFinancialData() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(dataToSave),
       });
-      if (!response.ok) throw new Error('Erreur API');
-      return await response.json(); 
+      if (!response.ok) throw new Error('Erreur sauvegarde');
+      return await response.json();
     } catch (error) { console.error("Erreur save:", error); throw error; }
   };
 
-  const saveProfile = async (newProfile: any, forceImmediate = false) => {
-    // Optimistic UI Update : On met à jour l'écran tout de suite
+  // 2. LA FONCTION DE SAUVEGARDE (DIRECTE)
+  // Appelle ça sur ton bouton "Enregistrer"
+  const saveProfile = async (newProfile: any) => {
+    // 1. On met à jour l'état local du hook pour être synchro
     const updatedProfile = { ...profile, ...newProfile };
     setProfile(updatedProfile); 
     
-    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
-
-    if (forceImmediate) {
-      return await pushToDB({ ...updatedProfile, history });
-    } else {
-      // Debounce : on attend 1 seconde que l'utilisateur finisse de taper
-      saveTimeoutRef.current = setTimeout(() => { pushToDB({ ...updatedProfile, history }); }, 1000); 
-      return Promise.resolve();
-    }
+    // 2. On envoie DIRECTEMENT à la BDD (Pas de délai, pas d'auto-save)
+    return await pushToDB({ ...updatedProfile, history });
   };
 
+  // Fonctions bonus pour l'historique (si besoin plus tard)
   const saveDecision = async (decision: any) => {
     const newHistory = [...history, decision];
     setHistory(newHistory);
-    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
     return await pushToDB({ ...profile, history: newHistory });
   };
 
   const deleteDecision = async (idToDelete: string) => {
     const newHistory = history.filter((item: any) => item.id !== idToDelete);
     setHistory(newHistory);
-    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
     return await pushToDB({ ...profile, history: newHistory });
   };
 
   return { 
       profile, 
       history, 
-      saveProfile, 
+      saveProfile,    // <-- C'est elle ta star
       saveDecision, 
       deleteDecision, 
       isLoaded: isClerkLoaded && !isLoadingData, 
       user,
-      // Petit utilitaire bonus pour recharger manuellement si besoin
       refreshData: fetchData 
   };
 }

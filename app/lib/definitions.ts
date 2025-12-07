@@ -129,6 +129,7 @@ export interface Profile {
   // Stock (Patrimoine)
   savings: number | string; // Total déclaré dans le Wizard
   investments: Investment[]; // MODIFIÉ : Tableau pour le détail futur
+  investedAmount?: number | string; // AJOUTÉ : Pour stocker le capital placé total (hors flux)
   currentBalance: number | string; // Compte courant
   
   // Flux (Budget)
@@ -281,6 +282,7 @@ export const INITIAL_PROFILE: Profile = {
   
   savings: 0, 
   investments: [], // Initialisé comme tableau vide (et non plus 0)
+  investedAmount: 0, // Nouveau champ stock
   investmentYield: 5, 
   currentBalance: 0, 
   variableCosts: 0, 
@@ -318,8 +320,11 @@ export const calculateFutureValue = (principal: number, rate: number, years: num
   return principal * Math.pow((1 + rate), years);
 };
 
+// ✅ FIX CRITIQUE : Protection contre les données corrompues (vieux format où items = nombre)
 export const calculateListTotal = (items: FinancialItem[]): number => {
-  return (items || []).reduce((acc, item) => {
+  if (!Array.isArray(items)) return 0; 
+  
+  return items.reduce((acc, item) => {
     let amount = Math.abs(safeFloat(item.amount));
     if (item.frequency === 'annuel') amount = amount / 12;
     return acc + amount;

@@ -86,7 +86,7 @@ const ACTION_GUIDES = {
 // ============================================================================
 
 const estimateTMI = (netIncome: number, parts: number = 1) => {
-    const q = (netIncome * 12 * 0.9) / parts; 
+    const q = (netIncome * 12 * 0.9) / Math.max(1, parts); // Sécurité division
     for (let i = FINANCIAL_KNOWLEDGE.TAX_BRACKETS.length - 1; i >= 0; i--) {
         if (q > FINANCIAL_KNOWLEDGE.TAX_BRACKETS[i].t) return FINANCIAL_KNOWLEDGE.TAX_BRACKETS[i].r;
     }
@@ -100,6 +100,7 @@ const calculateFIRE = (annualExpenses: number, currentWealth: number, monthlySav
     
     let wealth = currentWealth;
     let months = 0;
+    // Limite à 50 ans (600 mois) pour éviter boucle infinie
     while (wealth < target && months < 600) { 
         wealth += monthlySavings;
         wealth *= (1 + (FINANCIAL_KNOWLEDGE.RATES.MARKET_AVG / 12));
@@ -124,7 +125,10 @@ const calculateCompoundMonths = (target: number, pmt: number, rate: number) => {
     if (pmt <= 0) return 999;
     if (rate <= 0) return Math.ceil(target / pmt);
     const r = (rate / 100) / 12;
-    try { return Math.ceil(Math.log(((target * r) / pmt) + 1) / Math.log(1 + r)); } catch { return 999; }
+    try { 
+        const result = Math.ceil(Math.log(((target * r) / pmt) + 1) / Math.log(1 + r)); 
+        return isFinite(result) ? result : 999;
+    } catch { return 999; }
 };
 
 export const simulateCashflowTimeline = (profile: Profile, capacityToSave: number) => {
@@ -159,8 +163,11 @@ export const calculateMonthlyEffort = (goal: Goal): number => {
   
   if (goal.isInvested) {
     const r = (safeFloat(goal.projectedYield) || 7) / 100 / 12;
+    // Formule valeur future avec versements périodiques
     const fv = current * Math.pow(1 + r, months);
-    return Math.max(0, (target - fv) * (r / (Math.pow(1 + r, months) - 1)));
+    const numerator = (target - fv) * r;
+    const denominator = Math.pow(1 + r, months) - 1;
+    return Math.max(0, denominator === 0 ? 0 : numerator / denominator);
   }
   return Math.max(0, target - current) / months;
 };
@@ -237,14 +244,8 @@ export const computeFinancialPlan = (profile: Profile): SimulationResult => {
       housingCost = safeFloat(profile.housing?.monthlyCost);
   }
 
-  // 2. Charges Fixes (Mensualisées)
-  // Rappel : calculateListTotal gère déjà la fréquence si vos données sont propres
-  // (ex: si annualExpenses contient frequency='annuel', calculateListTotal doit le gérer)
-  // Si calculateListTotal ne gère pas la fréquence, il faut faire :
-  // const annualMonthly = calculateListTotal(profile.annualExpenses) / 12;
-  // Mais ici on suppose que votre utilitaire est intelligent ou que vous gérez le /12 si besoin.
-  // D'après votre retour précédent, on ne divise PAS une deuxième fois ici.
-  const annualExpensesTotal = calculateListTotal(profile.annualExpenses);
+  // 2. Charges Fixes (Mandatory Expenses)
+  const annualExpensesTotal = calculateListTotal(profile.annualExpenses); // Doit gérer la division /12 interne
 
   const fixed = calculateListTotal(profile.fixedCosts) 
                 + housingCost 
@@ -252,28 +253,34 @@ export const computeFinancialPlan = (profile: Profile): SimulationResult => {
                 + calculateListTotal(profile.credits) 
                 + calculateListTotal(profile.subscriptions);
   
-  // ✅ FIX 3: Vie Courante (Living Expenses)
-  // Plus de foodBudget ou funBudget séparés. Tout est dans "funBudget" (utilisé comme Vie Courante).
-  // On renomme la variable locale pour que ce soit clair dans la logique.
+  // 3. Vie Courante (Living / Discretionary Expenses)
+  // On utilise le champ 'funBudget' du formulaire qui contient en réalité 
+  // le montant global "Reste à vivre" saisi par l'utilisateur.
   const livingExpenses = safeFloat(profile.funBudget); 
 
+  // 4. Épargne Manuelle déjà programmée
   const manualSavings = calculateListTotal(profile.savingsContributions);
   
-  // ✅ FIX 4: Capacité d'épargne (Placements)
-  // C'est ce qu'il reste après avoir payé les charges fixes ET la vie courante.
+  // 5. Capacité d'Investissement Réelle (Le nerf de la guerre)
+  // = Revenus - Fixes - Vie Courante
   const capacityToSave = Math.max(0, income - fixed - livingExpenses);
   
+  // Allocation des objectifs sur cette capacité
   const { allocations, totalAllocated } = distributeGoals(profile.goals || [], capacityToSave);
+  
+  // Cashflow Libre (ce qu'il reste vraiment à la fin)
   const realCashflow = Math.max(0, capacityToSave - totalAllocated);
   
+  // Patrimoine
   const matelas = safeFloat(profile.savings);
   
-  // Gestion des investissements sous forme de liste
+  // Gestion robuste de l'investissement (tableau ou nombre)
   const investedAmount = Array.isArray(profile.investments) 
         ? calculateListTotal(profile.investments as any) 
         : safeFloat(profile.investments);
 
-  // Burn Rate : De combien j'ai besoin pour vivre (Fixes + Vie courante "de base")
+  // Burn Rate : Coût de vie minimal en cas de coup dur
+  // (Charges Fixes + une version compressée de la vie courante, ici plafonnée à 800€ min)
   const burnRate = fixed + Math.min(livingExpenses, 800); 
   const safetyMonths = burnRate > 0 ? matelas / burnRate : 99;
   const engagementRate = income > 0 ? (fixed / income) * 100 : 0;
@@ -283,12 +290,12 @@ export const computeFinancialPlan = (profile: Profile): SimulationResult => {
   return {
     budget: { 
       income, 
-      fixed, // Total des charges contraintes
-      capacity: capacityToSave, // C'est votre budget "Placements"
+      fixed,                        // Total des charges contraintes
+      capacity: capacityToSave,     // Budget disponible pour l'épargne/invest
       remainingToLive: income - fixed - totalAllocated,
       monthlyIncome: income, 
       mandatoryExpenses: fixed, 
-      discretionaryExpenses: livingExpenses, // C'est votre budget "Vie Courante"
+      discretionaryExpenses: livingExpenses, // Budget Vie Courante
       capacityToSave,
       profitableExpenses: manualSavings + totalAllocated, 
       totalGoalsEffort: totalAllocated, 
@@ -303,7 +310,8 @@ export const computeFinancialPlan = (profile: Profile): SimulationResult => {
       securityBuffer: 0, 
       availableForProjects: 0
     },
-    allocations, freeCashFlow: realCashflow
+    allocations, 
+    freeCashFlow: realCashflow
   };
 };
 
@@ -324,7 +332,7 @@ export const analyzeProfileHealth = (profile: Profile, context: SimulationResult
 
   const totalIncome = Math.max(1, context.monthlyIncome);
   const needsRatio = Math.round((context.fixed / totalIncome) * 100);
-  // On utilise discretionaryExpenses qui correspond maintenant à "Vie Courante"
+  // Wants Ratio = Vie Courante / Revenus
   const wantsRatio = Math.round((context.discretionaryExpenses / totalIncome) * 100);
   const savingsRatio = Math.round((context.capacityToSave / totalIncome) * 100);
   const debtRatio = context.engagementRate;
@@ -346,9 +354,11 @@ export const analyzeProfileHealth = (profile: Profile, context: SimulationResult
   
   // 1. Dépenses réelles (sans épargne)
   const realExpenses = context.fixed + context.discretionaryExpenses;
-  // 2. Cashflow opérationnel (Vivre au-dessus de ses moyens ?)
+  
+  // 2. Cashflow opérationnel (Revenus - Dépenses Réelles)
   const operationalCashflow = totalIncome - realExpenses;
   const isLivingAboveMeans = operationalCashflow < 0;
+  
   // 3. Cashflow net (après épargne programmée)
   const netCashflow = operationalCashflow - context.profitableExpenses;
   const isOverSaving = !isLivingAboveMeans && netCashflow < 0;
