@@ -226,13 +226,18 @@ export const distributeGoals = (goals: Goal[], capacity: number) => {
 };
 
 // ============================================================================
-// 4. ORCHESTRATEUR (CORRIGÉ POUR LE LOGEMENT & INVESTISSEMENTS)
+// 4. ORCHESTRATEUR (CORRIGÉ POUR IGNORER LE LOYER FANTÔME)
 // ============================================================================
 export const computeFinancialPlan = (profile: Profile): SimulationResult => {
   const income = calculateListTotal(profile.incomes);
   
-  // ✅ CORRECTION 1 : On inclut le coût du logement (si défini dans le wizard) dans les charges fixes
-  const housingCost = safeFloat(profile.housing?.monthlyCost);
+  // ✅ FIX: On vérifie si l'utilisateur PAIE vraiment son logement
+  let housingCost = 0;
+  // On ne compte le montant que si c'est un locataire ou un proprio avec crédit
+  if (profile.housing?.status === 'tenant' || profile.housing?.status === 'owner_loan') {
+      housingCost = safeFloat(profile.housing?.monthlyCost);
+  }
+
   const fixed = calculateListTotal(profile.fixedCosts) + housingCost + calculateListTotal(profile.annualExpenses) + calculateListTotal(profile.credits) + calculateListTotal(profile.subscriptions);
   
   const discretionary = safeFloat(profile.variableCosts);
@@ -246,7 +251,7 @@ export const computeFinancialPlan = (profile: Profile): SimulationResult => {
   
   const matelas = safeFloat(profile.savings);
   
-  // ✅ CORRECTION 2 : Gestion des investissements sous forme de liste
+  // Gestion des investissements sous forme de liste
   const investedAmount = Array.isArray(profile.investments) 
         ? calculateListTotal(profile.investments as any) 
         : safeFloat(profile.investments);
@@ -368,7 +373,7 @@ export const analyzeProfileHealth = (profile: Profile, context: SimulationResult
     });
   }
 
-  // ✅ CORRECTION 3 : ALERTE PROPRIÉTAIRE / LOCATAIRE
+  // ALERTE PROPRIÉTAIRE / LOCATAIRE
   if (profile.housing?.status === 'tenant' && totalIncome > 3000 && safetyMonths > 3) {
       opps.push({
           id: 'buy_home', type: 'INVESTMENT', level: 'INFO',

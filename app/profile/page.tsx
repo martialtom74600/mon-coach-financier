@@ -2,7 +2,8 @@
 
 import React, { useMemo, useState, useEffect } from 'react';
 import { useFinancialData } from '@/app/hooks/useFinancialData';
-import { calculateFinancials, formatCurrency, generateId } from '@/app/lib/logic';
+// ✅ IMPORT DU MOTEUR DE CALCUL (ENGINE)
+import { formatCurrency, generateId, computeFinancialPlan } from '@/app/lib/logic';
 
 // --- TES COMPOSANTS UI ---
 import Card from '@/app/components/ui/Card';
@@ -17,19 +18,16 @@ import AccordionSection from '@/app/components/AccordionSection';
 // Icons
 import {
   Wallet, Briefcase, GraduationCap, Armchair, Minus, CheckCircle,
-  CreditCard, ArrowRight, TrendingUp, Target, Home, Building, 
+  CreditCard, ArrowRight, Home, Building, Target,
   HeartHandshake, Plus, Loader2, AlertCircle, User, ShieldCheck, Banknote
 } from 'lucide-react';
 
-// --- LOGIC HELPERS ---
+// --- LOGIC HELPERS UI ---
 
-// 1. Helper de sécurité pour lire la valeur d'un input
-// (Gère le cas où InputGroup renvoie l'event OU la valeur directe)
+// Helper de sécurité pour lire la valeur d'un input
 const getInputValue = (e: any) => {
-  if (e && e.target && typeof e.target.value !== 'undefined') {
-    return e.target.value; // C'est un event standard
-  }
-  return e; // C'est directement la valeur
+  if (e && e.target && typeof e.target.value !== 'undefined') return e.target.value; 
+  return e; 
 };
 
 const parseNumber = (val: any) => {
@@ -39,13 +37,11 @@ const parseNumber = (val: any) => {
 const generateIdHelper = () => Math.random().toString(36).substr(2, 9);
 
 // ============================================================================
-// 1. COMPOSANTS DE PRESENTATION (LAYOUT)
+// 1. LAYOUT & COMPOSANTS VISUELS
 // ============================================================================
 
 const WizardLayout = ({ title, subtitle, icon: Icon, children, footer }: any) => (
   <div className="w-full max-w-2xl mx-auto lg:mx-0 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      
-      {/* En-tête Textuel */}
       <div className="text-center lg:text-left mb-8">
           <div className="inline-flex p-3 bg-indigo-50 text-indigo-600 rounded-2xl mb-4">
              <Icon size={28} />
@@ -54,11 +50,8 @@ const WizardLayout = ({ title, subtitle, icon: Icon, children, footer }: any) =>
           <p className="text-slate-500 text-lg max-w-md mx-auto lg:mx-0">{subtitle}</p>
       </div>
 
-      {/* Conteneur principal */}
       <Card className="p-6 md:p-10 shadow-xl shadow-slate-200/40 border-slate-100">
           {children}
-          
-          {/* Footer boutons */}
           {footer && (
              <div className="mt-8 pt-6 border-t border-slate-50 flex items-center justify-between gap-4">
                  {footer}
@@ -103,15 +96,20 @@ const CounterControl = ({ label, value, onChange }: any) => (
 );
 
 // ============================================================================
-// 2. NOUVEAU COMPOSANT : RÉCAPITULATIF LIVE (DESKTOP)
+// 2. RÉCAPITULATIF LIVE (Connecté à l'Engine)
 // ============================================================================
 
-const LiveSummary = ({ formData, stats, currentStep }: any) => {
-  const income = stats.monthlyIncome || 0;
-  const fixed = stats.mandatoryExpenses || 0;
+const LiveSummary = ({ formData, budget, currentStep }: any) => {
+  // On récupère les calculs directement depuis l'engine (budget)
+  const income = budget?.monthlyIncome || 0;
+  const fixed = budget?.mandatoryExpenses || 0;
+  // Le reste à vivre est calculé par l'engine (capacityToSave + discretionaryExpenses)
+  // Mais pour le wizard, on simplifie : Revenus - Charges Fixes
   const reste = Math.max(0, income - fixed);
-  const ratio = income > 0 ? Math.round((fixed / income) * 100) : 0;
+  
+  const ratio = budget?.engagementRate || 0;
   const ratioColor = ratio > 50 ? 'bg-orange-500' : ratio > 35 ? 'bg-yellow-500' : 'bg-emerald-500';
+  const badgeColor = ratio > 50 ? 'text-orange-600 border-orange-200 bg-orange-50' : ratio > 35 ? 'text-yellow-600 border-yellow-200 bg-yellow-50' : 'text-emerald-600 border-emerald-200 bg-emerald-50';
 
   return (
     <div className="sticky top-6 space-y-6 animate-in fade-in slide-in-from-right-4 duration-700">
@@ -161,8 +159,8 @@ const LiveSummary = ({ formData, stats, currentStep }: any) => {
           <Card className="p-6 border-slate-200 shadow-lg">
              <div className="flex items-center justify-between mb-4">
                 <h3 className="font-bold text-slate-900">Synthèse Mensuelle</h3>
-                <Badge variant="outline" className={`${ratio > 33 ? 'text-orange-600 border-orange-200 bg-orange-50' : 'text-emerald-600 border-emerald-200 bg-emerald-50'}`}>
-                    {ratio}% Charges
+                <Badge variant="outline" className={badgeColor}>
+                    {Math.round(ratio)}% Charges
                 </Badge>
              </div>
 
@@ -192,7 +190,7 @@ const LiveSummary = ({ formData, stats, currentStep }: any) => {
 };
 
 // ============================================================================
-// 3. ÉTAPES DU WIZARD (AVEC LE FIX `getInputValue`)
+// 3. ÉTAPES DU WIZARD
 // ============================================================================
 
 const StepIdentite = ({ formData, updateForm, onNext }: any) => (
@@ -211,7 +209,6 @@ const StepIdentite = ({ formData, updateForm, onNext }: any) => (
                 label="Votre Prénom"
                 placeholder="Ex: Thomas"
                 value={formData.firstName || ''}
-                // FIX: utilisation de getInputValue
                 onChange={(e: any) => updateForm({...formData, firstName: getInputValue(e)})}
                 autoFocus
             />
@@ -221,7 +218,6 @@ const StepIdentite = ({ formData, updateForm, onNext }: any) => (
                     type="number"
                     placeholder="30"
                     value={formData.age || ''}
-                    // FIX: utilisation de getInputValue
                     onChange={(e: any) => updateForm({...formData, age: getInputValue(e)})}
                     endAdornment={<span className="text-slate-400 font-bold px-3">ans</span>}
                 />
@@ -296,7 +292,6 @@ const StepBudget = ({ formData, updateForm, addItem, removeItem, updateItem, onN
                         type="number"
                         placeholder="800"
                         value={formData.housing?.monthlyCost || ''}
-                        // FIX: utilisation de getInputValue
                         onChange={(e: any) => updateForm({ ...formData, housing: { ...formData.housing, monthlyCost: parseNumber(getInputValue(e)) } })}
                         endAdornment={<span className="text-slate-400 font-bold px-3">€</span>}
                     />
@@ -309,10 +304,11 @@ const StepBudget = ({ formData, updateForm, addItem, removeItem, updateItem, onN
     </WizardLayout>
 );
 
-const StepAssets = ({ formData, updateForm, onConfirm, isSaving, onPrev }: any) => {
+const StepAssets = ({ formData, updateForm, onConfirm, isSaving, onPrev, simulation }: any) => {
     const [sliderValue, setSliderValue] = useState(0);
-    const stats = calculateFinancials(formData);
-    const theoreticalRest = Math.max(0, stats.monthlyIncome - stats.mandatoryExpenses);
+    
+    // On utilise les données de l'engine passées en props
+    const theoreticalRest = Math.max(0, (simulation?.budget?.income || 0) - (simulation?.budget?.mandatoryExpenses || 0));
     const displayRest = theoreticalRest - sliderValue;
 
     return (
@@ -335,7 +331,6 @@ const StepAssets = ({ formData, updateForm, onConfirm, isSaving, onPrev }: any) 
                         label="Compte Courant"
                         type="number"
                         value={formData.currentBalance || ''}
-                        // FIX: utilisation de getInputValue
                         onChange={(e: any) => updateForm({ ...formData, currentBalance: parseNumber(getInputValue(e)) })}
                         endAdornment="€"
                     />
@@ -343,7 +338,6 @@ const StepAssets = ({ formData, updateForm, onConfirm, isSaving, onPrev }: any) 
                         label="Épargne Totale"
                         type="number"
                         value={formData.savings || ''}
-                        // FIX: utilisation de getInputValue
                         onChange={(e: any) => updateForm({ ...formData, savings: parseNumber(getInputValue(e)) })}
                         endAdornment="€"
                     />
@@ -356,7 +350,6 @@ const StepAssets = ({ formData, updateForm, onConfirm, isSaving, onPrev }: any) 
                     </div>
                     
                     <div className="bg-slate-50 rounded-2xl p-6 border border-slate-100">
-                        {/* INPUT RANGE STANDARD - Pas besoin de fix ici car c'est du HTML natif */}
                         <input 
                             type="range" min="0" max={theoreticalRest} step="10" 
                             value={sliderValue} onChange={(e) => setSliderValue(parseInt(e.target.value))}
@@ -392,19 +385,16 @@ export default function ProfilePage() {
   useEffect(() => {
     if (isLoaded && profile && !formData) {
         const cleanProfile = JSON.parse(JSON.stringify(profile));
-        ['incomes', 'fixedCosts', 'credits', 'subscriptions'].forEach(k => { if(!cleanProfile[k]) cleanProfile[k] = []; });
+        ['incomes', 'fixedCosts', 'credits', 'subscriptions', 'investments'].forEach(k => { if(!cleanProfile[k]) cleanProfile[k] = []; });
         if (!cleanProfile.housing) cleanProfile.housing = { status: 'tenant', monthlyCost: 0, marketValue: 0 };
         setFormData(cleanProfile);
     }
   }, [isLoaded, profile]);
 
-  const stats = useMemo(() => {
-    if (!formData) return { monthlyIncome: 0, mandatoryExpenses: 0 };
-    const simulatedFixedCosts = [...formData.fixedCosts];
-    if (formData.housing?.monthlyCost > 0) {
-        simulatedFixedCosts.push({ id: 'housing_calc', name: 'Logement', amount: formData.housing.monthlyCost });
-    }
-    return calculateFinancials({ ...formData, fixedCosts: simulatedFixedCosts });
+  // ✅ C'est ICI que la magie opère : On utilise l'ENGINE pour tout calculer
+  const simulation = useMemo(() => {
+    if (!formData) return null;
+    return computeFinancialPlan(formData);
   }, [formData]);
 
   const updateForm = (newData: any) => setFormData(newData);
@@ -439,7 +429,6 @@ export default function ProfilePage() {
     <div className="min-h-screen bg-slate-50/50 pb-20 pt-6">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             
-            {/* Barre de progression globale */}
             <div className="mb-8 max-w-xl mx-auto lg:mx-0">
                 <div className="flex justify-between text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">
                     <span>Progression</span>
@@ -448,10 +437,9 @@ export default function ProfilePage() {
                 <ProgressBar value={(currentStep / 4) * 100} className="h-2" />
             </div>
 
-            {/* Layout en Grille (1 colonne Mobile / 2 colonnes Desktop) */}
             <div className="lg:grid lg:grid-cols-12 lg:gap-12 items-start">
                 
-                {/* COLONNE GAUCHE : WIZARD */}
+                {/* COLONNE GAUCHE */}
                 <div className="lg:col-span-7 xl:col-span-8">
                     {currentStep === 1 && <StepIdentite formData={formData} updateForm={updateForm} onNext={goNext} />}
                     {currentStep === 2 && <StepSituation formData={formData} updateForm={updateForm} onNext={goNext} onPrev={goPrev} />}
@@ -466,13 +454,18 @@ export default function ProfilePage() {
                         <StepAssets 
                             formData={formData} updateForm={updateForm} 
                             onConfirm={handleSaveAndExit} isSaving={isSaving} onPrev={goPrev}
+                            simulation={simulation} // On passe la simulation complète
                         />
                     )}
                 </div>
 
-                {/* COLONNE DROITE : RÉCAP LIVE (Hidden on mobile) */}
+                {/* COLONNE DROITE : RÉCAP LIVE (Connecté à l'engine) */}
                 <div className="hidden lg:block lg:col-span-5 xl:col-span-4">
-                    <LiveSummary formData={formData} stats={stats} currentStep={currentStep} />
+                    <LiveSummary 
+                        formData={formData} 
+                        budget={simulation?.budget} // On passe le budget calculé par l'engine
+                        currentStep={currentStep} 
+                    />
                 </div>
 
             </div>
