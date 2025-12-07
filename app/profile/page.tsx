@@ -4,12 +4,12 @@ import React, { useMemo, useState, useEffect } from 'react';
 import { useFinancialData } from '@/app/hooks/useFinancialData';
 import { calculateFinancials, formatCurrency, generateId } from '@/app/lib/logic';
 
-// --- TES COMPOSANTS EXISTANTS (D'après ton screenshot) ---
+// --- TES COMPOSANTS UI ---
 import Card from '@/app/components/ui/Card';
 import Button from '@/app/components/ui/Button';
-import InputGroup from '@/app/components/ui/InputGroup'; // On l'utilise pour tous les champs
-import ProgressBar from '@/app/components/ui/ProgressBar'; // Pour l'étape en cours
-import Badge from '@/app/components/ui/Badge'; // Peut servir pour les tags
+import InputGroup from '@/app/components/ui/InputGroup';
+import ProgressBar from '@/app/components/ui/ProgressBar';
+import Badge from '@/app/components/ui/Badge';
 
 // --- COMPOSANT METIER ---
 import AccordionSection from '@/app/components/AccordionSection';
@@ -17,42 +17,48 @@ import AccordionSection from '@/app/components/AccordionSection';
 // Icons
 import {
   Wallet, Briefcase, GraduationCap, Armchair, Minus, CheckCircle,
-  CreditCard, ArrowRight, ChevronLeft,
-  TrendingUp, Target, Home, Building, HeartHandshake, Plus, Loader2,
-  AlertCircle, User, ShieldCheck, Banknote
+  CreditCard, ArrowRight, TrendingUp, Target, Home, Building, 
+  HeartHandshake, Plus, Loader2, AlertCircle, User, ShieldCheck, Banknote
 } from 'lucide-react';
 
 // --- LOGIC HELPERS ---
+
+// 1. Helper de sécurité pour lire la valeur d'un input
+// (Gère le cas où InputGroup renvoie l'event OU la valeur directe)
+const getInputValue = (e: any) => {
+  if (e && e.target && typeof e.target.value !== 'undefined') {
+    return e.target.value; // C'est un event standard
+  }
+  return e; // C'est directement la valeur
+};
+
 const parseNumber = (val: any) => {
   if (!val) return 0;
   return parseFloat(val.toString().replace(/\s/g, '').replace(',', '.')) || 0;
 };
-const calculateListTotal = (list: any[]) => (list || []).reduce((acc, item) => acc + parseNumber(item.amount), 0);
 const generateIdHelper = () => Math.random().toString(36).substr(2, 9);
 
 // ============================================================================
-// 1. LAYOUT UNIFIÉ (Utilise tes composants)
+// 1. COMPOSANTS DE PRESENTATION (LAYOUT)
 // ============================================================================
 
-// Ce wrapper garantit que les 4 pages ont EXACTEMENT le même design
-// en utilisant ton composant <Card> comme base.
 const WizardLayout = ({ title, subtitle, icon: Icon, children, footer }: any) => (
-  <div className="max-w-2xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500">
+  <div className="w-full max-w-2xl mx-auto lg:mx-0 animate-in fade-in slide-in-from-bottom-4 duration-500">
       
       {/* En-tête Textuel */}
-      <div className="text-center mb-8">
+      <div className="text-center lg:text-left mb-8">
           <div className="inline-flex p-3 bg-indigo-50 text-indigo-600 rounded-2xl mb-4">
              <Icon size={28} />
           </div>
           <h1 className="text-3xl font-black text-slate-900 mb-2">{title}</h1>
-          <p className="text-slate-500 text-lg max-w-md mx-auto">{subtitle}</p>
+          <p className="text-slate-500 text-lg max-w-md mx-auto lg:mx-0">{subtitle}</p>
       </div>
 
-      {/* TA CARTE EXISTANTE qui sert de conteneur principal */}
+      {/* Conteneur principal */}
       <Card className="p-6 md:p-10 shadow-xl shadow-slate-200/40 border-slate-100">
           {children}
           
-          {/* Zone de boutons (Footer) */}
+          {/* Footer boutons */}
           {footer && (
              <div className="mt-8 pt-6 border-t border-slate-50 flex items-center justify-between gap-4">
                  {footer}
@@ -62,8 +68,6 @@ const WizardLayout = ({ title, subtitle, icon: Icon, children, footer }: any) =>
   </div>
 );
 
-// Composant local pour les sélections (Tuiles)
-// On essaye de le faire ressembler à ton InputGroup ou Card
 const SelectionTile = ({ selected, onClick, icon: Icon, title, desc }: any) => (
   <div 
     onClick={onClick} 
@@ -87,7 +91,6 @@ const SelectionTile = ({ selected, onClick, icon: Icon, title, desc }: any) => (
   </div>
 );
 
-// Compteur simple utilisant tes Buttons
 const CounterControl = ({ label, value, onChange }: any) => (
     <div className="flex flex-col items-center w-full p-4 border border-slate-100 rounded-xl bg-slate-50/50">
         <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">{label}</span>
@@ -100,7 +103,96 @@ const CounterControl = ({ label, value, onChange }: any) => (
 );
 
 // ============================================================================
-// 2. ÉTAPES DU WIZARD
+// 2. NOUVEAU COMPOSANT : RÉCAPITULATIF LIVE (DESKTOP)
+// ============================================================================
+
+const LiveSummary = ({ formData, stats, currentStep }: any) => {
+  const income = stats.monthlyIncome || 0;
+  const fixed = stats.mandatoryExpenses || 0;
+  const reste = Math.max(0, income - fixed);
+  const ratio = income > 0 ? Math.round((fixed / income) * 100) : 0;
+  const ratioColor = ratio > 50 ? 'bg-orange-500' : ratio > 35 ? 'bg-yellow-500' : 'bg-emerald-500';
+
+  return (
+    <div className="sticky top-6 space-y-6 animate-in fade-in slide-in-from-right-4 duration-700">
+      
+      {/* Carte Identité */}
+      <Card className="p-6 border-indigo-100 shadow-lg shadow-indigo-100/50 overflow-hidden relative">
+        <div className="absolute top-0 right-0 p-3 opacity-10">
+          <User size={64} />
+        </div>
+        <div className="relative z-10">
+          <h3 className="text-xs font-bold text-indigo-500 uppercase tracking-widest mb-1">Votre Profil</h3>
+          <div className="text-2xl font-black text-slate-800 truncate">
+            {formData.firstName || "Invité"}
+          </div>
+          <div className="flex flex-wrap gap-2 mt-3">
+             {formData.age && <Badge variant="secondary" className="bg-slate-100 text-slate-600">{formData.age} ans</Badge>}
+             {formData.persona && <Badge className="bg-indigo-100 text-indigo-700 border-indigo-200 capitalize">{formData.persona === 'salaried' ? 'Salarié' : formData.persona}</Badge>}
+          </div>
+        </div>
+
+        {/* Détails foyer */}
+        <div className="mt-6 pt-6 border-t border-slate-100 grid grid-cols-2 gap-4">
+            <div className="flex items-center gap-3">
+                <div className="p-2 bg-slate-50 rounded-lg text-slate-400"><Home size={16}/></div>
+                <div>
+                    <div className="text-[10px] uppercase text-slate-400 font-bold">Logement</div>
+                    <div className="text-sm font-bold text-slate-700 truncate">
+                        {formData.housing?.status === 'tenant' ? 'Locataire' : 
+                         formData.housing?.status?.includes('owner') ? 'Proprio' : 'Hébergé'}
+                    </div>
+                </div>
+            </div>
+            <div className="flex items-center gap-3">
+                <div className="p-2 bg-slate-50 rounded-lg text-slate-400"><User size={16}/></div>
+                <div>
+                    <div className="text-[10px] uppercase text-slate-400 font-bold">Foyer</div>
+                    <div className="text-sm font-bold text-slate-700">
+                        {formData.household?.adults + (formData.household?.children || 0)} pers.
+                    </div>
+                </div>
+            </div>
+        </div>
+      </Card>
+
+      {/* Carte Budget Live */}
+      {(currentStep >= 3 || income > 0) && (
+          <Card className="p-6 border-slate-200 shadow-lg">
+             <div className="flex items-center justify-between mb-4">
+                <h3 className="font-bold text-slate-900">Synthèse Mensuelle</h3>
+                <Badge variant="outline" className={`${ratio > 33 ? 'text-orange-600 border-orange-200 bg-orange-50' : 'text-emerald-600 border-emerald-200 bg-emerald-50'}`}>
+                    {ratio}% Charges
+                </Badge>
+             </div>
+
+             <div className="h-4 w-full bg-slate-100 rounded-full overflow-hidden flex mb-6">
+                <div style={{ width: `${Math.min(ratio, 100)}%` }} className={`h-full ${ratioColor} transition-all duration-500`} />
+                <div className="h-full bg-indigo-500 flex-1 transition-all duration-500" />
+             </div>
+
+             <div className="space-y-3">
+                <div className="flex justify-between items-center text-sm">
+                    <span className="text-slate-500 flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-slate-300"/> Revenus</span>
+                    <span className="font-bold text-slate-900">{formatCurrency(income)}</span>
+                </div>
+                <div className="flex justify-between items-center text-sm">
+                    <span className="text-slate-500 flex items-center gap-2"><div className={`w-2 h-2 rounded-full ${ratioColor}`}/> Charges</span>
+                    <span className="font-bold text-slate-900 text-rose-600">-{formatCurrency(fixed)}</span>
+                </div>
+                <div className="pt-3 border-t border-slate-100 flex justify-between items-center mt-3">
+                    <span className="font-bold text-slate-700 uppercase text-xs">Reste à vivre</span>
+                    <span className="font-black text-xl text-indigo-600">{formatCurrency(reste)}</span>
+                </div>
+             </div>
+          </Card>
+      )}
+    </div>
+  );
+};
+
+// ============================================================================
+// 3. ÉTAPES DU WIZARD (AVEC LE FIX `getInputValue`)
 // ============================================================================
 
 const StepIdentite = ({ formData, updateForm, onNext }: any) => (
@@ -115,22 +207,22 @@ const StepIdentite = ({ formData, updateForm, onNext }: any) => (
         }
     >
         <div className="space-y-6">
-            {/* Utilisation de ton composant InputGroup */}
             <InputGroup 
                 label="Votre Prénom"
                 placeholder="Ex: Thomas"
                 value={formData.firstName || ''}
-                onChange={(e: any) => updateForm({...formData, firstName: e.target.value})}
+                // FIX: utilisation de getInputValue
+                onChange={(e: any) => updateForm({...formData, firstName: getInputValue(e)})}
                 autoFocus
             />
-            
             <div className={`transition-opacity duration-500 ${formData.firstName ? 'opacity-100' : 'opacity-30'}`}>
                 <InputGroup 
                     label="Votre Âge"
                     type="number"
                     placeholder="30"
                     value={formData.age || ''}
-                    onChange={(e: any) => updateForm({...formData, age: e.target.value})}
+                    // FIX: utilisation de getInputValue
+                    onChange={(e: any) => updateForm({...formData, age: getInputValue(e)})}
                     endAdornment={<span className="text-slate-400 font-bold px-3">ans</span>}
                 />
             </div>
@@ -182,7 +274,7 @@ const StepSituation = ({ formData, updateForm, onNext, onPrev }: any) => (
     </WizardLayout>
 );
 
-const StepBudget = ({ formData, updateForm, addItem, removeItem, updateItem, onNext, onPrev, stats }: any) => (
+const StepBudget = ({ formData, updateForm, addItem, removeItem, updateItem, onNext, onPrev }: any) => (
     <WizardLayout 
         title="Vos Finances" 
         subtitle="Vos flux mensuels (Net avant impôt)."
@@ -197,7 +289,6 @@ const StepBudget = ({ formData, updateForm, addItem, removeItem, updateItem, onN
         <div className="space-y-6">
             <AccordionSection mode="expert" defaultOpen={true} title="Revenus (Net)" icon={Banknote} colorClass="text-emerald-600" items={formData.incomes} onItemChange={(id, f, v) => updateItem('incomes', id, f, v)} onItemAdd={() => addItem('incomes')} onItemRemove={(id) => removeItem('incomes', id)} />
 
-            {/* Input Spécial Logement */}
             {formData.housing?.status !== 'free' && formData.housing?.status !== 'owner_paid' && (
                 <div className="p-4 bg-slate-50 rounded-xl border border-slate-100">
                      <InputGroup 
@@ -205,7 +296,8 @@ const StepBudget = ({ formData, updateForm, addItem, removeItem, updateItem, onN
                         type="number"
                         placeholder="800"
                         value={formData.housing?.monthlyCost || ''}
-                        onChange={(e: any) => updateForm({ ...formData, housing: { ...formData.housing, monthlyCost: parseNumber(e.target.value) } })}
+                        // FIX: utilisation de getInputValue
+                        onChange={(e: any) => updateForm({ ...formData, housing: { ...formData.housing, monthlyCost: parseNumber(getInputValue(e)) } })}
                         endAdornment={<span className="text-slate-400 font-bold px-3">€</span>}
                     />
                 </div>
@@ -243,19 +335,20 @@ const StepAssets = ({ formData, updateForm, onConfirm, isSaving, onPrev }: any) 
                         label="Compte Courant"
                         type="number"
                         value={formData.currentBalance || ''}
-                        onChange={(e: any) => updateForm({ ...formData, currentBalance: parseNumber(e.target.value) })}
+                        // FIX: utilisation de getInputValue
+                        onChange={(e: any) => updateForm({ ...formData, currentBalance: parseNumber(getInputValue(e)) })}
                         endAdornment="€"
                     />
                     <InputGroup 
                         label="Épargne Totale"
                         type="number"
                         value={formData.savings || ''}
-                        onChange={(e: any) => updateForm({ ...formData, savings: parseNumber(e.target.value) })}
+                        // FIX: utilisation de getInputValue
+                        onChange={(e: any) => updateForm({ ...formData, savings: parseNumber(getInputValue(e)) })}
                         endAdornment="€"
                     />
                 </div>
 
-                {/* Slider personnalisé pour la répartition */}
                 <div className="pt-8 border-t border-slate-50">
                     <div className="text-center mb-6">
                          <h3 className="font-bold text-slate-900">Répartition Reste à Vivre</h3>
@@ -263,6 +356,7 @@ const StepAssets = ({ formData, updateForm, onConfirm, isSaving, onPrev }: any) 
                     </div>
                     
                     <div className="bg-slate-50 rounded-2xl p-6 border border-slate-100">
+                        {/* INPUT RANGE STANDARD - Pas besoin de fix ici car c'est du HTML natif */}
                         <input 
                             type="range" min="0" max={theoreticalRest} step="10" 
                             value={sliderValue} onChange={(e) => setSliderValue(parseInt(e.target.value))}
@@ -295,7 +389,6 @@ export default function ProfilePage() {
   const [formData, setFormData] = useState<any>(null);
   const [isSaving, setIsSaving] = useState(false);
 
-  // Initialisation
   useEffect(() => {
     if (isLoaded && profile && !formData) {
         const cleanProfile = JSON.parse(JSON.stringify(profile));
@@ -318,7 +411,6 @@ export default function ProfilePage() {
   const goNext = () => { setCurrentStep(s => s + 1); window.scrollTo({ top: 0, behavior: 'smooth' }); };
   const goPrev = () => setCurrentStep(s => Math.max(1, s - 1));
 
-  // Helpers Listes
   const updateItem = (list: string, id: string, field: string, val: any) => {
     const newList = (formData[list]||[]).map((i:any) => i.id === id ? { ...i, [field]: val } : i);
     updateForm({ ...formData, [list]: newList });
@@ -344,32 +436,47 @@ export default function ProfilePage() {
   if (!isLoaded || !formData) return <div className="h-[50vh] flex items-center justify-center"><Loader2 className="animate-spin text-indigo-600" size={32}/></div>;
 
   return (
-    <div className="w-full pb-10">
-        
-        {/* Utilisation de TON composant ProgressBar */}
-        <div className="mb-8 max-w-xs mx-auto">
-            <ProgressBar value={(currentStep / 4) * 100} className="h-2" />
-            <div className="text-center text-xs text-slate-400 mt-2 font-medium uppercase tracking-widest">
-                Étape {currentStep} / 4
+    <div className="min-h-screen bg-slate-50/50 pb-20 pt-6">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            
+            {/* Barre de progression globale */}
+            <div className="mb-8 max-w-xl mx-auto lg:mx-0">
+                <div className="flex justify-between text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">
+                    <span>Progression</span>
+                    <span>{currentStep * 25}%</span>
+                </div>
+                <ProgressBar value={(currentStep / 4) * 100} className="h-2" />
+            </div>
+
+            {/* Layout en Grille (1 colonne Mobile / 2 colonnes Desktop) */}
+            <div className="lg:grid lg:grid-cols-12 lg:gap-12 items-start">
+                
+                {/* COLONNE GAUCHE : WIZARD */}
+                <div className="lg:col-span-7 xl:col-span-8">
+                    {currentStep === 1 && <StepIdentite formData={formData} updateForm={updateForm} onNext={goNext} />}
+                    {currentStep === 2 && <StepSituation formData={formData} updateForm={updateForm} onNext={goNext} onPrev={goPrev} />}
+                    {currentStep === 3 && (
+                        <StepBudget 
+                            formData={formData} updateForm={updateForm} 
+                            addItem={addItem} removeItem={removeItem} updateItem={updateItem}
+                            onNext={goNext} onPrev={goPrev}
+                        />
+                    )}
+                    {currentStep === 4 && (
+                        <StepAssets 
+                            formData={formData} updateForm={updateForm} 
+                            onConfirm={handleSaveAndExit} isSaving={isSaving} onPrev={goPrev}
+                        />
+                    )}
+                </div>
+
+                {/* COLONNE DROITE : RÉCAP LIVE (Hidden on mobile) */}
+                <div className="hidden lg:block lg:col-span-5 xl:col-span-4">
+                    <LiveSummary formData={formData} stats={stats} currentStep={currentStep} />
+                </div>
+
             </div>
         </div>
-
-        {currentStep === 1 && <StepIdentite formData={formData} updateForm={updateForm} onNext={goNext} />}
-        {currentStep === 2 && <StepSituation formData={formData} updateForm={updateForm} onNext={goNext} onPrev={goPrev} />}
-        {currentStep === 3 && (
-            <StepBudget 
-                formData={formData} updateForm={updateForm} 
-                addItem={addItem} removeItem={removeItem} updateItem={updateItem}
-                onNext={goNext} onPrev={goPrev}
-                stats={stats}
-            />
-        )}
-        {currentStep === 4 && (
-            <StepAssets 
-                formData={formData} updateForm={updateForm} 
-                onConfirm={handleSaveAndExit} isSaving={isSaving} onPrev={goPrev}
-            />
-        )}
     </div>
   );
 }
