@@ -42,7 +42,7 @@ export const PAYMENT_MODES = {
 };
 
 // ============================================================================
-// 2. TYPES
+// 2. TYPES DE BASE
 // ============================================================================
 
 export type GoalCategoryKey = keyof typeof GOAL_CATEGORIES;
@@ -53,6 +53,22 @@ export interface FinancialItem {
   amount: number | string;
   frequency?: 'mensuel' | 'annuel';
   dayOfMonth?: number | string;
+}
+
+// NOUVEAU : Type pour les investissements (Pour le futur Dashboard)
+export interface Investment {
+  id: string;
+  type: 'crypto' | 'stock' | 'real_estate' | 'savings_account' | 'gold' | 'other';
+  name: string;
+  amount: number | string;
+  performance?: number;
+}
+
+// NOUVEAU : Type pour le logement (Utilisé dans le Wizard Step 2 & 3)
+export interface Housing {
+  status: 'tenant' | 'owner_loan' | 'owner_paid' | 'free';
+  monthlyCost: number; // Loyer ou Crédit
+  marketValue?: number; // Valeur du bien (si proprio)
 }
 
 export interface GoalStrategy {
@@ -94,19 +110,33 @@ export interface Goal {
 export interface Household { adults: number | string; children: number | string; }
 export interface PersonaRules { safetyMonths: number; maxDebt: number; minLiving: number; }
 
+// ============================================================================
+// 3. PROFIL UTILISATEUR (Mis à jour)
+// ============================================================================
+
 export interface Profile {
   firstName?: string;
+  age?: number | string; // AJOUTÉ : Pour le Wizard Step 1
   mode: 'beginner' | 'expert';
   persona: string;
+  
   household: Household;
+  housing?: Housing; // AJOUTÉ : Pour le Wizard Step 2
+  
   updatedAt?: string;
   balanceDate?: string;
-  savings: number | string;
-  investments: number | string;
+  
+  // Stock (Patrimoine)
+  savings: number | string; // Total déclaré dans le Wizard
+  investments: Investment[]; // MODIFIÉ : Tableau pour le détail futur
+  currentBalance: number | string; // Compte courant
+  
+  // Flux (Budget)
   investmentYield: number | string; 
-  currentBalance: number | string;
   monthlyIncome?: number; 
   variableCosts: number | string;
+  
+  // Listes
   incomes: FinancialItem[];
   fixedCosts: FinancialItem[];
   subscriptions: FinancialItem[];
@@ -114,7 +144,8 @@ export interface Profile {
   savingsContributions: FinancialItem[];
   annualExpenses: FinancialItem[];
   goals?: Goal[];
-  // Nouveaux champs pour le split variable (optionnels pour compatibilité)
+  
+  // Budget Split
   foodBudget?: number | string;
   funBudget?: number | string;
 }
@@ -130,6 +161,10 @@ export interface Purchase {
   isReimbursable?: boolean;
   isPro?: boolean;
 }
+
+// ============================================================================
+// 4. TYPES D'ANALYSE (Docteur Financier)
+// ============================================================================
 
 export interface AnalysisResult {
   verdict: 'green' | 'orange' | 'red';
@@ -152,12 +187,9 @@ export interface AnalysisResult {
   timeToWork: number;
 }
 
-// --- NOUVEAU : TYPES DU DOCTEUR FINANCIER & ACTIONS ---
-
 export type OpportunityLevel = 'CRITICAL' | 'WARNING' | 'INFO' | 'SUCCESS';
 export type OpportunityType = 'SAVINGS' | 'DEBT' | 'INVESTMENT' | 'BUDGET';
 
-// Structure pour le contenu éducatif (Modale)
 export interface ActionGuide {
   title: string;
   definition: string;
@@ -172,10 +204,9 @@ export interface OptimizationOpportunity {
   title: string;
   message: string;
   potentialGain?: number;
-  // Ces champs sont maintenant OPTIONNELS (?) pour éviter les boutons morts
   actionLabel?: string;
-  link?: string;        // Redirection interne (ex: /profile)
-  guide?: ActionGuide;  // Ouverture modale éducative
+  link?: string;       
+  guide?: ActionGuide;  
 }
 
 export interface DeepAnalysis {
@@ -183,7 +214,6 @@ export interface DeepAnalysis {
   tags: string[];
   ratios: { needs: number; wants: number; savings: number; };
   opportunities: OptimizationOpportunity[];
-  // Ajout des projections pour l'affichage V5
   projections: { 
     wealth10y: number; 
     wealth20y: number; 
@@ -229,25 +259,44 @@ export interface SimulationResult {
 }
 
 // ============================================================================
-// 3. OBJETS COMPLEXES
+// 5. OBJETS INITIAUX (PRESETS & DEFAULT)
 // ============================================================================
 
 export const PERSONA_PRESETS: Record<string, { id: string, label: string, description: string, rules: PersonaRules }> = {
-  STUDENT:    { id: 'student',    label: 'Étudiant(e)',           description: 'Budget serré, flexible.',     rules: { safetyMonths: 1, maxDebt: 40, minLiving: 100 } },
-  SALARIED:   { id: 'salaried',   label: 'Salarié / Stable',      description: 'Revenus réguliers.',            rules: { safetyMonths: 3, maxDebt: 35, minLiving: 300 } },
-  FREELANCE:  { id: 'freelance',  label: 'Indépendant',           description: 'Revenus variables, risque.',    rules: { safetyMonths: 6, maxDebt: 30, minLiving: 500 } },
-  RETIRED:    { id: 'retired',    label: 'Retraité(e)',           description: 'Revenus fixes, préservation.',  rules: { safetyMonths: 6, maxDebt: 25, minLiving: 400 } },
+  STUDENT:    { id: 'student',    label: 'Étudiant(e)',          description: 'Budget serré, flexible.',     rules: { safetyMonths: 1, maxDebt: 40, minLiving: 100 } },
+  SALARIED:   { id: 'salaried',   label: 'Salarié / Stable',      description: 'Revenus réguliers.',           rules: { safetyMonths: 3, maxDebt: 35, minLiving: 300 } },
+  FREELANCE:  { id: 'freelance',  label: 'Indépendant',          description: 'Revenus variables, risque.',    rules: { safetyMonths: 6, maxDebt: 30, minLiving: 500 } },
+  RETIIRED:   { id: 'retired',    label: 'Retraité(e)',          description: 'Revenus fixes, préservation.',  rules: { safetyMonths: 6, maxDebt: 25, minLiving: 400 } },
   UNEMPLOYED: { id: 'unemployed', label: 'En recherche',          description: 'Revenus précaires, prudence.',  rules: { safetyMonths: 6, maxDebt: 0, minLiving: 200 } }
 };
 
+// C'est ICI que ça change pour correspondre à ton nouveau formulaire
 export const INITIAL_PROFILE: Profile = {
-  firstName: '', mode: 'beginner', persona: 'salaried', household: { adults: 1, children: 0 },
-  savings: 0, investments: 0, investmentYield: 5, currentBalance: 0, variableCosts: 0, monthlyIncome: 0,
-  incomes: [], fixedCosts: [], subscriptions: [], credits: [], savingsContributions: [], annualExpenses: [], goals: [], 
+  firstName: '', 
+  age: 0, // Nouveau champ
+  mode: 'beginner', 
+  persona: 'salaried', 
+  household: { adults: 1, children: 0 },
+  housing: { status: 'tenant', monthlyCost: 0, marketValue: 0 }, // Nouveau champ par défaut
+  
+  savings: 0, 
+  investments: [], // Initialisé comme tableau vide (et non plus 0)
+  investmentYield: 5, 
+  currentBalance: 0, 
+  variableCosts: 0, 
+  monthlyIncome: 0,
+  
+  incomes: [], 
+  fixedCosts: [], 
+  subscriptions: [], 
+  credits: [], 
+  savingsContributions: [], 
+  annualExpenses: [], 
+  goals: [], 
 };
 
 // ============================================================================
-// 4. UTILITAIRES
+// 6. UTILITAIRES
 // ============================================================================
 
 export const generateId = (): string => Math.random().toString(36).substr(2, 9);

@@ -226,11 +226,15 @@ export const distributeGoals = (goals: Goal[], capacity: number) => {
 };
 
 // ============================================================================
-// 4. ORCHESTRATEUR
+// 4. ORCHESTRATEUR (CORRIGÉ POUR LE LOGEMENT & INVESTISSEMENTS)
 // ============================================================================
 export const computeFinancialPlan = (profile: Profile): SimulationResult => {
   const income = calculateListTotal(profile.incomes);
-  const fixed = calculateListTotal(profile.fixedCosts) + calculateListTotal(profile.annualExpenses) + calculateListTotal(profile.credits) + calculateListTotal(profile.subscriptions);
+  
+  // ✅ CORRECTION 1 : On inclut le coût du logement (si défini dans le wizard) dans les charges fixes
+  const housingCost = safeFloat(profile.housing?.monthlyCost);
+  const fixed = calculateListTotal(profile.fixedCosts) + housingCost + calculateListTotal(profile.annualExpenses) + calculateListTotal(profile.credits) + calculateListTotal(profile.subscriptions);
+  
   const discretionary = safeFloat(profile.variableCosts);
   const manualSavings = calculateListTotal(profile.savingsContributions);
   
@@ -241,17 +245,24 @@ export const computeFinancialPlan = (profile: Profile): SimulationResult => {
   const realCashflow = Math.max(0, capacityToSave - totalAllocated);
   
   const matelas = safeFloat(profile.savings);
+  
+  // ✅ CORRECTION 2 : Gestion des investissements sous forme de liste
+  const investedAmount = Array.isArray(profile.investments) 
+        ? calculateListTotal(profile.investments as any) 
+        : safeFloat(profile.investments);
+
   const burnRate = fixed + Math.min(discretionary, 800); 
   const safetyMonths = burnRate > 0 ? matelas / burnRate : 99;
   const engagementRate = income > 0 ? (fixed / income) * 100 : 0;
-  const totalWealth = matelas + safeFloat(profile.investments) + safeFloat(profile.currentBalance);
+  
+  const totalWealth = matelas + investedAmount + safeFloat(profile.currentBalance);
 
   return {
     budget: { 
       income, fixed, capacity: capacityToSave, remainingToLive: income - fixed - totalAllocated,
       monthlyIncome: income, mandatoryExpenses: fixed, discretionaryExpenses: discretionary, capacityToSave,
       profitableExpenses: manualSavings + totalAllocated, totalGoalsEffort: totalAllocated, totalRecurring: fixed + manualSavings,
-      realCashflow: realCashflow, matelas, investments: safeFloat(profile.investments), totalWealth,
+      realCashflow: realCashflow, matelas, investments: investedAmount, totalWealth,
       safetyMonths, engagementRate, rules: PERSONA_PRESETS.SALARIED.rules, securityBuffer: 0, availableForProjects: 0
     },
     allocations, freeCashFlow: realCashflow
@@ -281,7 +292,7 @@ export const analyzeProfileHealth = (profile: Profile, context: SimulationResult
   
   const cash = safeFloat(profile.currentBalance);
   const savings = safeFloat(profile.savings);
-  const invested = safeFloat(profile.investments);
+  const invested = context.investments; // On utilise la valeur calculée proprement dans context
   const totalWealth = context.totalWealth;
 
   const adults = Math.max(1, safeFloat(profile.household?.adults));
@@ -315,7 +326,6 @@ export const analyzeProfileHealth = (profile: Profile, context: SimulationResult
           id: 'deficit_alert', type: 'BUDGET', level: 'CRITICAL',
           title: 'Hémorragie Financière',
           message: `STOP ! Vous vivez au-dessus de vos moyens (${formatCurrency(Math.abs(operationalCashflow))} de perte/mois). Votre épargne ne suffira pas à combler le trou éternellement.`,
-          // Pas de lien, juste le constat
       });
       tags.push("DANGER");
   } else if (isOverSaving) {
@@ -323,7 +333,6 @@ export const analyzeProfileHealth = (profile: Profile, context: SimulationResult
           id: 'oversaving_alert', type: 'BUDGET', level: 'WARNING',
           title: 'Épargne trop agressive',
           message: `Bravo pour votre épargne ! Mais attention, vos virements automatiques (${formatCurrency(context.profitableExpenses)}) mettent votre compte courant dans le rouge (-${formatCurrency(Math.abs(netCashflow))}). Ralentissez le rythme pour éviter les agios.`,
-          // Pas de lien
       });
   }
 
@@ -337,7 +346,7 @@ export const analyzeProfileHealth = (profile: Profile, context: SimulationResult
       title: 'Zone Rouge : 0 Sécurité',
       message: `Règle d'or : Avoir 1000€ de sécurité. Vous avez ${formatCurrency(savings)}. Une panne de voiture vous mettrait en danger immédiat.`,
       actionLabel: `Sécuriser les ${formatCurrency(1000 - savings)} manquants`,
-      guide: ACTION_GUIDES.MATELAS // J'ai ajouté le guide ici au lieu d'un lien mort !
+      guide: ACTION_GUIDES.MATELAS
     });
   } else if (savings < idealSafety && !isLivingAboveMeans) {
     const manque = idealSafety - savings;
@@ -356,8 +365,16 @@ export const analyzeProfileHealth = (profile: Profile, context: SimulationResult
       title: 'Perte de Pouvoir d\'Achat',
       message: `Vous avez ${formatCurrency(excess)} qui dorment au-delà de votre sécurité nécessaire. L'inflation vous "vole" l'équivalent de ${formatCurrency(loss)} par an sur cette somme.`,
       potentialGain: Math.round(excess * 0.05),
-      // Pas de lien "Simuler"
     });
+  }
+
+  // ✅ CORRECTION 3 : ALERTE PROPRIÉTAIRE / LOCATAIRE
+  if (profile.housing?.status === 'tenant' && totalIncome > 3000 && safetyMonths > 3) {
+      opps.push({
+          id: 'buy_home', type: 'INVESTMENT', level: 'INFO',
+          title: 'Acheter ou Louer ?',
+          message: `Vous avez des revenus solides et une épargne de sécurité. Il serait peut-être temps d'évaluer si l'achat de votre résidence principale est pertinent.`,
+      });
   }
 
   // 3. DETTES
@@ -383,7 +400,6 @@ export const analyzeProfileHealth = (profile: Profile, context: SimulationResult
         id: 'leverage_opportunity', type: 'BUDGET', level: 'INFO',
         title: 'Levier Bancaire Inexploité',
         message: `Votre taux d'endettement est très faible (${Math.round(debtRatio)}%). La banque pourrait financer vos projets (Immobilier locatif) pour vous enrichir avec l'argent des autres.`,
-        // Pas de lien
       });
   }
 
@@ -397,7 +413,6 @@ export const analyzeProfileHealth = (profile: Profile, context: SimulationResult
           title: 'Argent Improductif',
           message: `Il y a ${formatCurrency(overflow)} en trop sur votre compte courant. C'est une perte sèche de ~${potential}€/an d'intérêts potentiels.`,
           potentialGain: potential,
-          // Pas de lien
        });
   }
 
@@ -408,7 +423,6 @@ export const analyzeProfileHealth = (profile: Profile, context: SimulationResult
           id: 'automate_savings', type: 'SAVINGS', level: 'WARNING',
           title: 'Le piège de la volonté',
           message: `Vous épargnez "ce qu'il reste". Programmez un virement de ${formatCurrency(Math.round(context.capacityToSave * 0.7))} dès le début du mois pour sécuriser votre avenir sans y penser.`,
-          // Pas de lien
        });
   }
 
@@ -418,7 +432,6 @@ export const analyzeProfileHealth = (profile: Profile, context: SimulationResult
           id: 'lifestyle_creep', type: 'BUDGET', level: 'WARNING',
           title: 'Inflation du Train de Vie',
           message: `La règle idéale est max 30% de plaisirs. Vous êtes à ${wantsRatio}%. C'est ${formatCurrency(context.discretionaryExpenses - (totalIncome * 0.3))} qui ne construisent pas votre avenir.`,
-          // Pas de lien
        });
   }
 
@@ -458,14 +471,12 @@ export const analyzeProfileHealth = (profile: Profile, context: SimulationResult
              id: 'push_20', type: 'SAVINGS', level: 'SUCCESS',
              title: 'Visez les 20%',
              message: `Votre situation est saine ! Prochain niveau : monter votre taux d'épargne à 20% (actuel: ${savingsRatio}%). C'est la clé de l'indépendance.`,
-             // Pas de lien
           });
       } else if (invested < totalWealth * 0.3 && !isModest) {
            opps.push({
              id: 'invest_more', type: 'INVESTMENT', level: 'INFO',
              title: 'Diversification',
              message: `Excellent épargnant, mais votre patrimoine est trop liquide. Visez 30% d'actifs investis (Bourse/Immo) pour dynamiser votre patrimoine sur le long terme.`,
-             // Pas de lien
           });
       } else {
           opps.push({
