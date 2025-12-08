@@ -133,7 +133,7 @@ export interface Profile {
   // Flux (Budget)
   investmentYield: number | string; 
   monthlyIncome?: number; 
-  variableCosts: number | string;
+  variableCosts: FinancialItem[]; // Corrigé : c'est bien un tableau
   
   // Listes
   incomes: FinancialItem[];
@@ -213,13 +213,26 @@ export interface SimulationResult {
   budget: { 
       income: number; 
       fixed: number; 
+      
+      // AJOUTS POUR LOGIC.TS COMPATIBILITÉ
+      variable: number; 
+      variableExpenses: number;
+
       capacity: number; 
       remainingToLive: number; 
       totalRecurring: number; 
       monthlyIncome: number; 
       mandatoryExpenses: number; 
       discretionaryExpenses: number; 
+      
       capacityToSave: number; 
+      
+      // [CRITIQUE 1] La vraie capacité (Revenus - Charges)
+      rawCapacity: number; 
+      
+      // [CRITIQUE 2 - CELUI QU'IL MANQUAIT] Le Solde après investissement
+      endOfMonthBalance: number;
+
       matelas: number; 
       rules: PersonaRules; 
       securityBuffer: number; 
@@ -231,11 +244,11 @@ export interface SimulationResult {
       totalWealth: number;
       safetyMonths: number;
       engagementRate: number;
-      currentBalance: number; // AJOUTÉ : Requis par le Engine V13
+      currentBalance: number; 
   };
   freeCashFlow: number; 
   diagnosis?: DeepAnalysis;
-  usedRates?: any; // AJOUTÉ : Pour afficher les taux utilisés en UI
+  usedRates?: any; 
 }
 
 // ============================================================================
@@ -243,7 +256,7 @@ export interface SimulationResult {
 // ============================================================================
 
 export const PERSONA_PRESETS: Record<string, { id: string, label: string, description: string, rules: PersonaRules }> = {
-  STUDENT:    { id: 'student',    label: 'Étudiant(e)',          description: 'Budget serré, flexible.',     rules: { safetyMonths: 1, maxDebt: 40, minLiving: 100 } },
+  STUDENT:    { id: 'student',    label: 'Étudiant(e)',         description: 'Budget serré, flexible.',     rules: { safetyMonths: 1, maxDebt: 40, minLiving: 100 } },
   SALARIED:   { id: 'salaried',   label: 'Salarié / Stable',      description: 'Revenus réguliers.',          rules: { safetyMonths: 3, maxDebt: 35, minLiving: 300 } },
   FREELANCE:  { id: 'freelance',  label: 'Indépendant',          description: 'Revenus variables, risque.',    rules: { safetyMonths: 6, maxDebt: 30, minLiving: 500 } },
   RETIIRED:   { id: 'retired',    label: 'Retraité(e)',          description: 'Revenus fixes, préservation.',  rules: { safetyMonths: 6, maxDebt: 25, minLiving: 400 } },
@@ -263,7 +276,10 @@ export const INITIAL_PROFILE: Profile = {
   investedAmount: 0, 
   investmentYield: 5, 
   currentBalance: 0, 
-  variableCosts: 0, 
+  
+  // [CORRECTION] Initialisé comme tableau vide, pas "0"
+  variableCosts: [], 
+  
   monthlyIncome: 0,
   
   incomes: [], 
@@ -284,7 +300,6 @@ export const generateId = (): string => Math.random().toString(36).substr(2, 9);
 export const safeFloat = (val: any): number => {
   if (val === null || val === undefined || val === '') return 0;
   if (typeof val === 'number') return isNaN(val) ? 0 : val;
-  // Nettoyage agressif des espaces insécables et conversion virgule
   const clean = String(val).replace(/[\s\u00A0]/g, '').replace(',', '.');
   const parsed = parseFloat(clean);
   return isNaN(parsed) ? 0 : parsed;

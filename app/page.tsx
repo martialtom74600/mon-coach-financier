@@ -25,7 +25,7 @@ import {
   TrendingUp, ArrowRight, Zap, Layers, Wallet, Rocket, 
   AlertOctagon, BookOpen, X, CheckSquare, Stethoscope, ShieldCheck, 
   XCircle, PiggyBank, Crown, Target, Activity, HelpCircle, ArrowUpRight, Lock,
-  LayoutDashboard, GitGraph // Ajout d'icones si dispo, sinon on utilise celles existantes
+  HeartPulse, Thermometer, ClipboardList, AlertTriangle
 } from 'lucide-react';
 
 // ============================================================================
@@ -37,6 +37,8 @@ const styles = `
   .delay-100 { animation-delay: 100ms; } .delay-200 { animation-delay: 200ms; } .delay-300 { animation-delay: 300ms; }
   .shimmer { background: linear-gradient(90deg, #f1f5f9 0%, #e2e8f0 50%, #f1f5f9 100%); background-size: 200% 100%; animation: shimmer 1.5s infinite; }
   @keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
+  .pulse-ring { animation: pulse-ring 2s cubic-bezier(0.215, 0.61, 0.355, 1) infinite; }
+  @keyframes pulse-ring { 0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); } 70% { transform: scale(1); box-shadow: 0 0 0 10px rgba(16, 185, 129, 0); } 100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); } }
 `;
 
 // ============================================================================
@@ -77,11 +79,7 @@ const DashboardSkeleton = () => (
         </div>
       ))}
     </div>
-    <div className="h-12 w-64 mx-auto rounded-xl shimmer"></div>
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-      <div className="lg:col-span-2 space-y-6"><div className="h-64 rounded-2xl shimmer"></div><div className="h-24 rounded-xl shimmer"></div></div>
-      <div className="space-y-6"><div className="h-80 rounded-2xl shimmer"></div></div>
-    </div>
+    <div className="h-96 w-full rounded-2xl shimmer"></div>
   </div>
 );
 
@@ -195,8 +193,57 @@ const OpportunityItem = ({ opp, onAction }: { opp: OptimizationOpportunity, onAc
   );
 };
 
+// --- LE "DOCTOR CARD" (Version Mini pour Dashboard) ---
+const DoctorMiniCard = ({ analysis }: { analysis: any }) => {
+    const getHealthStatus = (score: number) => {
+        if (score >= 80) return { label: "Santé Excellente", color: "text-emerald-600", bg: "bg-emerald-100", icon: HeartPulse };
+        if (score >= 50) return { label: "État Stable", color: "text-amber-600", bg: "bg-amber-100", icon: Thermometer };
+        return { label: "Attention Requise", color: "text-rose-600", bg: "bg-rose-100", icon: AlertTriangle };
+    };
+
+    const status = getHealthStatus(analysis.globalScore);
+    const StatusIcon = status.icon;
+
+    const Gauge = ({ label, value, target, color }: any) => (
+        <div className="space-y-1">
+            <div className="flex justify-between text-[10px] uppercase font-bold text-slate-400">
+                <span>{label}</span>
+                <span>{value}%</span>
+            </div>
+            <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
+                <div className={`h-full rounded-full ${color.replace('text-', 'bg-')}`} style={{ width: `${Math.min(100, (value/target)*100)}%` }}></div>
+            </div>
+        </div>
+    );
+
+    return (
+        <div className="h-full bg-white rounded-2xl border border-slate-100 p-6 flex flex-col justify-between">
+            <div className="flex items-start justify-between">
+                <div>
+                      <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2 mb-1"><Stethoscope size={14}/> Diagnostic</h3>
+                      <div className={`text-xl font-bold ${status.color}`}>{status.label}</div>
+                </div>
+                <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${status.bg} ${status.color}`}>
+                      <StatusIcon size={24} />
+                </div>
+            </div>
+            
+            <div className="space-y-4 my-4">
+                 <Gauge label="Épargne" value={analysis.ratios.savings} target={20} color="text-emerald-500" />
+                 <Gauge label="Charges" value={analysis.ratios.needs} target={50} color="text-indigo-500" />
+                 <Gauge label="Plaisirs" value={analysis.ratios.wants} target={30} color="text-purple-500" />
+            </div>
+
+            <div className="pt-4 border-t border-slate-50 flex justify-between items-center">
+                 <div className="text-xs text-slate-500">Score Global</div>
+                 <div className="text-2xl font-black text-slate-900">{analysis.globalScore}<span className="text-sm text-slate-400 font-medium">/100</span></div>
+            </div>
+        </div>
+    );
+};
+
 // ============================================================================
-// 4. DASHBOARD VIEW
+// 4. DASHBOARD VIEW (SINGLE PAGE POWER)
 // ============================================================================
 
 function DashboardView() {
@@ -204,15 +251,13 @@ function DashboardView() {
   const { user } = useUser();
   const { profile, isLoaded: isProfileLoaded } = useFinancialData();
   const [selectedGuide, setSelectedGuide] = useState<any | null>(null);
-  
-  // --- NOUVEL ÉTAT POUR LES ONGLETS ---
-  const [activeTab, setActiveTab] = useState<'overview' | 'analysis'>('overview');
 
   const analysis: DeepAnalysis | null = useMemo(() => {
       if (!profile || !profile.incomes) return null;
       try {
           const budgetContext = computeFinancialPlan(profile);
-          return analyzeProfileHealth(profile, budgetContext.budget);
+          const analysisResult = analyzeProfileHealth(profile, budgetContext.budget);
+          return { ...analysisResult, budget: budgetContext.budget };
       } catch (e) { console.error(e); return null; }
   }, [profile]);
 
@@ -234,28 +279,28 @@ function DashboardView() {
     );
   }
 
-  const chartData = [
-    { name: 'Besoins', value: analysis.ratios.needs, color: COLORS.needs }, 
-    { name: 'Plaisirs', value: analysis.ratios.wants, color: COLORS.wants }, 
-    { name: 'Épargne', value: analysis.ratios.savings, color: COLORS.savings }, 
-  ].filter(d => d.value > 0);
+  // --- DATA CALCULÉE POUR KPIS ---
+  const simulation = computeFinancialPlan(profile);
+  
+  // [IMPORTANT] UTILISATION DU SOLDE RÉEL
+  const balance = simulation.budget.endOfMonthBalance;
+  const rawCapacity = simulation.budget.rawCapacity;
 
+  // LOGIQUE DE DÉFICIT
+  const isDeficit = balance < 0;
+  const isOverInvested = rawCapacity > 0 && balance < 0;
+
+  const autoInvest = simulation.budget.profitableExpenses; 
+  const currentNetWorth = simulation.budget.totalWealth;
+  const safetyMonths = simulation.budget.safetyMonths;
+
+  // --- ACTIONS ---
   const sortedOpps = [...analysis.opportunities].sort((a, b) => {
       const priority = { 'CRITICAL': 0, 'WARNING': 1, 'SUCCESS': 2, 'INFO': 3 };
       return (priority[a.level as keyof typeof priority] || 99) - (priority[b.level as keyof typeof priority] || 99);
   });
-
   const heroAction = sortedOpps[0];
   const secondaryActions = sortedOpps.slice(1);
-  const scoreColor = analysis.globalScore >= 80 ? 'text-emerald-600' : analysis.globalScore >= 50 ? 'text-amber-500' : 'text-rose-500';
-  
-  // 🔥 DATA RÉELLE DU MOTEUR
-  const simulation = computeFinancialPlan(profile);
-  const totalCapacity = simulation.budget.capacityToSave; 
-  const autoInvest = simulation.budget.profitableExpenses; 
-  const leftCash = simulation.budget.realCashflow; 
-  const currentNetWorth = simulation.budget.totalWealth;
-  const safetyMonths = simulation.budget.safetyMonths;
 
   return (
     <>
@@ -264,162 +309,84 @@ function DashboardView() {
         
         {selectedGuide && <EducationalModal guide={selectedGuide} onClose={() => setSelectedGuide(null)} />}
           
-        {/* --- SECTION 1: KPIS (SNAPSHOTS) - TOUJOURS VISIBLES --- */}
+        {/* --- 1. LES CHIFFRES CLÉS (KPIs) --- */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 animate-fade-in-up">
               
-              {/* 1. STOCK (PATRIMOINE) */}
+              {/* KPI 1 : PATRIMOINE */}
               <KpiCard 
                   icon={Layers} 
-                  label="Patrimoine Net Actuel" 
+                  label="Patrimoine Net" 
                   value={formatCurrency(currentNetWorth)} 
-                  subtext="Cash + Investissements Réels"
+                  subtext="Cash + Investissements"
                   delay="delay-0"
               />
-              
-              {/* 2. FLUX (DÉTAILLÉ) */}
+
+              {/* KPI 2 : CAPACITÉ / DÉFICIT */}
               <KpiCard 
-                  icon={Wallet} 
-                  label="Enrichissement Mensuel" 
-                  value={formatCurrency(totalCapacity)}
-                  trend={`${analysis.ratios.savings}% des revenus`}
-                  colorClass={totalCapacity > 0 ? "text-emerald-600" : "text-rose-600"}
+                  icon={isDeficit ? AlertTriangle : Wallet} 
+                  label={isDeficit ? "Solde Fin de Mois" : "Capacité d'Épargne"} 
+                  value={formatCurrency(isDeficit ? balance : rawCapacity)}
+                  trend={isDeficit ? "Négatif" : `${analysis.ratios.savings}% des revenus`}
+                  colorClass={isDeficit ? "text-rose-600" : "text-emerald-600"}
                   delay="delay-100"
                   subtext={
-                      autoInvest > 0 ? (
-                        <div className="pt-3 border-t border-slate-50 w-full">
-                            <div className="flex items-center justify-between text-[11px] font-bold mb-1">
-                                <span className="text-indigo-600 flex items-center gap-1"><ArrowUpRight size={10}/> Investi</span>
-                                <span>{formatCurrency(autoInvest)}</span>
-                            </div>
-                            <div className="flex items-center justify-between text-[11px] font-bold text-emerald-600">
-                                <span className="flex items-center gap-1"><Wallet size={10}/> Cash</span>
-                                <span>+{formatCurrency(leftCash)}</span>
-                            </div>
-                        </div>
-                      ) : (
-                        <div className="pt-3 border-t border-slate-50 w-full">
-                             <div className="flex items-center justify-between text-[11px] font-bold text-emerald-600">
-                                <span className="flex items-center gap-1"><Lock size={10}/> Épargne Disponible</span>
-                                <span>100% Cash</span>
-                            </div>
-                        </div>
+                      isOverInvested 
+                      ? <span className="text-rose-500 font-bold">Investissement excessif !</span>
+                      : (isDeficit 
+                          ? <span className="text-rose-500 font-bold">Déficit structurel</span>
+                          : (autoInvest > 0 ? `Dont ${formatCurrency(autoInvest)} investis` : "100% Cash")
                       )
                   }
               />
-              
-              {/* 3. SÉCURITÉ */}
+
+              {/* KPI 3 : SÉCURITÉ */}
               <KpiCard 
                   icon={ShieldCheck} 
                   label="Filet de Sécurité" 
                   value={safetyMonths >= 99 ? "Infini" : `${safetyMonths.toFixed(1)} mois`} 
                   subtext="Durée de vie sans revenus"
-                  colorClass={safetyMonths < 3 ? "text-rose-600" : "text-indigo-600"}
+                  colorClass={safetyMonths < 1 ? "text-rose-600" : (safetyMonths < 3 ? "text-amber-600" : "text-indigo-600")}
                   delay="delay-200"
               />
         </div>
 
-        {/* --- SECTION 2: MENU D'ONGLETS (NAVIGATION) --- */}
-        <div className="flex justify-center mb-2 animate-fade-in-up delay-100">
-            <div className="bg-slate-100 p-1 rounded-xl inline-flex relative shadow-inner">
-                <button 
-                    onClick={() => setActiveTab('overview')}
-                    className={`px-6 py-2 rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${activeTab === 'overview' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-                >
-                    <Target size={16} /> Tableau de Bord
-                </button>
-                <button 
-                    onClick={() => setActiveTab('analysis')}
-                    className={`px-6 py-2 rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${activeTab === 'analysis' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-                >
-                    <Activity size={16} /> Analyse de Flux
-                </button>
-            </div>
+        {/* --- 2. LE COEUR (SANKEY + DIAGNOSTIC CÔTE À CÔTE) --- */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-fade-in-up delay-200">
+             {/* GAUCHE : LE SANKEY (Prend 2/3) */}
+             <div className="lg:col-span-2 h-full">
+                  <FinancialSankey />
+             </div>
+             {/* DROITE : LE DOCTEUR (Prend 1/3) */}
+             <div className="h-full">
+                  <DoctorMiniCard analysis={analysis} />
+             </div>
         </div>
 
-        {/* --- SECTION 3: CONTENU CONDITIONNEL --- */}
-        
-        {activeTab === 'overview' ? (
-            /* === VUE 1 : ACTIONS & SCORE === */
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start animate-fade-in-up">
-                {/* ACTIONS */}
-                <div className="lg:col-span-2 space-y-6">
-                    <div className="flex items-center justify-between">
-                        <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2"><Rocket className="text-indigo-600"/> Actions Recommandées</h2>
-                        <Badge size="sm" className="bg-slate-100 text-slate-500 border-slate-200">{analysis.opportunities.length} détectées</Badge>
-                    </div>
+        {/* --- 3. LE PLAN D'ACTION --- */}
+        <div className="space-y-6 animate-fade-in-up delay-300">
+             <div className="flex items-center justify-between">
+                <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2"><Rocket className="text-indigo-600"/> Actions Recommandées</h2>
+             </div>
 
-                    {heroAction ? (
-                        <HeroAction opp={heroAction} onAction={() => handleAction(heroAction)} />
-                    ) : (
-                        <div className="p-10 text-center bg-emerald-50 rounded-2xl border border-emerald-100">
-                            <Crown size={48} className="text-emerald-600 mx-auto mb-4" />
-                            <h3 className="text-lg font-bold text-emerald-900">Tout est optimisé !</h3>
-                            <p className="text-emerald-800/70">Votre santé financière est excellente. Continuez ainsi.</p>
-                        </div>
-                    )}
-
-                    {secondaryActions.length > 0 && (
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            {secondaryActions.map((opp) => (
-                                <OpportunityItem key={opp.id} opp={opp} onAction={() => handleAction(opp)} />
-                            ))}
-                        </div>
-                    )}
+             {/* Hero Action */}
+             {heroAction ? (
+                <HeroAction opp={heroAction} onAction={() => handleAction(heroAction)} />
+             ) : (
+                <div className="p-10 text-center bg-emerald-50 rounded-2xl border border-emerald-100">
+                    <Crown size={48} className="text-emerald-600 mx-auto mb-4" />
+                    <h3 className="text-lg font-bold text-emerald-900">Tout est optimisé !</h3>
                 </div>
+             )}
 
-                {/* SANTÉ & PROJECTIONS */}
-                <div className="space-y-6">
-                    {/* SCORE */}
-                    <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6 relative overflow-hidden">
-                        <div className="flex justify-between items-center mb-4">
-                            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2"><Stethoscope size={14}/> Score Global</h3>
-                            <Badge size="sm" className={`${analysis.globalScore >= 80 ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>{analysis.globalScore >= 80 ? 'Excellent' : 'Moyen'}</Badge>
-                        </div>
-                        <div className="flex items-center justify-center py-4 relative">
-                            <div className="h-40 w-full relative z-10">
-                                <ResponsiveContainer width="100%" height="100%">
-                                    <PieChart>
-                                        <Pie data={chartData} cx="50%" cy="50%" innerRadius={55} outerRadius={70} paddingAngle={5} dataKey="value" stroke="none" cornerRadius={4}>
-                                            {chartData.map((entry: any, index: number) => <Cell key={`cell-${index}`} fill={entry.color} />)}
-                                        </Pie>
-                                        <RechartsTooltip content={<CustomTooltip />} />
-                                    </PieChart>
-                                </ResponsiveContainer>
-                                <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                                    <div className={`text-4xl font-black tracking-tighter ${scoreColor}`}>{analysis.globalScore}</div>
-                                    <span className="text-[10px] text-slate-400 font-bold uppercase mt-1">/ 100</span>
-                                </div>
-                            </div>
-                        </div>
-                        <div className="space-y-3 mt-2">
-                            <div className="flex justify-between text-sm"><span className="flex items-center gap-2 text-slate-600"><div className="w-2 h-2 rounded-full bg-indigo-500"></div>Besoins (50%)</span><span className="font-bold">{analysis.ratios.needs}%</span></div>
-                            <div className="flex justify-between text-sm"><span className="flex items-center gap-2 text-slate-600"><div className="w-2 h-2 rounded-full bg-purple-500"></div>Plaisirs (30%)</span><span className="font-bold">{analysis.ratios.wants}%</span></div>
-                            <div className="flex justify-between text-sm"><span className="flex items-center gap-2 text-slate-600"><div className="w-2 h-2 rounded-full bg-emerald-500"></div>Épargne (20%)</span><span className="font-bold">{analysis.ratios.savings}%</span></div>
-                        </div>
-                    </div>
-
-                    {/* PROJECTION */}
-                    <div className="bg-slate-900 rounded-2xl p-6 text-white relative overflow-hidden">
-                        <h3 className="text-xs font-bold text-indigo-300 uppercase tracking-widest mb-4 flex items-center gap-2"><TrendingUp size={14}/> Projection 10 ans</h3>
-                        <div className="flex items-end justify-between mb-2">
-                            <div><div className="text-xs text-slate-400">Actuel</div><div className="text-lg font-bold text-white/60">{formatCurrency(currentNetWorth)}</div></div>
-                            <div className="text-right"><div className="text-xs text-emerald-400">Futur (est.)</div><div className="text-2xl font-bold text-white">{formatCurrency(analysis.projections.wealth10y)}</div></div>
-                        </div>
-                        <div className="w-full bg-slate-800 h-1.5 rounded-full mt-2 mb-4">
-                            <div className="bg-emerald-500 h-full rounded-full" style={{ width: `${Math.min(100, (currentNetWorth / (analysis.projections.wealth10y || 1)) * 100)}%` }}></div>
-                        </div>
-                        <p className="text-xs text-slate-400 leading-relaxed">Projection basée sur une épargne mensuelle de <strong>{formatCurrency(totalCapacity)}</strong> avec un rendement moyen de 7%.</p>
-                    </div>
+             {/* Secondary Actions */}
+             {secondaryActions.length > 0 && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {secondaryActions.map((opp) => (
+                        <OpportunityItem key={opp.id} opp={opp} onAction={() => handleAction(opp)} />
+                    ))}
                 </div>
-            </div>
-        ) : (
-            /* === VUE 2 : SANKEY (ANALYSE) === */
-            <div className="animate-fade-in-up">
-                 
-                <FinancialSankey />
-            </div>
-        )}
-
+             )}
+        </div>
       </div>
     </>
   );
