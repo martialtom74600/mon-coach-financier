@@ -2,13 +2,13 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useUser } from '@clerk/nextjs';
-// Assure-toi que ce chemin pointe bien vers ton fichier definitions.ts créé juste avant
+// Assure-toi que ce chemin pointe bien vers ton fichier definitions.ts
 import { INITIAL_PROFILE, Profile } from '@/app/lib/definitions'; 
 
 export function useFinancialData() {
   const { user, isLoaded: isClerkLoaded } = useUser();
   
-  // 1. TYPAGE STRICT : On utilise le type Profile, fini le 'any'
+  // 1. TYPAGE STRICT
   const [profile, setProfile] = useState<Profile>(INITIAL_PROFILE);
   const [history, setHistory] = useState<any[]>([]); 
   const [isLoadingData, setIsLoadingData] = useState(true);
@@ -17,7 +17,7 @@ export function useFinancialData() {
   const fetchData = useCallback(async () => {
     if (!user) return;
     try {
-      // Le timestamp ?t=... force le rafraichissement (pas de cache vieux)
+      // Le timestamp ?t=... force le rafraichissement (anti-cache)
       const res = await fetch(`/api/user?t=${Date.now()}`);
       
       if (res.ok) {
@@ -27,15 +27,27 @@ export function useFinancialData() {
           const { history: savedHistory, ...savedProfile } = data;
 
           // --- NETTOYAGE ANTI-CRASH (Vital) ---
-          // On force le typage pour s'assurer que l'objet respecte l'interface Profile
+          // On force la structure pour qu'elle respecte l'interface Profile
+          // C'est ici qu'on gère l'ajout des nouvelles colonnes (comme variableCosts)
           const cleanProfile: Profile = {
               ...INITIAL_PROFILE, // On part des valeurs par défaut saines
               ...savedProfile,    // On écrase avec les données BDD
               
-              // Sécurisation des tableaux (Si la BDD renvoie null, on met [])
+              // --- SÉCURISATION DES TABLEAUX (Si la BDD renvoie null, on met []) ---
+              
+              // 1. Revenus
               incomes: Array.isArray(savedProfile.incomes) ? savedProfile.incomes : [],
+              
+              // 2. Charges Fixes (Datées / Mensualisées)
               fixedCosts: Array.isArray(savedProfile.fixedCosts) ? savedProfile.fixedCosts : [],
+              
+              // 3. ✅ NOUVEAU : Charges Variables (Lissées / Courses / Essence)
+              variableCosts: Array.isArray(savedProfile.variableCosts) ? savedProfile.variableCosts : [],
+
+              // 4. Dettes & Crédits
               credits: Array.isArray(savedProfile.credits) ? savedProfile.credits : [],
+              
+              // 5. Autres listes
               subscriptions: Array.isArray(savedProfile.subscriptions) ? savedProfile.subscriptions : [],
               annualExpenses: Array.isArray(savedProfile.annualExpenses) ? savedProfile.annualExpenses : [],
               savingsContributions: Array.isArray(savedProfile.savingsContributions) ? savedProfile.savingsContributions : [],
@@ -87,7 +99,6 @@ export function useFinancialData() {
   };
 
   // 3. LA FONCTION DE SAUVEGARDE (TYPÉE)
-  // Accepte un "bout" de profil (Partial) pour faire des mises à jour ciblées
   const saveProfile = async (newProfileData: Partial<Profile>) => {
     // 1. Fusion Optimiste : On met à jour l'état local immédiatement
     const updatedProfile = { ...profile, ...newProfileData };

@@ -2,7 +2,7 @@
 
 import React, { useMemo, useState, useEffect, ReactNode } from 'react';
 import { useFinancialData } from '@/app/hooks/useFinancialData';
-// ✅ IMPORT DU MOTEUR & UTILITAIRES
+// ✅ IMPORT DU MOTEUR
 import { formatCurrency, generateId, computeFinancialPlan, calculateListTotal } from '@/app/lib/logic';
 
 // --- COMPOSANTS UI ---
@@ -20,11 +20,11 @@ import {
   Wallet, Briefcase, GraduationCap, Armchair, Minus, CheckCircle,
   CreditCard, ArrowRight, Home, Building, Target,
   HeartHandshake, Plus, Loader2, AlertCircle, User, ShieldCheck, Banknote,
-  Zap, Calendar, TrendingUp, Flag, LucideIcon
+  Zap, Calendar, TrendingUp, Flag, LucideIcon, ShoppingCart, Coffee, Car
 } from 'lucide-react';
 
 // ============================================================================
-// 0. DÉFINITION DES TYPES (POUR ARRÊTER LES ANY)
+// 0. DÉFINITION DES TYPES
 // ============================================================================
 
 export interface FinancialItem {
@@ -45,11 +45,13 @@ export interface FinancialProfile {
   
   // Listes
   incomes: FinancialItem[];
-  fixedCosts: FinancialItem[];
+  fixedCosts: FinancialItem[];    // Factures datées (Électricité, Internet...)
+  variableCosts: FinancialItem[]; // Conso lissée (Courses, Essence, Santé...)
   credits: FinancialItem[];
   subscriptions: FinancialItem[];
   annualExpenses: FinancialItem[];
-  investments: FinancialItem[]; // Utilisé comme flux mensuel dans le wizard
+  investments: FinancialItem[]; 
+  savingsContributions?: FinancialItem[];
 
   housing: {
     status: string;
@@ -81,31 +83,17 @@ const generateIdHelper = () => Math.random().toString(36).substr(2, 9);
 // 2. LAYOUT & COMPOSANTS VISUELS
 // ============================================================================
 
-interface WizardLayoutProps {
-  title: string;
-  subtitle: string;
-  icon: LucideIcon;
-  children: ReactNode;
-  footer?: ReactNode;
-}
-
+interface WizardLayoutProps { title: string; subtitle: string; icon: LucideIcon; children: ReactNode; footer?: ReactNode; }
 const WizardLayout = ({ title, subtitle, icon: Icon, children, footer }: WizardLayoutProps) => (
   <div className="w-full max-w-2xl mx-auto lg:mx-0 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <div className="text-center lg:text-left mb-8">
-          <div className="inline-flex p-3 bg-indigo-50 text-indigo-600 rounded-2xl mb-4">
-             <Icon size={28} />
-          </div>
+          <div className="inline-flex p-3 bg-indigo-50 text-indigo-600 rounded-2xl mb-4"><Icon size={28} /></div>
           <h1 className="text-3xl font-black text-slate-900 mb-2">{title}</h1>
           <p className="text-slate-500 text-lg max-w-md mx-auto lg:mx-0">{subtitle}</p>
       </div>
-
       <Card className="p-6 md:p-10 shadow-xl shadow-slate-200/40 border-slate-100">
           {children}
-          {footer && (
-             <div className="mt-8 pt-6 border-t border-slate-50 flex items-center justify-between gap-4">
-                 {footer}
-             </div>
-          )}
+          {footer && <div className="mt-8 pt-6 border-t border-slate-50 flex items-center justify-between gap-4">{footer}</div>}
       </Card>
   </div>
 );
@@ -142,33 +130,23 @@ const ToggleSwitch = ({ label, checked, onChange, icon: Icon }: any) => (
 );
 
 // ============================================================================
-// 3. RÉCAPITULATIF LIVE (100% VISUEL, 0% CALCUL)
+// 3. RÉCAPITULATIF LIVE
 // ============================================================================
 
 interface LiveSummaryProps {
     formData: FinancialProfile;
-    stats: {
-        income: number;
-        fixed: number;
-        investments: number;
-        ratio: number;
-        remaining: number;
-    };
+    stats: { income: number; fixed: number; variable: number; investments: number; ratio: number; remaining: number; };
     currentStep: number;
 }
 
 const LiveSummary = ({ formData, stats, currentStep }: LiveSummaryProps) => {
-  // Valeurs par défaut si stats n'est pas encore prêt
-  const { income = 0, fixed = 0, investments = 0, ratio = 0, remaining = 0 } = stats || {};
-  
-  // Logique purement visuelle (Couleurs)
-  const ratioColor = ratio > 50 ? 'bg-orange-500' : ratio > 35 ? 'bg-yellow-500' : 'bg-emerald-500';
-  const badgeColor = ratio > 50 ? 'text-orange-600 border-orange-200 bg-orange-50' : ratio > 35 ? 'text-yellow-600 border-yellow-200 bg-yellow-50' : 'text-emerald-600 border-emerald-200 bg-emerald-50';
+  const { income = 0, fixed = 0, variable = 0, investments = 0, ratio = 0, remaining = 0 } = stats || {};
+  const ratioColor = ratio > 60 ? 'bg-orange-500' : ratio > 40 ? 'bg-yellow-500' : 'bg-emerald-500';
+  const badgeColor = ratio > 60 ? 'text-orange-600 border-orange-200 bg-orange-50' : ratio > 40 ? 'text-yellow-600 border-yellow-200 bg-yellow-50' : 'text-emerald-600 border-emerald-200 bg-emerald-50';
 
   return (
     <div className="sticky top-6 space-y-6 animate-in fade-in slide-in-from-right-4 duration-700">
       
-      {/* Carte Identité */}
       <Card className="p-6 border-indigo-100 shadow-lg shadow-indigo-100/50 overflow-hidden relative">
         <div className="absolute top-0 right-0 p-3 opacity-10"><User size={64} /></div>
         <div className="relative z-10">
@@ -179,31 +157,18 @@ const LiveSummary = ({ formData, stats, currentStep }: LiveSummaryProps) => {
              {formData.persona && <Badge className="bg-indigo-100 text-indigo-700 border-indigo-200 capitalize">{formData.persona === 'salaried' ? 'Salarié' : formData.persona}</Badge>}
           </div>
         </div>
-        <div className="mt-6 pt-6 border-t border-slate-100 grid grid-cols-2 gap-4">
-            <div className="flex items-center gap-3">
-                <div className="p-2 bg-slate-50 rounded-lg text-slate-400"><Home size={16}/></div>
-                <div><div className="text-[10px] uppercase text-slate-400 font-bold">Logement</div><div className="text-sm font-bold text-slate-700 truncate">{formData.housing?.status === 'tenant' ? 'Locataire' : formData.housing?.status?.includes('owner') ? 'Proprio' : 'Hébergé'}</div></div>
-            </div>
-            <div className="flex items-center gap-3">
-                <div className="p-2 bg-slate-50 rounded-lg text-slate-400"><User size={16}/></div>
-                <div><div className="text-[10px] uppercase text-slate-400 font-bold">Foyer</div><div className="text-sm font-bold text-slate-700">{formData.household?.adults + (formData.household?.children || 0)} pers.</div></div>
-            </div>
-        </div>
       </Card>
 
-      {/* Carte Budget Live */}
       {(currentStep >= 3 || income > 0) && (
           <Card className="p-6 border-slate-200 shadow-lg">
              <div className="flex items-center justify-between mb-4">
                 <h3 className="font-bold text-slate-900">Synthèse Mensuelle</h3>
                 <Badge variant="outline" className={badgeColor}>{Math.round(ratio)}% Engagés</Badge>
              </div>
-
              <div className="h-4 w-full bg-slate-100 rounded-full overflow-hidden flex mb-6">
                 <div style={{ width: `${Math.min(ratio, 100)}%` }} className={`h-full ${ratioColor} transition-all duration-500`} />
                 <div className="h-full bg-indigo-500 flex-1 transition-all duration-500" />
              </div>
-
              <div className="space-y-3">
                 <div className="flex justify-between items-center text-sm">
                     <span className="text-slate-500 flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-slate-300"/> Revenus</span>
@@ -213,15 +178,20 @@ const LiveSummary = ({ formData, stats, currentStep }: LiveSummaryProps) => {
                     <span className="text-slate-500 flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-orange-400"/> Charges Fixes</span>
                     <span className="font-bold text-slate-900 text-rose-600">-{formatCurrency(fixed)}</span>
                 </div>
+                {variable > 0 && (
+                    <div className="flex justify-between items-center text-sm">
+                        <span className="text-slate-500 flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-yellow-400"/> Vie Quotidienne</span>
+                        <span className="font-bold text-slate-700">-{formatCurrency(variable)}</span>
+                    </div>
+                )}
                 {investments > 0 && (
                     <div className="flex justify-between items-center text-sm">
                         <span className="text-slate-500 flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-emerald-500"/> Investissements</span>
                         <span className="font-bold text-emerald-600">-{formatCurrency(investments)}</span>
                     </div>
                 )}
-                
                 <div className="pt-3 border-t border-slate-100 flex justify-between items-center mt-3">
-                    <span className="font-bold text-slate-700 uppercase text-xs">Reste à vivre</span>
+                    <span className="font-bold text-slate-700 uppercase text-xs">Vrai Reste à vivre</span>
                     <span className="font-black text-xl text-indigo-600">{formatCurrency(remaining)}</span>
                 </div>
              </div>
@@ -245,7 +215,7 @@ interface StepProps {
     updateItem?: (list: keyof FinancialProfile, id: string, field: string, val: any) => void;
     onConfirm?: (lifestyle: number, savings: number) => void;
     isSaving?: boolean;
-    stats?: any; // Les stats pré-calculées
+    stats?: any;
 }
 
 const StepIdentite = ({ formData, updateForm, onNext }: StepProps) => (
@@ -290,9 +260,10 @@ const StepSituation = ({ formData, updateForm, onNext, onPrev }: StepProps) => (
     </WizardLayout>
 );
 
-const StepBudget = ({ formData, updateForm, addItem, removeItem, updateItem, onNext, onPrev }: StepProps) => (
-    <WizardLayout title="Vos Finances" subtitle="Vos flux mensuels (Net avant impôt)." icon={Wallet}
-        footer={<><Button variant="ghost" onClick={onPrev}>Retour</Button><Button onClick={onNext}>Patrimoine <ArrowRight className="ml-2" size={18}/></Button></>}>
+// ✅ STEP 3 : Charges FIXES (Dates précises)
+const StepFixedFinances = ({ formData, updateForm, addItem, removeItem, updateItem, onNext, onPrev }: StepProps) => (
+    <WizardLayout title="Revenus & Charges Fixes" subtitle="Ce qui tombe à date fixe chaque mois." icon={Wallet}
+        footer={<><Button variant="ghost" onClick={onPrev}>Retour</Button><Button onClick={onNext}>Vie Quotidienne <ArrowRight className="ml-2" size={18}/></Button></>}>
         <div className="space-y-6">
             <AccordionSection mode="expert" defaultOpen={true} title="Revenus (Net)" icon={Banknote} colorClass="text-emerald-600" items={formData.incomes} onItemChange={(id: string, f: string, v: any) => updateItem!('incomes', id, f, v)} onItemAdd={() => addItem!('incomes')} onItemRemove={(id: string) => removeItem!('incomes', id)} />
             {formData.housing?.status !== 'free' && formData.housing?.status !== 'owner_paid' && (
@@ -300,10 +271,43 @@ const StepBudget = ({ formData, updateForm, addItem, removeItem, updateItem, onN
                       <InputGroup label={formData.housing?.status === 'tenant' ? "Loyer Mensuel" : "Mensualité Crédit"} type="number" placeholder="800" value={formData.housing?.monthlyCost || ''} onChange={(e: any) => updateForm({ ...formData, housing: { ...formData.housing, monthlyCost: parseNumber(getInputValue(e)) } })} endAdornment={<span className="text-slate-400 font-bold px-3">€</span>} />
                 </div>
             )}
-            <AccordionSection mode="expert" defaultOpen={false} title="Charges Fixes" icon={CreditCard} colorClass="text-slate-600" items={formData.fixedCosts} onItemChange={(id: string, f: string, v: any) => updateItem!('fixedCosts', id, f, v)} onItemAdd={() => addItem!('fixedCosts')} onItemRemove={(id: string) => removeItem!('fixedCosts', id)} />
+            <AccordionSection mode="expert" defaultOpen={false} title="Factures Fixes" icon={CreditCard} colorClass="text-slate-600" items={formData.fixedCosts} onItemChange={(id: string, f: string, v: any) => updateItem!('fixedCosts', id, f, v)} onItemAdd={() => addItem!('fixedCosts')} onItemRemove={(id: string) => removeItem!('fixedCosts', id)} />
             <AccordionSection mode="expert" defaultOpen={false} title="Abonnements" icon={Zap} colorClass="text-purple-500" items={formData.subscriptions} onItemChange={(id: string, f: string, v: any) => updateItem!('subscriptions', id, f, v)} onItemAdd={() => addItem!('subscriptions')} onItemRemove={(id: string) => removeItem!('subscriptions', id)} />
             <AccordionSection mode="expert" defaultOpen={false} title="Dépenses Annuelles" icon={Calendar} colorClass="text-orange-500" items={formData.annualExpenses} onItemChange={(id: string, f: string, v: any) => updateItem!('annualExpenses', id, f, v)} onItemAdd={() => addItem!('annualExpenses')} onItemRemove={(id: string) => removeItem!('annualExpenses', id)} />
             <AccordionSection mode="expert" defaultOpen={false} title="Crédits Conso" icon={AlertCircle} colorClass="text-rose-500" items={formData.credits} onItemChange={(id: string, f: string, v: any) => updateItem!('credits', id, f, v)} onItemAdd={() => addItem!('credits')} onItemRemove={(id: string) => removeItem!('credits', id)} />
+        </div>
+    </WizardLayout>
+);
+
+// ✅ STEP 4 : Vie Quotidienne (Lissé sur le mois)
+const StepDailyLife = ({ formData, updateForm, addItem, removeItem, updateItem, onNext, onPrev }: StepProps) => (
+    <WizardLayout title="Vie Quotidienne" subtitle="Estimation des dépenses variables (Courses, Essence...)" icon={ShoppingCart}
+        footer={<><Button variant="ghost" onClick={onPrev}>Retour</Button><Button onClick={onNext}>Patrimoine <ArrowRight className="ml-2" size={18}/></Button></>}>
+        <div className="space-y-6">
+            <div className="p-4 bg-yellow-50 rounded-xl text-sm text-yellow-800 mb-4 border border-yellow-100 flex items-start gap-3">
+                <AlertCircle className="shrink-0 mt-0.5" size={18} />
+                <div>
+                    <span className="font-bold block mb-1">Pas de date nécessaire</span>
+                    Ces dépenses seront "lissées" sur tout le mois par notre algorithme (divisées par 30j) pour simuler une consommation réaliste.
+                </div>
+            </div>
+            
+            <AccordionSection mode="expert" defaultOpen={true} title="Courses & Alimentation" icon={ShoppingCart} colorClass="text-indigo-600" items={formData.variableCosts} onItemChange={(id: string, f: string, v: any) => updateItem!('variableCosts', id, f, v)} onItemAdd={() => addItem!('variableCosts')} onItemRemove={(id: string) => removeItem!('variableCosts', id)} />
+            
+            <div className="grid grid-cols-2 gap-3 mt-4">
+                <Button variant="outline" size="sm" className="w-full text-xs" onClick={() => updateForm({ ...formData, variableCosts: [...formData.variableCosts, { id: generateIdHelper(), name: 'Essence / Péage', amount: 0, frequency: 'mensuel' }] })}>
+                    <Car className="mr-2" size={14} /> + Transport
+                </Button>
+                <Button variant="outline" size="sm" className="w-full text-xs" onClick={() => updateForm({ ...formData, variableCosts: [...formData.variableCosts, { id: generateIdHelper(), name: 'Santé (Reste à charge)', amount: 0, frequency: 'mensuel' }] })}>
+                    <HeartHandshake className="mr-2" size={14} /> + Santé
+                </Button>
+                <Button variant="outline" size="sm" className="w-full text-xs" onClick={() => updateForm({ ...formData, variableCosts: [...formData.variableCosts, { id: generateIdHelper(), name: 'Animaux', amount: 0, frequency: 'mensuel' }] })}>
+                    <User className="mr-2" size={14} /> + Animaux
+                </Button>
+                <Button variant="outline" size="sm" className="w-full text-xs" onClick={() => updateForm({ ...formData, variableCosts: [...formData.variableCosts, { id: generateIdHelper(), name: 'Pause Dej / Cantine', amount: 0, frequency: 'mensuel' }] })}>
+                    <Coffee className="mr-2" size={14} /> + Repas Midi
+                </Button>
+            </div>
         </div>
     </WizardLayout>
 );
@@ -345,7 +349,6 @@ const StepAssets = ({ formData, updateForm, addItem, removeItem, updateItem, onN
     );
 };
 
-// ✅ ÉTAPE 5 : STRATÉGIE (AFFICHAGE PUR)
 const StepStrategy = ({ formData, onConfirm, isSaving, onPrev, stats }: StepProps) => {
     const [lifestyleInput, setLifestyleInput] = useState<string | number>('');
 
@@ -353,10 +356,7 @@ const StepStrategy = ({ formData, onConfirm, isSaving, onPrev, stats }: StepProp
         if (formData.funBudget) setLifestyleInput(formData.funBudget);
     }, []);
 
-    // 🚀 MAGIE : On utilise les données pré-calculées
     const theoreticalRest = stats ? Math.round(stats.remaining) : 0;
-    
-    // Seul calcul "UI" (Interaction immédiate)
     const userLifestyle = parseNumber(lifestyleInput);
     const cashSavingsCapacity = theoreticalRest - userLifestyle;
 
@@ -365,20 +365,20 @@ const StepStrategy = ({ formData, onConfirm, isSaving, onPrev, stats }: StepProp
             footer={<><Button variant="ghost" onClick={onPrev}>Retour</Button><Button onClick={() => onConfirm!(userLifestyle, cashSavingsCapacity)} className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 text-white" size="lg">{isSaving ? <Loader2 className="animate-spin" /> : "Valider ma stratégie"}</Button></>}>
             <div className="space-y-8 animate-in zoom-in-95 duration-500">
                 <div className="text-center p-6 bg-slate-900 rounded-2xl text-white shadow-xl shadow-slate-200">
-                    <p className="text-sm font-medium text-slate-400 uppercase tracking-widest mb-2">Disponible après charges & Invest.</p>
+                    <p className="text-sm font-medium text-slate-400 uppercase tracking-widest mb-2">Disponible après TOUTES charges</p>
                     <div className="text-4xl md:text-5xl font-black text-white tracking-tight">{formatCurrency(theoreticalRest)}</div>
-                    <p className="text-xs text-slate-500 mt-2">C'est votre argent "libre".</p>
+                    <p className="text-xs text-slate-500 mt-2">C'est votre argent pour le "Plaisir".</p>
                 </div>
                 <div className="relative"><div className="absolute inset-0 flex items-center" aria-hidden="true"><div className="w-full border-t border-slate-200"></div></div><div className="relative flex justify-center"><span className="bg-white px-2 text-sm text-slate-500 font-medium">Répartition</span></div></div>
                 <div className="bg-white border-2 border-slate-100 rounded-2xl p-6 hover:border-indigo-200 transition-colors duration-300">
                     <div className="flex flex-col md:flex-row gap-8 items-center">
                         <div className="flex-1 w-full">
-                            <label className="block text-sm font-bold text-slate-700 mb-2">Budget Vie Courante & Plaisirs</label>
+                            <label className="block text-sm font-bold text-slate-700 mb-2">Budget Plaisir Pur</label>
                             <div className="relative">
                                 <input type="number" className="block w-full rounded-xl border-slate-200 bg-slate-50 p-4 pr-12 text-2xl font-bold text-slate-900 focus:border-indigo-500 focus:ring-indigo-500" placeholder="0" value={lifestyleInput} onChange={(e) => setLifestyleInput(getInputValue(e) as string)} />
                                 <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-4"><span className="text-slate-400 font-bold">€</span></div>
                             </div>
-                            <p className="text-xs text-slate-400 mt-2">Alimentation, sorties, shopping, essence...</p>
+                            <p className="text-xs text-slate-400 mt-2">Resto, sorties, vacances, shopping...</p>
                         </div>
                         <div className="hidden md:block text-slate-300"><ArrowRight size={32} /></div>
                         <div className="flex-1 w-full text-center md:text-right">
@@ -404,41 +404,47 @@ export default function ProfilePage() {
   const [formData, setFormData] = useState<FinancialProfile | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
-  // 1. Initialisation (On fait confiance au Hook)
+  // 1. Initialisation + Réhydratation des listes
   useEffect(() => {
-    if (isLoaded && profile && !formData) {
-        setFormData(profile);
+    if (isLoaded && profile) {
+        const visualInvestments = (profile.investments && profile.investments.length > 0)
+            ? profile.investments
+            : (profile.savingsContributions || []); 
+
+        if (!formData || profile.updatedAt !== formData.updatedAt) {
+             setFormData({
+                ...profile,
+                variableCosts: Array.isArray(profile.variableCosts) ? profile.variableCosts : [],
+                investments: visualInvestments as FinancialItem[] 
+             });
+        }
     }
   }, [isLoaded, profile]);
 
-  // 2. 🧠 CALCUL DU PLAN FINANCIER (ENGINE)
   const simulation = useMemo(() => {
     if (!formData) return null;
     return computeFinancialPlan(formData);
   }, [formData]);
 
-  // 3. 🎯 PRÉPARATION DES STATS POUR L'UI (BRIDGE ENGINE -> UI)
   const wizardStats = useMemo(() => {
     if (!simulation || !formData) return null;
 
     const { budget } = simulation;
-    // L'Engine a calculé capacityToSave = income - fixed - livingExpenses.
-    // Mais le LiveSummary a besoin de "Income - Fixed - Investments" pour afficher le Reste à Vivre avant vie courante.
-    
-    // On doit récupérer le flux mensuel d'investissement pour l'affichage live
     const monthlyInvestments = calculateListTotal(formData.investments || []);
+    const monthlyVariable = calculateListTotal(formData.variableCosts || []);
 
-    const totalEngaged = budget.mandatoryExpenses + monthlyInvestments;
+    const totalEngaged = budget.mandatoryExpenses + monthlyInvestments + monthlyVariable;
     const ratio = budget.monthlyIncome > 0 ? (totalEngaged / budget.monthlyIncome) * 100 : 0;
     const remaining = Math.max(0, budget.monthlyIncome - totalEngaged);
 
     return {
         income: budget.monthlyIncome,
         fixed: budget.mandatoryExpenses,
+        variable: monthlyVariable,
         investments: monthlyInvestments,
         totalEngaged,
         ratio,
-        remaining, // Reste avant Vie Courante
+        remaining,
     };
   }, [simulation, formData]);
 
@@ -446,7 +452,6 @@ export default function ProfilePage() {
   const goNext = () => { setCurrentStep(s => s + 1); window.scrollTo({ top: 0, behavior: 'smooth' }); };
   const goPrev = () => setCurrentStep(s => Math.max(1, s - 1));
 
-  // Gestion Listes (Helper générique)
   const updateItem = (list: keyof FinancialProfile, id: string, field: string, val: any) => {
     if (!formData) return;
     const currentList = formData[list] as FinancialItem[];
@@ -463,15 +468,26 @@ export default function ProfilePage() {
     updateForm({ ...formData, [list]: currentList.filter((i) => i.id !== id) });
   };
 
-  // 4. SAUVEGARDE MANUELLE
   const handleSaveAndExit = async (lifestyle: number, savings: number) => {
     if (isSaving || !formData) return;
     setIsSaving(true);
     try {
-        const finalData = { ...formData, funBudget: lifestyle, balanceDate: new Date().toISOString() };
+        const stockAmount = formData.investedAmount || 0;
+        const monthlyFlows = (formData.investments || []).map(item => ({ ...item, frequency: 'mensuel' }));
+
+        const finalData = { 
+            ...formData, 
+            funBudget: lifestyle, 
+            balanceDate: new Date().toISOString(),
+            investedAmount: stockAmount,
+            savingsContributions: monthlyFlows,
+            investments: [], // On vide l'affichage Stock pour éviter doublons calcul
+            variableCosts: formData.variableCosts || [] // On sauvegarde bien le Step 4
+        };
+
         await saveProfile(finalData);
         window.location.href = '/'; 
-    } catch { setIsSaving(false); alert("Erreur."); }
+    } catch (e) { console.error(e); setIsSaving(false); alert("Erreur."); }
   };
 
   if (!isLoaded || !formData) return <div className="h-[50vh] flex items-center justify-center"><Loader2 className="animate-spin text-indigo-600" size={32}/></div>;
@@ -480,23 +496,28 @@ export default function ProfilePage() {
     <div className="min-h-screen bg-slate-50/50 pb-20 pt-6">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="mb-8 max-w-xl mx-auto lg:mx-0">
-                <div className="flex justify-between text-xs font-bold text-slate-400 uppercase tracking-widest mb-2"><span>Progression</span><span>{currentStep * 20}%</span></div>
-                <ProgressBar value={(currentStep / 5) * 100} className="h-2" />
+                <div className="flex justify-between text-xs font-bold text-slate-400 uppercase tracking-widest mb-2"><span>Progression</span><span>{Math.round(currentStep / 6 * 100)}%</span></div>
+                <ProgressBar value={(currentStep / 6) * 100} className="h-2" />
             </div>
 
             <div className="lg:grid lg:grid-cols-12 lg:gap-12 items-start">
-                {/* GAUCHE : FORMULAIRES */}
                 <div className="lg:col-span-7 xl:col-span-8">
                     {currentStep === 1 && <StepIdentite formData={formData} updateForm={updateForm} onNext={goNext} />}
                     {currentStep === 2 && <StepSituation formData={formData} updateForm={updateForm} onNext={goNext} onPrev={goPrev} />}
-                    {currentStep === 3 && <StepBudget formData={formData} updateForm={updateForm} addItem={addItem} removeItem={removeItem} updateItem={updateItem} onNext={goNext} onPrev={goPrev} />}
-                    {currentStep === 4 && <StepAssets formData={formData} updateForm={updateForm} addItem={addItem} removeItem={removeItem} updateItem={updateItem} onNext={goNext} onPrev={goPrev} />}
                     
-                    {/* 👇 StepStrategy reçoit les stats calculées, il n'a plus besoin de 'simulation' brut */}
-                    {currentStep === 5 && <StepStrategy formData={formData} updateForm={updateForm} onConfirm={handleSaveAndExit} isSaving={isSaving} onPrev={goPrev} stats={wizardStats} />}
+                    {/* Step 3 : Fixe */}
+                    {currentStep === 3 && <StepFixedFinances formData={formData} updateForm={updateForm} addItem={addItem} removeItem={removeItem} updateItem={updateItem} onNext={goNext} onPrev={goPrev} />}
+                    
+                    {/* Step 4 : Variable (Nouveau) */}
+                    {currentStep === 4 && <StepDailyLife formData={formData} updateForm={updateForm} addItem={addItem} removeItem={removeItem} updateItem={updateItem} onNext={goNext} onPrev={goPrev} />}
+                    
+                    {/* Step 5 : Patrimoine */}
+                    {currentStep === 5 && <StepAssets formData={formData} updateForm={updateForm} addItem={addItem} removeItem={removeItem} updateItem={updateItem} onNext={goNext} onPrev={goPrev} />}
+                    
+                    {/* Step 6 : Verdict */}
+                    {currentStep === 6 && <StepStrategy formData={formData} updateForm={updateForm} onConfirm={handleSaveAndExit} isSaving={isSaving} onPrev={goPrev} stats={wizardStats} />}
                 </div>
 
-                {/* DROITE : RÉCAPITULATIF LIVE */}
                 <div className="hidden lg:block lg:col-span-5 xl:col-span-4">
                     <LiveSummary formData={formData} stats={wizardStats!} currentStep={currentStep} />
                 </div>
