@@ -55,7 +55,6 @@ export interface FinancialItem {
   dayOfMonth?: number | string;
 }
 
-// NOUVEAU : Type pour les investissements (Pour le futur Dashboard)
 export interface Investment {
   id: string;
   type: 'crypto' | 'stock' | 'real_estate' | 'savings_account' | 'gold' | 'other';
@@ -64,20 +63,19 @@ export interface Investment {
   performance?: number;
 }
 
-// NOUVEAU : Type pour le logement (Utilisé dans le Wizard Step 2 & 3)
 export interface Housing {
   status: 'tenant' | 'owner_loan' | 'owner_paid' | 'free';
-  monthlyCost: number; // Loyer ou Crédit
-  marketValue?: number; // Valeur du bien (si proprio)
+  monthlyCost: number; 
+  marketValue?: number;
 }
 
 export interface GoalStrategy {
   type: 'TIME' | 'BUDGET' | 'HYBRID' | 'INCOME';
   title: string;
-  description: string;
+  description?: string; // Optionnel car parfois c'est 'message'
+  message?: string;
   value?: number | Date | string;
   painLevel?: 'LOW' | 'MEDIUM' | 'HIGH';
-  message?: string;
   disabled?: boolean;
   newDate?: string; 
   actionLabel?: string;
@@ -111,26 +109,26 @@ export interface Household { adults: number | string; children: number | string;
 export interface PersonaRules { safetyMonths: number; maxDebt: number; minLiving: number; }
 
 // ============================================================================
-// 3. PROFIL UTILISATEUR (Mis à jour)
+// 3. PROFIL UTILISATEUR
 // ============================================================================
 
 export interface Profile {
   firstName?: string;
-  age?: number | string; // AJOUTÉ : Pour le Wizard Step 1
+  age?: number | string;
   mode: 'beginner' | 'expert';
   persona: string;
   
   household: Household;
-  housing?: Housing; // AJOUTÉ : Pour le Wizard Step 2
+  housing?: Housing;
   
   updatedAt?: string;
   balanceDate?: string;
   
   // Stock (Patrimoine)
-  savings: number | string; // Total déclaré dans le Wizard
-  investments: Investment[]; // MODIFIÉ : Tableau pour le détail futur
-  investedAmount?: number | string; // AJOUTÉ : Pour stocker le capital placé total (hors flux)
-  currentBalance: number | string; // Compte courant
+  savings: number | string; 
+  investments: Investment[]; 
+  investedAmount?: number | string;
+  currentBalance: number | string;
   
   // Flux (Budget)
   investmentYield: number | string; 
@@ -166,27 +164,6 @@ export interface Purchase {
 // ============================================================================
 // 4. TYPES D'ANALYSE (Docteur Financier)
 // ============================================================================
-
-export interface AnalysisResult {
-  verdict: 'green' | 'orange' | 'red';
-  score: number;
-  smartTitle: string;
-  smartMessage: string;
-  isBudgetOk: boolean;
-  isCashflowOk: boolean;
-  newMatelas: number;
-  newRV: number;
-  lowestProjectedBalance: number;
-  issues: any[];
-  tips: any[];
-  projectedCurve: { date: string; value: number }[];
-  newSafetyMonths: number;
-  newEngagementRate: number;
-  realCost: number;
-  creditCost: number;
-  opportunityCost: number;
-  timeToWork: number;
-}
 
 export type OpportunityLevel = 'CRITICAL' | 'WARNING' | 'INFO' | 'SUCCESS';
 export type OpportunityType = 'SAVINGS' | 'DEBT' | 'INVESTMENT' | 'BUDGET';
@@ -231,7 +208,7 @@ export interface SimulationResult {
       requestedEffort: number;
       status: 'FULL'|'PARTIAL'|'STARVED';
       fillRate: number;
-      message: string;
+      message?: string; // message est optionnel
   }[];
   budget: { 
       income: number; 
@@ -254,9 +231,11 @@ export interface SimulationResult {
       totalWealth: number;
       safetyMonths: number;
       engagementRate: number;
+      currentBalance: number; // AJOUTÉ : Requis par le Engine V13
   };
   freeCashFlow: number; 
-  diagnosis?: DeepAnalysis; 
+  diagnosis?: DeepAnalysis;
+  usedRates?: any; // AJOUTÉ : Pour afficher les taux utilisés en UI
 }
 
 // ============================================================================
@@ -265,24 +244,23 @@ export interface SimulationResult {
 
 export const PERSONA_PRESETS: Record<string, { id: string, label: string, description: string, rules: PersonaRules }> = {
   STUDENT:    { id: 'student',    label: 'Étudiant(e)',          description: 'Budget serré, flexible.',     rules: { safetyMonths: 1, maxDebt: 40, minLiving: 100 } },
-  SALARIED:   { id: 'salaried',   label: 'Salarié / Stable',      description: 'Revenus réguliers.',           rules: { safetyMonths: 3, maxDebt: 35, minLiving: 300 } },
+  SALARIED:   { id: 'salaried',   label: 'Salarié / Stable',      description: 'Revenus réguliers.',          rules: { safetyMonths: 3, maxDebt: 35, minLiving: 300 } },
   FREELANCE:  { id: 'freelance',  label: 'Indépendant',          description: 'Revenus variables, risque.',    rules: { safetyMonths: 6, maxDebt: 30, minLiving: 500 } },
   RETIIRED:   { id: 'retired',    label: 'Retraité(e)',          description: 'Revenus fixes, préservation.',  rules: { safetyMonths: 6, maxDebt: 25, minLiving: 400 } },
   UNEMPLOYED: { id: 'unemployed', label: 'En recherche',          description: 'Revenus précaires, prudence.',  rules: { safetyMonths: 6, maxDebt: 0, minLiving: 200 } }
 };
 
-// C'est ICI que ça change pour correspondre à ton nouveau formulaire
 export const INITIAL_PROFILE: Profile = {
   firstName: '', 
-  age: 0, // Nouveau champ
+  age: 0, 
   mode: 'beginner', 
   persona: 'salaried', 
   household: { adults: 1, children: 0 },
-  housing: { status: 'tenant', monthlyCost: 0, marketValue: 0 }, // Nouveau champ par défaut
+  housing: { status: 'tenant', monthlyCost: 0, marketValue: 0 }, 
   
   savings: 0, 
-  investments: [], // Initialisé comme tableau vide (et non plus 0)
-  investedAmount: 0, // Nouveau champ stock
+  investments: [], 
+  investedAmount: 0, 
   investmentYield: 5, 
   currentBalance: 0, 
   variableCosts: 0, 
@@ -306,6 +284,7 @@ export const generateId = (): string => Math.random().toString(36).substr(2, 9);
 export const safeFloat = (val: any): number => {
   if (val === null || val === undefined || val === '') return 0;
   if (typeof val === 'number') return isNaN(val) ? 0 : val;
+  // Nettoyage agressif des espaces insécables et conversion virgule
   const clean = String(val).replace(/[\s\u00A0]/g, '').replace(',', '.');
   const parsed = parseFloat(clean);
   return isNaN(parsed) ? 0 : parsed;
@@ -320,7 +299,6 @@ export const calculateFutureValue = (principal: number, rate: number, years: num
   return principal * Math.pow((1 + rate), years);
 };
 
-// ✅ FIX CRITIQUE : Protection contre les données corrompues (vieux format où items = nombre)
 export const calculateListTotal = (items: FinancialItem[]): number => {
   if (!Array.isArray(items)) return 0; 
   
