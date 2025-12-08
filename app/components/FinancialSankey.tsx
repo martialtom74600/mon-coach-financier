@@ -4,134 +4,167 @@ import { useMemo } from 'react';
 import { ResponsiveSankey } from '@nivo/sankey';
 import { calculateListTotal, safeFloat, formatCurrency } from '@/app/lib/logic';
 import { useFinancialData } from '@/app/hooks/useFinancialData';
+import { Layers } from 'lucide-react';
 
-// Palette de couleurs cohérente avec le reste de l'app
+// --- PALETTE "ULTIMATE" (Haut Contraste & Moderne) ---
 const THEME = {
-  income: '#10b981',    // Emerald (Entrées)
-  wallet: '#1e293b',    // Slate 800 (Portefeuille central)
-  fixed: '#f59e0b',     // Amber (Charges fixes)
-  variable: '#eab308',  // Yellow (Vie quotidienne)
-  fun: '#a855f7',       // Purple (Plaisirs)
-  invest: '#6366f1',    // Indigo (Investissement)
-  housing: '#f43f5e',   // Rose (Logement)
-  savings: '#14b8a6',   // Teal (Cash restant)
+  income: '#10b981',    // Emerald (Entrées) - Vif
+  wallet: '#1e293b',    // Slate 900 (HUB CENTRAL) - Très sombre pour le contraste
+  housing: '#ef4444',   // Red (Gros poste)
+  fixed: '#f97316',     // Orange (Charges)
+  variable: '#eab308',  // Yellow (Quotidien)
+  fun: '#d946ef',       // Fuchsia (Plaisirs)
+  invest: '#6366f1',    // Indigo (Futur)
+  savings: '#06b6d4',   // Cyan (Cash dispo)
 };
 
 export default function FinancialSankey() {
   const { profile, isLoaded } = useFinancialData();
 
-  // --- 1. CALCUL ET TRANSFORMATION DES DONNÉES (MÉMOISÉ) ---
+  // --- TRANSFORMATION DES DONNÉES ---
   const data = useMemo(() => {
     if (!isLoaded || !profile) return { nodes: [], links: [] };
 
     const nodes: { id: string; nodeColor: string }[] = [];
     const links: { source: string; target: string; value: number }[] = [];
 
-    // Helper pour construire le graphe proprement
     const addFlow = (source: string, target: string, value: number, color: string) => {
       if (value <= 0) return;
       
-      // Ajout des noeuds s'ils n'existent pas
+      // On s'assure que les noeuds existent avec la bonne couleur
       if (!nodes.find(n => n.id === source)) nodes.push({ id: source, nodeColor: THEME.income });
-      if (!nodes.find(n => n.id === target)) nodes.push({ id: target, nodeColor: color });
+      
+      const existingTarget = nodes.find(n => n.id === target);
+      if (!existingTarget) {
+          nodes.push({ id: target, nodeColor: color });
+      } else {
+          // Si le noeud existe (ex: Budget Global), on ne change pas sa couleur s'il est déjà défini
+          if (target !== 'Budget Global') existingTarget.nodeColor = color;
+      }
 
       links.push({ source, target, value: Math.round(value) });
     };
 
-    // --- A. ENTRÉES (Income -> Portefeuille) ---
+    // --- LOGIQUE METIER ---
     const totalIncome = calculateListTotal(profile.incomes);
     
-    // On groupe les revenus pour ne pas surcharger la gauche du graphe
-    // Si un seul revenu, on met son nom, sinon "Revenus Totaux"
-    if (profile.incomes.length === 1) {
-        addFlow(profile.incomes[0].name, 'Portefeuille', safeFloat(profile.incomes[0].amount), THEME.wallet);
-    } else {
-        addFlow('Revenus', 'Portefeuille', totalIncome, THEME.wallet);
-    }
+    // Le Hub Central s'appelle "Budget" pour être court sur le graph
+    const HUB_NAME = "Budget"; 
 
-    // --- B. SORTIES (Portefeuille -> Catégories) ---
+    // 1. Entrées
+    addFlow('Revenus', HUB_NAME, totalIncome, THEME.wallet);
 
-    // 1. Logement
+    // 2. Sorties
     let housingCost = 0;
     if (profile.housing?.status === 'tenant' || profile.housing?.status === 'owner_loan') {
         housingCost = safeFloat(profile.housing?.monthlyCost);
-        addFlow('Portefeuille', 'Logement', housingCost, THEME.housing);
+        addFlow(HUB_NAME, 'Logement', housingCost, THEME.housing);
     }
 
-    // 2. Charges Fixes (Agrégées par type pour la lisibilité)
     const fixedCosts = calculateListTotal(profile.fixedCosts) + calculateListTotal(profile.annualExpenses);
     const subscriptions = calculateListTotal(profile.subscriptions);
     const credits = calculateListTotal(profile.credits);
+    
+    // Regroupement intelligent pour la lisibilité
+    addFlow(HUB_NAME, 'Charges Fixes', fixedCosts + subscriptions, THEME.fixed);
+    if (credits > 0) addFlow(HUB_NAME, 'Crédits', credits, THEME.housing);
 
-    addFlow('Portefeuille', 'Factures Fixes', fixedCosts, THEME.fixed);
-    addFlow('Portefeuille', 'Abonnements', subscriptions, THEME.fixed);
-    addFlow('Portefeuille', 'Crédits', credits, THEME.housing); // Ou couleur dette spécifique
-
-    // 3. Vie Quotidienne (Courses, Essence...)
     const variable = calculateListTotal(profile.variableCosts || []);
-    addFlow('Portefeuille', 'Vie Quotidienne', variable, THEME.variable);
+    addFlow(HUB_NAME, 'Vie Quotidienne', variable, THEME.variable);
 
-    // 4. Plaisirs
     const fun = safeFloat(profile.funBudget);
-    addFlow('Portefeuille', 'Plaisirs', fun, THEME.fun);
+    addFlow(HUB_NAME, 'Plaisirs', fun, THEME.fun);
 
-    // 5. Investissements (Flux)
-    // On prend bien 'savingsContributions' qui contient le flux mensuel (ex: 810€)
     const investFlux = calculateListTotal(profile.savingsContributions || []);
-    addFlow('Portefeuille', 'Investissements', investFlux, THEME.invest);
+    addFlow(HUB_NAME, 'Investissements', investFlux, THEME.invest);
 
-    // 6. Cash Restant (Équilibrage)
     const totalOut = housingCost + fixedCosts + subscriptions + credits + variable + fun + investFlux;
     const remainingCash = Math.max(0, totalIncome - totalOut);
+    addFlow(HUB_NAME, 'Cash Dispo', remainingCash, THEME.savings);
 
-    addFlow('Portefeuille', 'Cash Épargné', remainingCash, THEME.savings);
+    // On force la couleur du HUB à la fin pour être sûr
+    const hubNode = nodes.find(n => n.id === HUB_NAME);
+    if (hubNode) hubNode.nodeColor = THEME.wallet;
 
     return { nodes, links };
   }, [profile, isLoaded]);
 
-  if (!isLoaded) return <div className="h-[400px] w-full bg-slate-50 animate-pulse rounded-2xl"></div>;
+  if (!isLoaded) return <div className="h-[450px] w-full bg-slate-50 animate-pulse rounded-2xl"></div>;
   if (data.links.length === 0) return null;
 
   return (
-    <div className="h-[500px] w-full bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden flex flex-col">
-        <div className="p-6 border-b border-slate-50 flex justify-between items-center bg-slate-50/30">
-            <div>
-                <h3 className="font-bold text-slate-900 text-lg">Flux Financiers</h3>
-                <p className="text-slate-500 text-sm">Visualisation de vos entrées et sorties mensuelles.</p>
+    <div className="w-full bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden flex flex-col">
+        {/* Header */}
+        <div className="px-6 py-4 border-b border-slate-50 flex justify-between items-center bg-slate-50/50">
+            <div className="flex items-center gap-2">
+                <div className="p-2 bg-white border border-slate-200 text-indigo-600 rounded-lg shadow-sm"><Layers size={18} /></div>
+                <div>
+                    <h3 className="font-bold text-slate-900 text-sm">Répartition des Flux</h3>
+                    <p className="text-xs text-slate-500">Vue mensuelle détaillée</p>
+                </div>
+            </div>
+            {/* Légende rapide */}
+            <div className="hidden md:flex gap-3">
+                <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-emerald-500"></div><span className="text-[10px] font-bold text-slate-500">Entrées</span></div>
+                <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-slate-800"></div><span className="text-[10px] font-bold text-slate-500">Flux</span></div>
+                <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-indigo-500"></div><span className="text-[10px] font-bold text-slate-500">Sorties</span></div>
             </div>
         </div>
         
-        <div className="flex-1 relative">
+        <div className="h-[450px] relative w-full bg-white p-2">
             <ResponsiveSankey
                 data={data}
-                margin={{ top: 40, right: 160, bottom: 40, left: 40 }}
+                // --- MARGES AJUSTÉES POUR LES TEXTES ---
+                // Left: 100px (pour "Revenus + Montant")
+                // Right: 160px (pour les catégories de droite)
+                margin={{ top: 20, right: 160, bottom: 20, left: 100 }} 
+                
                 align="justify"
                 colors={(node: any) => node.nodeColor}
+                
+                // === DESIGN DES NOEUDS ===
                 nodeOpacity={1}
-                nodeHoverOthersOpacity={0.35}
-                nodeThickness={18}
-                nodeSpacing={24}
-                nodeBorderRadius={6} // Plus doux
-                linkOpacity={0.4}
-                linkHoverOthersOpacity={0.1}
-                linkContract={0}
-                enableLinkGradient={true}
+                nodeHoverOthersOpacity={0.3}
+                nodeThickness={10}        // Plus fin = Plus élégant
+                nodeSpacing={24}          // Bien aéré
+                nodeBorderRadius={5}      // Effet capsule
+                
+                // === DESIGN DES LIENS ===
+                linkOpacity={0.35}          // Plus visible que la version précédente
+                linkHoverOpacity={0.8}
+                linkContract={3}          // Espace blanc entre noeud et lien
+                enableLinkGradient={true} // Dégradé fluide
+                
+                // === ETIQUETTES (LA CLÉ !) ===
                 labelPosition="outside"
                 labelOrientation="horizontal"
-                labelPadding={16}
-                labelTextColor={{ from: 'color', modifiers: [ [ 'darker', 1.5 ] ] }}
+                labelPadding={14}
+                // Ici on injecte le MONTANT directement dans le label affiché
+                label={(node) => `${node.id} ${formatCurrency(node.value)}`}
+                labelTextColor={{ from: 'color', modifiers: [ [ 'darker', 2.5 ] ] }}
+                
                 theme={{
                     fontFamily: 'inherit',
-                    fontSize: 12,
-                    labels: { text: { fontWeight: 600 } },
+                    fontSize: 11, // Police légèrement plus petite pour tout faire rentrer
+                    labels: { text: { fontWeight: 700 } }, // Gras pour la lisibilité
                 }}
+                
+                // === TOOLTIP ===
                 tooltip={({ node, source, target, value }: any) => {
                     return (
-                        <div className="bg-slate-900 text-white text-xs p-3 rounded-lg shadow-xl border border-slate-800 z-50">
+                        <div className="bg-slate-900 text-white text-xs p-3 rounded-xl shadow-xl border border-slate-700 z-50 min-w-[140px]">
                             {node ? (
-                                <span><strong>{node.id}</strong> : {formatCurrency(value)}</span>
+                                <div className="text-center">
+                                    <span className="font-bold block text-sm mb-1">{node.id}</span>
+                                    <span className="text-emerald-400 font-mono text-base font-bold">{formatCurrency(value)}</span>
+                                </div>
                             ) : (
-                                <span>{source.id} ➔ {target.id} : <strong>{formatCurrency(value)}</strong></span>
+                                <div className="flex flex-col gap-1 text-center">
+                                    <div className="text-slate-400 mb-1">{source.id} <span className="text-slate-600">➔</span> {target.id}</div>
+                                    <div className="font-bold text-lg text-emerald-400">
+                                        {formatCurrency(value)}
+                                    </div>
+                                </div>
                             )}
                         </div>
                     );
