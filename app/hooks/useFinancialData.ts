@@ -28,11 +28,21 @@ export function useFinancialData() {
 
           // --- NETTOYAGE ANTI-CRASH (Vital) ---
           // On force la structure pour qu'elle respecte l'interface Profile
-          // C'est ici qu'on gère l'ajout des nouvelles colonnes (comme variableCosts)
           const cleanProfile: Profile = {
               ...INITIAL_PROFILE, // On part des valeurs par défaut saines
               ...savedProfile,    // On écrase avec les données BDD
               
+              // 🛡️ SÉCURITÉ SUPPLÉMENTAIRE POUR OBJETS IMBRIQUÉS
+              // Empêche le crash si la BDD renvoie housing: null
+              housing: { 
+                ...INITIAL_PROFILE.housing, 
+                ...(savedProfile.housing || {}) 
+              },
+              household: { 
+                ...INITIAL_PROFILE.household, 
+                ...(savedProfile.household || {}) 
+              },
+
               // --- SÉCURISATION DES TABLEAUX (Si la BDD renvoie null, on met []) ---
               
               // 1. Revenus

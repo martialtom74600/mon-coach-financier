@@ -27,6 +27,39 @@ export const GOAL_CATEGORIES = {
   RETIREMENT:  { id: 'RETIREMENT',  priority: 4, label: 'Retraite',            icon: '🌴', description: 'Long terme' },
 } as const;
 
+// ✅ NOUVELLE LISTE OFFICIELLE DES ACTIFS (Single Source of Truth)
+// app/lib/definitions.ts
+
+// ... (Le début du fichier ne change pas)
+
+// ✅ NOUVELLE LISTE OFFICIELLE DES ACTIFS (Single Source of Truth)
+export const ASSET_TYPES = [
+  // --- LIQUIDITÉS ---
+  { id: 'cc',         label: 'Compte Courant',      category: 'LIQUIDITY', color: 'text-slate-600',   bg: 'bg-slate-50',   border: 'border-slate-300' },
+
+  // --- BOURSE & RETRAITE ---
+  { id: 'pea',        label: 'PEA / PEA-PME',       category: 'BOURSE', color: 'text-blue-600',    bg: 'bg-blue-50',    border: 'border-blue-200' },
+  { id: 'av',         label: 'Assurance Vie',       category: 'BOURSE', color: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-emerald-200' },
+  { id: 'cto',        label: 'Compte Titres (CTO)', category: 'BOURSE', color: 'text-cyan-600',    bg: 'bg-cyan-50',    border: 'border-cyan-200' },
+  { id: 'per',        label: 'PER (Retraite)',      category: 'BOURSE', color: 'text-orange-600',  bg: 'bg-orange-50',  border: 'border-orange-200' },
+  
+  // --- ÉPARGNE ---
+  { id: 'livret',     label: 'Livrets (A/LDDS)',    category: 'CASH',   color: 'text-rose-600',    bg: 'bg-rose-50',    border: 'border-rose-200' },
+  // ✅ AJOUT DU LEP ICI
+  { id: 'lep',        label: 'LEP (Épargne Pop.)',  category: 'CASH',   color: 'text-pink-600',    bg: 'bg-pink-50',    border: 'border-pink-200' },
+  { id: 'pel',        label: 'PEL / CEL',           category: 'CASH',   color: 'text-slate-600',   bg: 'bg-slate-100',  border: 'border-slate-300' },
+  { id: 'pee',        label: 'Épargne Salariale',   category: 'CASH',   color: 'text-indigo-600',  bg: 'bg-indigo-50',  border: 'border-indigo-200' },
+
+  // --- IMMOBILIER ---
+  { id: 'immo_paper', label: 'SCPI / SIIC',         category: 'IMMO',   color: 'text-amber-600',   bg: 'bg-amber-50',   border: 'border-amber-200' },
+  { id: 'crowd',      label: 'Crowdfunding',        category: 'IMMO',   color: 'text-lime-600',    bg: 'bg-lime-50',    border: 'border-lime-200' },
+  { id: 'immo_phys',  label: 'Immo. Locatif',       category: 'IMMO',   color: 'text-amber-700',   bg: 'bg-amber-100',  border: 'border-amber-300' },
+
+  // --- ALTERNATIF ---
+  { id: 'crypto',     label: 'Crypto / Web3',       category: 'EXOTIC', color: 'text-purple-600',  bg: 'bg-purple-50',  border: 'border-purple-200' },
+  { id: 'gold',       label: 'Or / Montres / Art',  category: 'EXOTIC', color: 'text-yellow-600',  bg: 'bg-yellow-50',  border: 'border-yellow-200' },
+] as const;
+
 export const PURCHASE_TYPES = {
   NEED:   { id: 'need',   label: 'Besoin Vital',    description: 'Nourriture, Santé', color: 'bg-blue-100 text-blue-700 border-blue-200' },
   USEFUL: { id: 'useful', label: 'Confort / Utile', description: 'Gain de temps',     color: 'bg-emerald-100 text-emerald-700 border-emerald-200' },
@@ -55,9 +88,11 @@ export interface FinancialItem {
   dayOfMonth?: number | string;
 }
 
+// ✅ TYPAGE STRONGLY TYPED BASÉ SUR LA CONSTANTE
 export interface Investment {
   id: string;
-  type: 'crypto' | 'stock' | 'real_estate' | 'savings_account' | 'gold' | 'other';
+  // On autorise les IDs définis ci-dessus, ou une string libre pour la flexibilité
+  type: typeof ASSET_TYPES[number]['id'] | string;
   name: string;
   amount: number | string;
   performance?: number;

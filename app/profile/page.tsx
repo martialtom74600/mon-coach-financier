@@ -2,8 +2,17 @@
 
 import React, { useMemo, useState, useEffect, ReactNode } from 'react';
 import { useFinancialData } from '@/app/hooks/useFinancialData';
-// ✅ IMPORT DU MOTEUR
-import { formatCurrency, generateId, computeFinancialPlan, calculateListTotal } from '@/app/lib/logic';
+
+// ✅ IMPORTS MOTEUR & DEFINITIONS
+import { computeFinancialPlan as runSimulation } from '@/app/lib/engine';
+import { 
+  ASSET_TYPES, 
+  formatCurrency, 
+  generateId, 
+  calculateListTotal,
+  Profile,
+  FinancialItem 
+} from '@/app/lib/definitions';
 
 // --- COMPOSANTS UI ---
 import Card from '@/app/components/ui/Card';
@@ -11,8 +20,6 @@ import Button from '@/app/components/ui/Button';
 import InputGroup from '@/app/components/ui/InputGroup';
 import ProgressBar from '@/app/components/ui/ProgressBar';
 import Badge from '@/app/components/ui/Badge';
-
-// --- COMPOSANT METIER ---
 import AccordionSection from '@/app/components/AccordionSection';
 
 // Icons
@@ -20,70 +27,162 @@ import {
   Wallet, Briefcase, GraduationCap, Armchair, Minus, CheckCircle,
   CreditCard, ArrowRight, Home, Building, Target,
   HeartHandshake, Plus, Loader2, AlertCircle, User, ShieldCheck, Banknote,
-  Zap, Calendar, TrendingUp, Flag, LucideIcon, ShoppingCart, Coffee, Car
+  Zap, Calendar, TrendingUp, Flag, LucideIcon, ShoppingCart, Coffee, Car,
+  Coins, Landmark, Sprout, Building2, PiggyBank, Gem, Key, Trash2, CalendarDays
 } from 'lucide-react';
 
 // ============================================================================
-// 0. DÉFINITION DES TYPES
+// 1. TYPES UI SPÉCIFIQUES (CLEAN ARCHITECTURE)
 // ============================================================================
 
-export interface FinancialItem {
+// Représente une ligne unifiée dans l'écran Patrimoine
+interface AssetUiRow {
   id: string;
+  type: string;
   name: string;
-  amount: number | string;
-  frequency: string;
+  stock: number;       // Solde Actuel (Ce que j'ai)
+  monthlyFlow: number; // Versement (Ce que je mets)
+  transferDay: number; // Jour du prélèvement
 }
 
-export interface FinancialProfile {
-  firstName: string;
-  age: number | string;
-  persona: string;
-  currentBalance: number;
-  savings: number;
-  investedAmount: number;
-  funBudget: number;
+// Extension du profil pour le formulaire local
+interface FormProfile extends Omit<Profile, 'investments' | 'savingsContributions'> {
+  // On remplace les listes complexes par notre liste UI propre
+  assetsUi: AssetUiRow[];
   
-  // Listes
+  // Les autres listes restent standard
   incomes: FinancialItem[];
-  fixedCosts: FinancialItem[];    // Factures datées (Électricité, Internet...)
-  variableCosts: FinancialItem[]; // Conso lissée (Courses, Essence, Santé...)
+  fixedCosts: FinancialItem[];
+  variableCosts: FinancialItem[];
   credits: FinancialItem[];
   subscriptions: FinancialItem[];
   annualExpenses: FinancialItem[];
-  investments: FinancialItem[]; 
-  savingsContributions?: FinancialItem[];
-
-  housing: {
-    status: string;
-    monthlyCost: number;
-  };
-  household: {
-    adults: number;
-    children: number;
-  };
 }
 
 // ============================================================================
-// 1. HELPERS UI
+// 2. MAPPERS (LA LOGIQUE PROPRE)
+// ============================================================================
+
+/**
+ * LECTURE : DB (Complexe) -> Formulaire UI (Simple)
+ * Fusionne Investments (Stock) et SavingsContributions (Flux)
+ */
+const mapProfileToForm = (profile: Profile): FormProfile => {
+  const assetsUi: AssetUiRow[] = [];
+  
+  // On itère sur les STOCKS (Investments) car c'est la source de vérité des comptes ouverts
+  (profile.investments || []).forEach(inv => {
+    // On cherche le FLUX correspondant via l'ID
+    const matchingFlow = (profile.savingsContributions || []).find(f => f.id === inv.id);
+    
+    // Rétro-compatibilité : si currentValue n'existe pas, on prend amount
+    const stockValue = (inv as any).currentValue ?? inv.amount;
+
+    assetsUi.push({
+      id: inv.id,
+      type: inv.type || 'unknown',
+      name: inv.name,
+      stock: parseFloat(String(stockValue)) || 0,
+      monthlyFlow: matchingFlow ? (parseFloat(String(matchingFlow.amount)) || 0) : 0,
+      transferDay: matchingFlow ? (Number(matchingFlow.dayOfMonth) || 1) : 1
+    });
+  });
+
+  // Initialisation par défaut si vide (au moins un Compte Courant)
+  if (assetsUi.length === 0) {
+    assetsUi.push({ id: generateId(), type: 'cc', name: 'Compte Courant', stock: 0, monthlyFlow: 0, transferDay: 1 });
+  }
+
+  return {
+    ...profile,
+    assetsUi,
+    // Garantir que les tableaux ne sont jamais undefined
+    incomes: profile.incomes || [],
+    fixedCosts: profile.fixedCosts || [],
+    variableCosts: profile.variableCosts || [],
+    credits: profile.credits || [],
+    subscriptions: profile.subscriptions || [],
+    annualExpenses: profile.annualExpenses || [],
+  } as FormProfile;
+};
+
+/**
+ * ÉCRITURE : Formulaire UI (Simple) -> DB (Complexe)
+ * Sépare la liste UI en deux listes distinctes pour le moteur
+ */
+const mapFormToProfile = (formData: FormProfile, lifestyle: number): Profile => {
+  
+  // 1. Calcul des totaux
+  let totalCash = 0;
+  let totalInvested = 0;
+  let totalSavings = 0; 
+
+  formData.assetsUi.forEach(asset => {
+    const def = ASSET_TYPES.find(a => a.id === asset.type);
+    const val = asset.stock;
+
+    if (asset.type === 'cc') totalCash += val;
+    else if (def?.category === 'CASH' || def?.category === 'LIQUIDITY') totalSavings += val;
+    else totalInvested += val;
+  });
+
+  // 2. Génération liste STOCK (Investments)
+  // Pour le moteur : amount = stock. Pour l'UI future : currentValue = stock.
+  const investments = formData.assetsUi.map(a => ({
+    id: a.id,
+    type: a.type,
+    name: a.name,
+    amount: a.stock, 
+    currentValue: a.stock, 
+    frequency: 'mensuel'
+  }));
+
+  // 3. Génération liste FLUX (SavingsContributions)
+  // On ne garde que ceux qui ont un versement > 0 et qui ne sont pas le compte courant
+  const savingsContributions = formData.assetsUi
+    .filter(a => a.type !== 'cc' && a.monthlyFlow > 0)
+    .map(a => ({
+      id: a.id, 
+      name: a.name,
+      amount: a.monthlyFlow,
+      dayOfMonth: a.transferDay,
+      frequency: 'mensuel'
+    }));
+
+  // 4. Nettoyage Housing
+  let housingCost = formData.housing?.monthlyCost || 0;
+  if (['free', 'owner_paid'].includes(formData.housing?.status)) housingCost = 0;
+
+  return {
+    ...formData,
+    funBudget: lifestyle,
+    investedAmount: totalInvested,
+    savings: totalSavings,
+    currentBalance: totalCash,
+    investments,           // ✅ Liste 1 : Patrimoine
+    savingsContributions,  // ✅ Liste 2 : Budget Mensuel
+    housing: { ...formData.housing, monthlyCost: housingCost },
+    updatedAt: new Date().toISOString()
+  } as Profile;
+};
+
+// ============================================================================
+// 3. HELPERS UI
 // ============================================================================
 
 const getInputValue = (e: React.ChangeEvent<HTMLInputElement> | string | number) => {
   if (typeof e === 'object' && e !== null && 'target' in e) return e.target.value;
   return e;
 };
-
-const parseNumber = (val: string | number | undefined): number => {
-  if (!val) return 0;
-  return parseFloat(val.toString().replace(/\s/g, '').replace(',', '.')) || 0;
-};
-
+const parseNumber = (val: string | number | undefined): number => parseFloat(String(val).replace(/\s/g, '').replace(',', '.')) || 0;
 const generateIdHelper = () => Math.random().toString(36).substr(2, 9);
 
 // ============================================================================
-// 2. LAYOUT & COMPOSANTS VISUELS
+// 4. LAYOUT & COMPOSANTS VISUELS
 // ============================================================================
 
 interface WizardLayoutProps { title: string; subtitle: string; icon: LucideIcon; children: ReactNode; footer?: ReactNode; }
+
 const WizardLayout = ({ title, subtitle, icon: Icon, children, footer }: WizardLayoutProps) => (
   <div className="w-full max-w-2xl mx-auto lg:mx-0 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <div className="text-center lg:text-left mb-8">
@@ -117,24 +216,8 @@ const CounterControl = ({ label, value, onChange }: any) => (
     </div>
 );
 
-const ToggleSwitch = ({ label, checked, onChange, icon: Icon }: any) => (
-    <div onClick={() => onChange(!checked)} role="button" className={`cursor-pointer flex items-center justify-between p-4 rounded-xl border transition-all duration-300 ${checked ? 'bg-indigo-50 border-indigo-200 ring-1 ring-indigo-200' : 'bg-white border-slate-200 hover:bg-slate-50'}`}>
-        <div className="flex items-center gap-3">
-            <div className={`p-2 rounded-lg ${checked ? 'bg-indigo-200 text-indigo-700' : 'bg-slate-100 text-slate-400'}`}><Icon size={20} /></div>
-            <span className={`font-bold text-sm ${checked ? 'text-indigo-900' : 'text-slate-600'}`}>{label}</span>
-        </div>
-        <div className={`w-12 h-6 rounded-full p-1 transition-colors duration-300 ${checked ? 'bg-indigo-600' : 'bg-slate-300'}`}>
-            <div className={`w-4 h-4 bg-white rounded-full shadow-sm transform transition-transform duration-300 ${checked ? 'translate-x-6' : 'translate-x-0'}`} />
-        </div>
-    </div>
-);
-
-// ============================================================================
-// 3. RÉCAPITULATIF LIVE
-// ============================================================================
-
 interface LiveSummaryProps {
-    formData: FinancialProfile;
+    formData: FormProfile;
     stats: { income: number; fixed: number; variable: number; investments: number; ratio: number; remaining: number; };
     currentStep: number;
 }
@@ -146,7 +229,6 @@ const LiveSummary = ({ formData, stats, currentStep }: LiveSummaryProps) => {
 
   return (
     <div className="sticky top-6 space-y-6 animate-in fade-in slide-in-from-right-4 duration-700">
-      
       <Card className="p-6 border-indigo-100 shadow-lg shadow-indigo-100/50 overflow-hidden relative">
         <div className="absolute top-0 right-0 p-3 opacity-10"><User size={64} /></div>
         <div className="relative z-10">
@@ -202,17 +284,17 @@ const LiveSummary = ({ formData, stats, currentStep }: LiveSummaryProps) => {
 };
 
 // ============================================================================
-// 4. ÉTAPES DU WIZARD
+// 5. ÉTAPES DU WIZARD
 // ============================================================================
 
 interface StepProps {
-    formData: FinancialProfile;
-    updateForm: (data: FinancialProfile) => void;
+    formData: FormProfile;
+    updateForm: (data: FormProfile) => void;
     onNext?: () => void;
     onPrev?: () => void;
-    addItem?: (list: keyof FinancialProfile) => void;
-    removeItem?: (list: keyof FinancialProfile, id: string) => void;
-    updateItem?: (list: keyof FinancialProfile, id: string, field: string, val: any) => void;
+    addItem?: (list: keyof FormProfile) => void;
+    removeItem?: (list: keyof FormProfile, id: string) => void;
+    updateItem?: (list: keyof FormProfile, id: string, field: string, val: any) => void;
     onConfirm?: (lifestyle: number, savings: number) => void;
     isSaving?: boolean;
     stats?: any;
@@ -244,27 +326,10 @@ const StepSituation = ({ formData, updateForm, onNext, onPrev }: StepProps) => (
           </div>
           <div><label className="block text-xs font-bold text-slate-500 uppercase mb-3">Logement</label>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {/* Pour Locataire et Propriétaire (crédit), on garde l'ancien montant s'il existe (UX friendly en cas d'erreur de clic) */}
                   <SelectionTile icon={Building} title="Locataire" desc="Loyer" selected={formData.housing?.status === 'tenant'} onClick={() => updateForm({ ...formData, housing: { ...formData.housing, status: 'tenant' } })} />
                   <SelectionTile icon={Home} title="Propriétaire" desc="Crédit" selected={formData.housing?.status === 'owner_loan'} onClick={() => updateForm({ ...formData, housing: { ...formData.housing, status: 'owner_loan' } })} />
-                  
-                  {/* ✅ FIX UX : On force monthlyCost à 0 pour "Propriétaire Payé" */}
-                  <SelectionTile 
-                    icon={CheckCircle} 
-                    title="Propriétaire" 
-                    desc="Payé" 
-                    selected={formData.housing?.status === 'owner_paid'} 
-                    onClick={() => updateForm({ ...formData, housing: { ...formData.housing, status: 'owner_paid', monthlyCost: 0 } })} 
-                  />
-                  
-                  {/* ✅ FIX UX : On force monthlyCost à 0 pour "Gratuit / Hébergé" */}
-                  <SelectionTile 
-                    icon={HeartHandshake} 
-                    title="Gratuit" 
-                    desc="Hébergé" 
-                    selected={formData.housing?.status === 'free'} 
-                    onClick={() => updateForm({ ...formData, housing: { ...formData.housing, status: 'free', monthlyCost: 0 } })} 
-                  />
+                  <SelectionTile icon={CheckCircle} title="Propriétaire" desc="Payé" selected={formData.housing?.status === 'owner_paid'} onClick={() => updateForm({ ...formData, housing: { ...formData.housing, status: 'owner_paid', monthlyCost: 0 } })} />
+                  <SelectionTile icon={HeartHandshake} title="Gratuit" desc="Hébergé" selected={formData.housing?.status === 'free'} onClick={() => updateForm({ ...formData, housing: { ...formData.housing, status: 'free', monthlyCost: 0 } })} />
               </div>
           </div>
           <div><label className="block text-xs font-bold text-slate-500 uppercase mb-3">Foyer</label>
@@ -277,7 +342,6 @@ const StepSituation = ({ formData, updateForm, onNext, onPrev }: StepProps) => (
   </WizardLayout>
 );
 
-// ✅ STEP 3 : Charges FIXES (Dates précises)
 const StepFixedFinances = ({ formData, updateForm, addItem, removeItem, updateItem, onNext, onPrev }: StepProps) => (
     <WizardLayout title="Revenus & Charges Fixes" subtitle="Ce qui tombe à date fixe chaque mois." icon={Wallet}
         footer={<><Button variant="ghost" onClick={onPrev}>Retour</Button><Button onClick={onNext}>Vie Quotidienne <ArrowRight className="ml-2" size={18}/></Button></>}>
@@ -296,7 +360,6 @@ const StepFixedFinances = ({ formData, updateForm, addItem, removeItem, updateIt
     </WizardLayout>
 );
 
-// ✅ STEP 4 : Vie Quotidienne (Lissé sur le mois)
 const StepDailyLife = ({ formData, updateForm, addItem, removeItem, updateItem, onNext, onPrev }: StepProps) => (
     <WizardLayout title="Vie Quotidienne" subtitle="Estimation des dépenses variables (Courses, Essence...)" icon={ShoppingCart}
         footer={<><Button variant="ghost" onClick={onPrev}>Retour</Button><Button onClick={onNext}>Patrimoine <ArrowRight className="ml-2" size={18}/></Button></>}>
@@ -329,40 +392,137 @@ const StepDailyLife = ({ formData, updateForm, addItem, removeItem, updateItem, 
     </WizardLayout>
 );
 
+// ✅ STEP 5 : PATRIMOINE (REFAITE ET PROPRE)
 const StepAssets = ({ formData, updateForm, addItem, removeItem, updateItem, onNext, onPrev }: StepProps) => {
-    const [isInvestor, setIsInvestor] = useState(false);
-    useEffect(() => {
-        const investmentList = Array.isArray(formData.investments) ? formData.investments : [];
-        const hasInvestments = (investmentList.length > 0) || (formData.investedAmount > 0);
-        setIsInvestor(hasInvestments);
-    }, []);
-
-    const handleInvestorToggle = (checked: boolean) => {
-        setIsInvestor(checked);
-        if (!checked) updateForm({ ...formData, investments: [], investedAmount: 0 });
+  
+    // MAPPING DES ICONES
+    const ICON_MAPPING: Record<string, LucideIcon> = {
+        cc: Wallet, pea: TrendingUp, av: ShieldCheck, cto: TrendingUp, per: PiggyBank,
+        livret: Landmark, lep: Landmark, pel: Key, pee: Briefcase, immo_paper: Building2,
+        crowd: Sprout, immo_phys: Building, crypto: Coins, gold: Gem
+    };
+  
+    const hasAsset = (labelSubString: string) => {
+      return formData.assetsUi.some(i => i.name.toLowerCase().includes(labelSubString.toLowerCase().split('/')[0].trim()));
+    };
+  
+    const toggleAsset = (type: any) => {
+      if (hasAsset(type.label)) return; 
+      const newList = [
+          ...formData.assetsUi, 
+          { id: generateIdHelper(), name: type.label, type: type.id, stock: 0, monthlyFlow: 0, transferDay: 1 }
+      ];
+      updateForm({ ...formData, assetsUi: newList });
     };
 
+    const updateAssetRow = (id: string, field: keyof AssetUiRow, value: any) => {
+        const newList = formData.assetsUi.map(a => a.id === id ? { ...a, [field]: value } : a);
+        updateForm({ ...formData, assetsUi: newList });
+    };
+
+    const removeAssetRow = (id: string) => {
+        updateForm({ ...formData, assetsUi: formData.assetsUi.filter(a => a.id !== id) });
+    };
+
+    // Calcul du total affiché
+    const totalAssets = formData.assetsUi.reduce((acc, item) => acc + (item.stock || 0), 0);
+
     return (
-        <WizardLayout title="Votre Patrimoine" subtitle="Faisons le point sur ce que vous possédez." icon={ShieldCheck}
-            footer={<><Button variant="ghost" onClick={onPrev}>Retour</Button><Button onClick={onNext} className="w-full sm:w-auto" size="lg">Découvrir mon verdict <ArrowRight className="ml-2" size={18}/></Button></>}>
-            <div className="space-y-8">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                    <InputGroup label="Compte Courant" type="number" value={formData.currentBalance || ''} onChange={(e: any) => updateForm({ ...formData, currentBalance: parseNumber(getInputValue(e)) })} endAdornment="€" />
-                    <InputGroup label="Épargne de Précaution (Cash)" type="number" placeholder="Livrets..." value={formData.savings || ''} onChange={(e: any) => updateForm({ ...formData, savings: parseNumber(getInputValue(e)) })} endAdornment="€" />
-                </div>
-                <div className="pt-2">
-                    <ToggleSwitch label="Je suis investisseur" icon={TrendingUp} checked={isInvestor} onChange={handleInvestorToggle} />
-                    {isInvestor && (
-                        <div className="mt-4 animate-in fade-in slide-in-from-top-2 space-y-6">
-                            <div className="p-4 bg-indigo-50/50 rounded-xl border border-indigo-100">
-                                <InputGroup label="Capital Placé (Stock Total)" type="number" placeholder="PEA, Crypto, Immo..." value={formData.investedAmount || ''} onChange={(e: any) => updateForm({...formData, investedAmount: parseNumber(getInputValue(e))})} endAdornment="€" />
-                            </div>
-                            <AccordionSection mode="expert" defaultOpen={true} title="Investissements Mensuels (Flux)" icon={TrendingUp} colorClass="text-indigo-600" items={formData.investments} onItemChange={(id: string, f: string, v: any) => updateItem!('investments', id, f, v)} onItemAdd={() => addItem!('investments')} onItemRemove={(id: string) => removeItem!('investments', id)} />
-                        </div>
-                    )}
-                </div>
+      <WizardLayout title="Votre Patrimoine" subtitle="Faisons l'inventaire complet (Comptes & Investissements)." icon={ShieldCheck}
+        footer={<><Button variant="ghost" onClick={onPrev}>Retour</Button><Button onClick={onNext} className="w-full sm:w-auto" size="lg">Découvrir mon verdict <ArrowRight className="ml-2" size={18}/></Button></>}>
+        
+        <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2">
+            
+            {/* 1. SÉLECTEUR */}
+            <div>
+              <label className="block text-xs font-bold text-slate-500 uppercase mb-3">Qu'est-ce que vous possédez ?</label>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                  {ASSET_TYPES.map((type) => {
+                      const isSelected = hasAsset(type.label);
+                      const Icon = ICON_MAPPING[type.id] || TrendingUp;
+                      return (
+                          <button key={type.id} onClick={() => toggleAsset(type)} className={`relative p-3 rounded-xl border-2 text-left transition-all duration-200 group ${isSelected ? `${type.bg} ${type.border} ring-1 ring-offset-1 ring-indigo-100` : 'bg-white border-slate-100 hover:border-slate-300 hover:shadow-md'}`}>
+                              <div className="flex items-start justify-between mb-2">
+                                  <div className={`p-2 rounded-lg ${isSelected ? 'bg-white/80' : 'bg-slate-50'} ${type.color}`}><Icon size={18} /></div>
+                                  {isSelected && <div className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-white ${type.color}`}>AJOUTÉ</div>}
+                              </div>
+                              <div className={`font-bold text-sm ${isSelected ? 'text-slate-800' : 'text-slate-600'}`}>{type.label}</div>
+                          </button>
+                      );
+                  })}
+              </div>
             </div>
-        </WizardLayout>
+
+            {/* 2. LISTE ÉDITABLE */}
+            {formData.assetsUi.length > 0 && (
+                <div className="space-y-4">
+                    <div className="flex items-center gap-2 mb-2">
+                        <div className="p-1.5 bg-white rounded-md shadow-sm text-slate-500"><TrendingUp size={16}/></div>
+                        <span className="text-sm font-bold text-slate-700 uppercase tracking-wide">Détail de vos comptes</span>
+                    </div>
+                    
+                    <div className="grid grid-cols-1 gap-4">
+                        {formData.assetsUi.map((item) => {
+                            const isCC = item.type === 'cc' || item.name.toLowerCase().includes('courant');
+                            return (
+                                <div key={item.id} className="p-4 bg-white border border-slate-200 rounded-xl shadow-sm hover:border-indigo-200 transition-colors">
+                                    <div className="flex items-center justify-between mb-3">
+                                        <div className="font-bold text-slate-800 flex items-center gap-2">
+                                            <div className={`w-2 h-2 rounded-full ${isCC ? 'bg-slate-400' : 'bg-indigo-500'}`}/>
+                                            {item.name}
+                                        </div>
+                                        {!isCC && (
+                                            <button onClick={() => removeAssetRow(item.id)} className="text-slate-400 hover:text-red-500 transition-colors"><Trash2 size={16}/></button>
+                                        )}
+                                    </div>
+                                    <div className={`grid ${isCC ? 'grid-cols-1' : 'grid-cols-12'} gap-4`}>
+                                        {/* COLONNE 1 : STOCK (Solde) */}
+                                        <div className={isCC ? 'col-span-1' : 'col-span-5'}>
+                                            <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Solde Actuel (Stock)</label>
+                                            <div className="relative">
+                                                <input type="number" className="block w-full rounded-lg border-slate-200 bg-slate-50 p-2 text-sm font-bold text-slate-900 focus:border-indigo-500 focus:ring-indigo-500" placeholder="0" 
+                                                    value={item.stock || ''} onChange={(e) => updateAssetRow(item.id, 'stock', parseFloat(e.target.value) || 0)} />
+                                                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3"><span className="text-slate-400 text-xs">€</span></div>
+                                            </div>
+                                        </div>
+                                        
+                                        {/* COLONNE 2 : FLUX (Mensualité) - Caché pour CC */}
+                                        {!isCC && (
+                                            <>
+                                                <div className="col-span-4">
+                                                    <label className="block text-[10px] font-bold text-indigo-400 uppercase mb-1">Versement / Mois</label>
+                                                    <div className="relative">
+                                                        <input type="number" className="block w-full rounded-lg border-indigo-100 bg-indigo-50/50 p-2 text-sm font-bold text-indigo-900 focus:border-indigo-500 focus:ring-indigo-500" placeholder="0" 
+                                                            value={item.monthlyFlow || ''} onChange={(e) => updateAssetRow(item.id, 'monthlyFlow', parseFloat(e.target.value) || 0)} />
+                                                        <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3"><span className="text-indigo-400 text-xs">€</span></div>
+                                                    </div>
+                                                </div>
+                                                <div className="col-span-3">
+                                                    <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Jour</label>
+                                                    <div className="relative">
+                                                        <input type="number" min="1" max="31" className="block w-full rounded-lg border-slate-200 bg-white p-2 text-sm font-medium text-slate-700 text-center" placeholder="1" 
+                                                            value={item.transferDay || ''} onChange={(e) => updateAssetRow(item.id, 'transferDay', parseFloat(e.target.value) || 1)} />
+                                                    </div>
+                                                </div>
+                                            </>
+                                        )}
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                    
+                    <Card className="p-4 bg-slate-900 text-white flex justify-between items-center rounded-xl shadow-lg shadow-slate-200/50">
+                        <div className="flex flex-col">
+                            <span className="text-xs text-slate-400 font-medium uppercase tracking-wider">Patrimoine Total Estimé</span>
+                            <span className="text-xs text-slate-500">Cash + Investissements</span>
+                        </div>
+                        <span className="text-2xl font-black">{formatCurrency(totalAssets)}</span>
+                    </Card>
+                </div>
+            )}
+        </div>
+      </WizardLayout>
     );
 };
 
@@ -418,38 +578,38 @@ const StepStrategy = ({ formData, onConfirm, isSaving, onPrev, stats }: StepProp
 export default function ProfilePage() {
   const { profile, saveProfile, isLoaded } = useFinancialData();
   const [currentStep, setCurrentStep] = useState(1);
-  const [formData, setFormData] = useState<FinancialProfile | null>(null);
+  const [formData, setFormData] = useState<FormProfile | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
-  // 1. Initialisation + Réhydratation des listes
+  // 1. Initialisation : On convertit la DB (Profile) vers l'UI (FormProfile) via le Mapper
   useEffect(() => {
     if (isLoaded && profile) {
-        const visualInvestments = (profile.investments && profile.investments.length > 0)
-            ? profile.investments
-            : (profile.savingsContributions || []); 
-
+        // On vérifie si on doit mettre à jour le state local
         if (!formData || profile.updatedAt !== formData.updatedAt) {
-             setFormData({
-                ...profile,
-                variableCosts: Array.isArray(profile.variableCosts) ? profile.variableCosts : [],
-                investments: visualInvestments as FinancialItem[] 
-             });
+             const cleanForm = mapProfileToForm(profile);
+             setFormData(cleanForm);
         }
     }
   }, [isLoaded, profile]);
 
+  // 2. Simulation Live : On convertit l'UI vers la DB pour nourrir le moteur
   const simulation = useMemo(() => {
     if (!formData) return null;
-    return computeFinancialPlan(formData);
+    const profileForEngine = mapFormToProfile(formData, 0); // Le lifestyle n'importe pas pour le budget brut
+    return runSimulation(profileForEngine);
   }, [formData]);
 
+  // 3. Stats pour le LiveSummary
   const wizardStats = useMemo(() => {
     if (!simulation || !formData) return null;
 
     const { budget } = simulation;
-    const monthlyInvestments = calculateListTotal(formData.investments || []);
-    const monthlyVariable = calculateListTotal(formData.variableCosts || []);
+    // On calcule les investissements mensuels directement depuis notre UI propre
+    const monthlyInvestments = formData.assetsUi
+        .filter(a => a.type !== 'cc')
+        .reduce((sum, item) => sum + (item.monthlyFlow || 0), 0);
 
+    const monthlyVariable = calculateListTotal(formData.variableCosts || []);
     const totalEngaged = budget.mandatoryExpenses + monthlyInvestments + monthlyVariable;
     const ratio = budget.monthlyIncome > 0 ? (totalEngaged / budget.monthlyIncome) * 100 : 0;
     const remaining = Math.max(0, budget.monthlyIncome - totalEngaged);
@@ -465,59 +625,36 @@ export default function ProfilePage() {
     };
   }, [simulation, formData]);
 
-  const updateForm = (newData: FinancialProfile) => setFormData(newData);
+  const updateForm = (newData: FormProfile) => setFormData(newData);
   const goNext = () => { setCurrentStep(s => s + 1); window.scrollTo({ top: 0, behavior: 'smooth' }); };
   const goPrev = () => setCurrentStep(s => Math.max(1, s - 1));
 
-  const updateItem = (list: keyof FinancialProfile, id: string, field: string, val: any) => {
+  const updateItem = (list: keyof FormProfile, id: string, field: string, val: any) => {
     if (!formData) return;
     const currentList = formData[list] as FinancialItem[];
     updateForm({ ...formData, [list]: currentList.map((i) => i.id === id ? { ...i, [field]: val } : i) });
   };
-  const addItem = (list: keyof FinancialProfile) => {
+  const addItem = (list: keyof FormProfile) => {
     if (!formData) return;
     const currentList = formData[list] as FinancialItem[];
     updateForm({ ...formData, [list]: [...currentList, { id: generateIdHelper(), name: '', amount: '', frequency: 'mensuel' }] });
   };
-  const removeItem = (list: keyof FinancialProfile, id: string) => {
+  const removeItem = (list: keyof FormProfile, id: string) => {
     if (!formData) return;
     const currentList = formData[list] as FinancialItem[];
     updateForm({ ...formData, [list]: currentList.filter((i) => i.id !== id) });
   };
 
-  // ✅ FONCTION SAVE BLINDÉE
-  const handleSaveAndExit = async (lifestyle: number, savings: number) => {
+  // ✅ SAUVEGARDE FINALE
+  const handleSaveAndExit = async (lifestyle: number, savingsFromWizard: number) => {
     if (isSaving || !formData) return;
     setIsSaving(true);
     try {
-        const stockAmount = formData.investedAmount || 0;
-        const monthlyFlows = (formData.investments || []).map(item => ({ ...item, frequency: 'mensuel' }));
-
-        // 🛡️ SANITIZATION BACKEND/SAVE
-        // Sécurité supplémentaire : On force le coût à 0 si le statut est gratuit/payé
-        let finalHousingCost = formData.housing?.monthlyCost || 0;
-        if (formData.housing?.status === 'free' || formData.housing?.status === 'owner_paid') {
-            finalHousingCost = 0;
-        }
-
-        const finalData = { 
-            ...formData, 
-            funBudget: lifestyle, 
-            balanceDate: new Date().toISOString(),
-            investedAmount: stockAmount,
-            savingsContributions: monthlyFlows,
-            investments: [], // On vide l'affichage Stock pour éviter doublons calcul
-            variableCosts: formData.variableCosts || [], // On sauvegarde bien le Step 4
-            // On sauvegarde l'objet housing nettoyé
-            housing: {
-                ...formData.housing,
-                monthlyCost: finalHousingCost
-            }
-        };
-
-        await saveProfile(finalData);
+        // On utilise le Mapper pour générer un profil propre pour la DB
+        const finalProfile = mapFormToProfile(formData, lifestyle);
+        await saveProfile(finalProfile);
         window.location.href = '/'; 
-    } catch (e) { console.error(e); setIsSaving(false); alert("Erreur."); }
+    } catch (e) { console.error(e); setIsSaving(false); alert("Erreur lors de la sauvegarde."); }
   };
 
   if (!isLoaded || !formData) return <div className="h-[50vh] flex items-center justify-center"><Loader2 className="animate-spin text-indigo-600" size={32}/></div>;
@@ -538,10 +675,10 @@ export default function ProfilePage() {
                     {/* Step 3 : Fixe */}
                     {currentStep === 3 && <StepFixedFinances formData={formData} updateForm={updateForm} addItem={addItem} removeItem={removeItem} updateItem={updateItem} onNext={goNext} onPrev={goPrev} />}
                     
-                    {/* Step 4 : Variable (Nouveau) */}
+                    {/* Step 4 : Variable */}
                     {currentStep === 4 && <StepDailyLife formData={formData} updateForm={updateForm} addItem={addItem} removeItem={removeItem} updateItem={updateItem} onNext={goNext} onPrev={goPrev} />}
                     
-                    {/* Step 5 : Patrimoine */}
+                    {/* Step 5 : Patrimoine (CLEAN ARCHITECTURE) */}
                     {currentStep === 5 && <StepAssets formData={formData} updateForm={updateForm} addItem={addItem} removeItem={removeItem} updateItem={updateItem} onNext={goNext} onPrev={goPrev} />}
                     
                     {/* Step 6 : Verdict */}

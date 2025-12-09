@@ -1,5 +1,5 @@
 // app/lib/engine.ts
-import { differenceInMonths, isValid, addMonths, addYears, isSameMonth } from 'date-fns';
+import { differenceInMonths, addMonths } from 'date-fns';
 import { 
   Profile, Goal, SimulationResult, GoalDiagnosis, GoalStrategy, 
   DeepAnalysis, OptimizationOpportunity, 
@@ -8,7 +8,7 @@ import {
 } from './definitions';
 
 // ============================================================================
-// 1. CONFIGURATION & TYPES
+// 1. CONFIGURATION & ACTION GUIDES
 // ============================================================================
 
 export type SimulationRates = typeof FINANCIAL_KNOWLEDGE.RATES;
@@ -28,7 +28,7 @@ const FINANCIAL_KNOWLEDGE = {
     RICH_INCOME: 4000,        
     POOR_INCOME: 1600,        
     SURVIVAL_BUFFER: 1000,
-    MIN_RAV: 900 // Reste à vivre minimum vital
+    MIN_RAV: 900 
   },
   TAX_BRACKETS: [ 
     { t: 11294, r: 0.11 }, 
@@ -48,187 +48,114 @@ type ActionGuide = {
 };
 
 const ACTION_GUIDES: Record<string, ActionGuide> = {
-  // --- NIVEAU 1 : SÉCURITÉ & TRÉSORERIE ---
-  
-  LEP: { 
-    title: "Ouvrir un Livret d'Épargne Populaire (LEP)", 
-    definition: "Le placement sans risque le plus rentable de France (net d'impôt). Réservé aux revenus modestes.", 
-    steps: [
-      "Retrouver votre dernier avis d'imposition (Revenu Fiscal de Référence).", 
-      "Vérifier l'éligibilité (Plafond env. 22k€ pour 1 part, 34k€ pour 2 parts).", 
-      "Prendre rendez-vous avec votre banque (ou changer si elle ne le propose pas)."
-    ], 
-    tips: [
-      "Même si vous ne payez pas d'impôts, déclarez vos revenus pour avoir l'avis d'imposition nécessaire.",
-      "Plafond de versement : 10 000€."
-    ],
-    difficulty: 'Facile',
-    impact: 'Immédiat'
-  },
-
-  MATELAS: { 
-    title: "Constituer son Épargne de Précaution", 
-    definition: "Votre pare-feu contre les imprévus (panne auto, chômage, santé). C'est la priorité n°1 avant d'investir.", 
-    steps: [
-      "Calculer 3 mois de dépenses contraintes (Loyer + Courses + Factures).", 
-      "Ouvrir un Livret A ou un LDDS dédié uniquement à ça.", 
-      "Mettre en place un virement automatique (ex: 50€) dès le début du mois."
-    ], 
-    tips: [
-      "Ne touchez JAMAIS à cet argent pour des loisirs ou des vacances.",
-      "Si vous puisez dedans, la priorité absolue est de le reconstituer."
-    ],
-    difficulty: 'Moyen',
-    impact: 'Immédiat'
-  },
-
-  // --- NIVEAU 2 : ASSAINISSEMENT ---
-
-  DETTE: { 
-    title: "Éradiquer les Mauvaises Dettes", 
-    definition: "Les crédits conso (revolving) coûtent plus cher que ce que l'épargne rapporte. S'en débarrasser est le meilleur investissement.", 
-    steps: [
-      "Lister toutes les dettes avec leur taux d'intérêt et capital restant.", 
-      "Méthode Avalanche : Rembourser en priorité la dette avec le taux le plus élevé.", 
-      "Méthode Boule de Neige : Rembourser la plus petite dette pour se motiver psychologiquement."
-    ], 
-    tips: [
-      "Contactez les créanciers pour négocier un échelonnement si besoin.",
-      "Coupez les cartes de crédit revolving."
-    ],
-    difficulty: 'Difficile',
-    impact: 'Immédiat'
-  },
-
+  // --- BASICS ---
   BUDGET_CUT: { 
     title: "Optimiser les Charges Fixes", 
-    definition: "Récupérer du pouvoir d'achat sans baisser son niveau de vie, juste en arrêtant de payer pour rien.", 
-    steps: [
-      "Lister les abonnements récurrents (Netflix, Salle de sport, Box).", 
-      "Utiliser la Loi Hamon pour changer d'assurance auto/habitation (souvent -20% de gain).", 
-      "Appeler son opérateur mobile/internet pour menacer de partir."
-    ], 
-    tips: [
-      "Supprimez les abonnements que vous n'avez pas utilisés depuis 30 jours.",
-      "Utilisez des comparateurs en ligne (LeLynx, LesFurets...)."
-    ],
-    difficulty: 'Facile',
-    impact: 'Immédiat'
+    definition: "Récupérer du pouvoir d'achat sans baisser son niveau de vie.", 
+    steps: ["Lister les abonnements.", "Utiliser la loi Hamon (Assurances).", "Renégocier Mobile/Internet."], 
+    tips: ["Supprimez ce qui n'est pas utilisé depuis 30j."], difficulty: 'Facile', impact: 'Immédiat' 
+  },
+  DETTE: { 
+    title: "Éradiquer les Mauvaises Dettes", 
+    definition: "Les crédits conso coûtent plus cher que l'épargne ne rapporte.", 
+    steps: ["Lister les taux.", "Rembourser le taux le plus élevé en premier."], 
+    tips: ["Coupez les cartes revolving."], difficulty: 'Difficile', impact: 'Immédiat' 
+  },
+  
+  // --- LIVRETS & CASH ---
+  LIVRET_OPEN: { 
+    title: "Constituer un Matelas de Sécurité", 
+    definition: "Votre pare-feu contre les imprévus (panne, santé).", 
+    steps: ["Ouvrir un Livret A ou LDDS.", "Viser 3 mois de charges.", "Automatiser 50€/mois."], 
+    tips: ["Ne touchez jamais à cet argent pour le plaisir."], difficulty: 'Facile', impact: 'Immédiat' 
+  },
+  LIVRET_BOOST: { 
+    title: "Renforcer votre Sécurité", 
+    definition: "Votre épargne de précaution est un peu faible.", 
+    steps: ["Augmenter le virement mensuel vers vos livrets.", "Vérifier si vous avez atteint le plafond (22 950€)."], 
+    tips: ["Dormir tranquille n'a pas de prix."], difficulty: 'Facile', impact: 'Immédiat' 
+  },
+  LEP_OPEN: { 
+    title: "Ouvrir un LEP (5% Net)", 
+    definition: "Le placement sans risque le plus rentable. Réservé aux revenus modestes.", 
+    steps: ["Vérifier avis d'imposition.", "Prendre RDV banque."], 
+    tips: ["Plafond 10 000€."], difficulty: 'Facile', impact: 'Immédiat' 
   },
 
-  // --- NIVEAU 3 : INVESTISSEMENT LONG TERME ---
-
-  INVEST_START: { 
-    title: "Démarrer l'investissement", 
-    definition: "Faire travailler son argent pour battre l'inflation.", 
-    steps: [
-      "Ouvrir une Assurance Vie ou un PEA.", 
-      "Mettre 50€/mois en DCA (versement programmé).", 
-      "Ne pas regarder les courbes tous les jours."
-    ], 
-    tips: [
-      "Le temps est votre meilleur allié.",
-      "Commencez petit, mais commencez maintenant."
-    ],
-    difficulty: 'Moyen',
-    impact: 'Long terme'
+  // --- PEA (BOURSE) ---
+  PEA_OPEN: { 
+    title: "Ouvrir un PEA", 
+    definition: "La meilleure niche fiscale pour investir en Bourse.", 
+    steps: ["Choisir banque en ligne (frais < 0.5%).", "Prendre date (compteur 5 ans).", "Acheter un ETF Monde."], 
+    tips: ["Évitez les banques traditionnelles."], difficulty: 'Moyen', impact: 'Long terme' 
+  },
+  PEA_BOOST: { 
+    title: "Optimiser votre PEA", 
+    definition: "Vous avez l'outil, maintenant il faut le remplir.", 
+    steps: ["Augmenter le DCA (versement mensuel).", "Vérifier que vous n'avez pas trop de liquidités non investies.", "Viser le plafond 150k€."], 
+    tips: ["L'argent sur le compte espèce ne rapporte rien."], difficulty: 'Facile', impact: 'Long terme' 
   },
 
-  PEA: { 
-    title: "Ouvrir un PEA (Plan Épargne Actions)", 
-    definition: "L'enveloppe fiscale royale pour investir en Bourse avec une fiscalité adoucie après 5 ans.", 
-    steps: [
-      "Choisir un courtier en ligne ou une banque en ligne (frais < 0.5% par ordre).", 
-      "Ouvrir le compte pour 'prendre date' (le compteur fiscal de 5 ans démarre).", 
-      "Mettre en place un versement mensuel programmé (DCA)."
-    ], 
-    tips: [
-      "Fuyez les grandes banques traditionnelles (frais de garde trop élevés).",
-      "Privilégiez les ETF Monde (MSCI World) pour diversifier sans effort."
-    ],
-    difficulty: 'Moyen',
-    impact: 'Long terme'
+  // --- ASSURANCE VIE ---
+  AV_OPEN: {
+    title: "Ouvrir une Assurance Vie",
+    definition: "Le couteau suisse de l'épargne (Projets & Succession).",
+    steps: ["Choisir contrat sans frais d'entrée.", "Mixer Fonds Euros (Sécurité) et UC (Performance)."],
+    tips: ["Ouvrez pour prendre date."], difficulty: 'Moyen', impact: 'Long terme'
+  },
+  AV_BOOST: {
+    title: "Dynamiser votre Assurance Vie",
+    definition: "Votre AV dort peut-être sur un fonds euros peu performant.",
+    steps: ["Vérifier les frais de gestion (<0.6%).", "Arbitrer une partie vers des ETF ou SCPI si horizon long.", "Vérifier la clause bénéficiaire."],
+    tips: ["Si votre contrat a > 8 ans, profitez des abattements."], difficulty: 'Moyen', impact: 'Long terme'
   },
 
-  AV_FONDS_EUROS: {
-    title: "Ouvrir une Assurance Vie (Fonds Euros)",
-    definition: "Le couteau suisse de l'épargne. Plus souple que le PER, plus rentable que le Livret A (sur les bons contrats).",
-    steps: [
-      "Comparer les contrats : 0€ frais d'entrée, 0€ frais d'arbitrage.",
-      "Vérifier le rendement du Fonds Euros sur les 3 dernières années.",
-      "Désigner proprement sa clause bénéficiaire (transmission)."
-    ],
-    tips: [
-      "Idéal pour les projets à moyen terme (achat immo dans 3-5 ans).",
-      "Évitez les contrats proposés par votre banquier (souvent chargés en frais)."
-    ],
-    difficulty: 'Moyen',
-    impact: 'Long terme'
+  // --- CRYPTO ---
+  CRYPTO_OPEN: {
+    title: "Découvrir les Crypto (Prudence)",
+    definition: "Une classe d'actif volatile mais performante pour diversifier (max 5%).",
+    steps: ["Ouvrir un compte sur une plateforme régulée (PSAN).", "Commencer par Bitcoin/Ethereum uniquement.", "Ne mettre que ce qu'on peut perdre."],
+    tips: ["Not your keys, not your coins."], difficulty: 'Difficile', impact: 'Long terme'
+  },
+  CRYPTO_BOOST: {
+    title: "Sécuriser vos Cryptos",
+    definition: "Vous avez des cryptos, pensez à sécuriser vos gains.",
+    steps: ["Avez-vous un Ledger (Cold Wallet) ?", "Rebalencez si ça dépasse 10% de votre patrimoine.", "Déclarez vos comptes aux impôts."],
+    tips: ["Prendre des profits n'a jamais tué personne."], difficulty: 'Moyen', impact: 'Long terme'
   },
 
-  SCPI: {
-    title: "Investir en SCPI (Pierre-Papier)",
-    definition: "Devenir propriétaire immobilier sans gérer les locataires ni les fuites d'eau.",
-    steps: [
-      "Définir si on achète en direct (revenus complémentaires) ou dans une Assurance Vie (capitalisation).",
-      "Diversifier sur 2 ou 3 SCPI (Santé, Logistique, Bureaux).",
-      "Étudier l'achat à crédit pour profiter de l'effet de levier."
-    ],
-    tips: [
-      "Attention aux frais d'entrée élevés (env. 10%). C'est un placement sur 8-10 ans minimum.",
-      "Les revenus sont imposés comme des revenus fonciers (attention à la tranche d'impôt)."
-    ],
-    difficulty: 'Difficile',
-    impact: 'Long terme'
+  // --- IMMO / SCPI ---
+  SCPI_OPEN: {
+    title: "Investir en Pierre-Papier (SCPI)",
+    definition: "L'immobilier sans les soucis de gestion.",
+    steps: ["Définir budget.", "Choisir SCPI diversifiées (Santé/Logistique).", "Étudier l'achat à crédit."],
+    tips: ["Placement long terme (8 ans min)."], difficulty: 'Moyen', impact: 'Long terme'
+  },
+  SCPI_BOOST: {
+    title: "Réinvestir vos loyers SCPI",
+    definition: "Faites rouler la boule de neige immobilière.",
+    steps: ["Optez pour le réinvestissement automatique des dividendes.", "Vérifiez la fiscalité (TMI)."],
+    tips: ["Attention à la fiscalité des revenus fonciers."], difficulty: 'Facile', impact: 'Long terme'
   },
 
-  // --- NIVEAU 4 : OPTIMISATION FISCALE & REVENUS ---
-
-  PER: {
-    title: "Ouvrir un PER (Plan Épargne Retraite)",
-    definition: "Bloquer de l'argent pour la retraite en réduisant ses impôts aujourd'hui. Puissant si vous payez beaucoup d'impôts.",
-    steps: [
-      "Vérifier votre Tranche Marginale d'Imposition (TMI). Intéressant surtout si TMI ≥ 30%.",
-      "Calculer le plafond de déduction disponible sur votre avis d'impôt.",
-      "Choisir un PER en gestion libre avec des frais bas (ETF)."
-    ],
-    tips: [
-      "Attention : l'argent est bloqué jusqu'à la retraite (sauf achat résidence principale).",
-      "L'économie d'impôt à l'entrée est 'rendue' à la sortie, mais vous aurez sûrement une TMI plus faible à la retraite."
-    ],
-    difficulty: 'Difficile',
-    impact: 'Long terme'
+  // --- PER (RETRAITE) ---
+  PER_OPEN: {
+    title: "Ouvrir un PER (Défiscalisation)",
+    definition: "Réduire ses impôts aujourd'hui pour sa retraite demain.",
+    steps: ["Vérifier TMI (>=30%).", "Ouvrir PER frais bas.", "Verser avant le 31/12."],
+    tips: ["Argent bloqué jusqu'à la retraite."], difficulty: 'Difficile', impact: 'Long terme'
   },
-
-  SALARY_NEGOTIATION: {
-    title: "Négocier une Augmentation",
-    definition: "La meilleure façon d'augmenter son épargne n'est pas de moins dépenser, mais de plus gagner.",
-    steps: [
-      "Lister vos réalisations concrètes des 12 derniers mois.",
-      "Faire une étude de marché sur les salaires de votre poste (Glassdoor, LinkedIn).",
-      "Solliciter un entretien formel avec votre manager."
-    ],
-    tips: [
-      "Ne parlez pas de vos besoins perso ('J'ai un loyer à payer'), mais de votre valeur pro.",
-      "Si le salaire est bloqué, négociez des avantages (télétravail, formation, prime)."
-    ],
-    difficulty: 'Difficile',
-    impact: 'Immédiat'
+  PER_BOOST: {
+    title: "Maximiser le plafond PER",
+    definition: "Utilisez votre plafond fiscal non utilisé des 3 dernières années.",
+    steps: ["Regarder avis d'imposition (Plafond Retraite).", "Faire un versement exceptionnel."],
+    tips: ["C'est le moment de gommer une grosse année fiscale."], difficulty: 'Moyen', impact: 'Long terme'
   }
 };
 
 // ============================================================================
 // 2. MODULES DE CALCUL
 // ============================================================================
-
-const estimateTMI = (netIncome: number, parts: number = 1, isSalaried: boolean = true) => {
-    const taxableIncome = netIncome * 12 * (isSalaried ? 0.9 : 1);
-    const q = taxableIncome / Math.max(1, parts);
-    for (let i = FINANCIAL_KNOWLEDGE.TAX_BRACKETS.length - 1; i >= 0; i--) {
-        if (q > FINANCIAL_KNOWLEDGE.TAX_BRACKETS[i].t) return FINANCIAL_KNOWLEDGE.TAX_BRACKETS[i].r;
-    }
-    return 0;
-};
 
 const calculateFIRE = (annualExpenses: number, currentWealth: number, monthlySavings: number, rates: SimulationRates) => {
     if (monthlySavings <= 0) return { years: 99, date: null };
@@ -270,9 +197,39 @@ const calculateCompoundMonths = (target: number, pmt: number, rate: number) => {
     } catch { return 999; }
 };
 
+// ✅ HELPER INTELLIGENT : Vérifie si l'utilisateur possède déjà un actif
+// Il regarde dans TOUTES les listes (Stocks & Flux)
+const hasAsset = (profile: Profile, typeKeys: string[]): boolean => {
+  // On regroupe tout pour être sûr de ne rien rater
+  const allItems = [
+    ...(profile.investments || []),
+    ...(profile.savingsContributions || [])
+  ];
+  
+  if (allItems.length === 0) return false;
+  
+  return allItems.some(inv => {
+    // 1. Vérification par ID strict (ex: 'pea', 'av')
+    if ((inv as any).type && typeKeys.includes((inv as any).type)) return true;
+    
+    // 2. Vérification par mot-clé dans le nom (Fallback)
+    const nameLower = (inv.name || '').toLowerCase();
+    return typeKeys.some(key => {
+      if (key === 'pea') return nameLower.includes('pea') || nameLower.includes('plan epargne action');
+      if (key === 'av') return nameLower.includes('assurance') || nameLower.includes('vie') || nameLower.includes('av ');
+      if (key === 'crypto') return nameLower.includes('crypto') || nameLower.includes('bitcoin') || nameLower.includes('eth');
+      if (key === 'scpi') return nameLower.includes('scpi') || nameLower.includes('civil') || nameLower.includes('immo');
+      if (key === 'per') return nameLower.includes('per') || nameLower.includes('retraite');
+      if (key === 'livret') return nameLower.includes('livret') || nameLower.includes('ldd') || nameLower.includes('lep');
+      return nameLower.includes(key);
+    });
+  });
+};
+
 // ============================================================================
-// 3. GESTION DES OBJECTIFS
+// 3. GESTION DES OBJECTIFS & BUDGET
 // ============================================================================
+
 export const calculateMonthlyEffort = (goal: Goal): number => {
   if (!goal.targetAmount || !goal.deadline) return 0;
   const targetDate = new Date(goal.deadline);
@@ -348,106 +305,52 @@ export const distributeGoals = (goals: Goal[], capacity: number) => {
 // ============================================================================
 // 4. ORCHESTRATEUR (MOTEUR PRINCIPAL)
 // ============================================================================
-export const computeFinancialPlan = (
-    profile: Profile, 
-    customRates?: Partial<SimulationRates>
-): SimulationResult => {
-  
+
+export const computeFinancialPlan = (profile: Profile, customRates?: Partial<SimulationRates>): SimulationResult => {
   const RATES = { ...FINANCIAL_KNOWLEDGE.RATES, ...customRates };
   
-  // 1. REVENUS
+  // Calculs de base
   const income = calculateListTotal(profile.incomes);
-  
-  // 2. CHARGES FIXES
   let housingCost = 0;
   if (profile.housing?.status === 'tenant' || profile.housing?.status === 'owner_loan') {
       housingCost = safeFloat(profile.housing?.monthlyCost);
   }
   const annualExpensesTotal = calculateListTotal(profile.annualExpenses);
   const fixed = calculateListTotal(profile.fixedCosts) + housingCost + annualExpensesTotal + calculateListTotal(profile.credits) + calculateListTotal(profile.subscriptions);
-  
-  // 3. CHARGES VARIABLES
   const variable = calculateListTotal(profile.variableCosts || []);
-
-  // 4. BUDGET PLAISIR
   const funBudget = safeFloat(profile.funBudget); 
-
-  // 5. FLUX D'INVESTISSEMENT
   const manualSavings = calculateListTotal(profile.savingsContributions);
   
-  // 6. CAPACITÉ D'ÉPARGNE & SOLDE (LE CŒUR DU CALCUL)
   const mandatoryAndVital = fixed + variable;
-  
-  // Capacité Théorique (Revenus - Charges)
   const rawCapacity = income - mandatoryAndVital - funBudget;
-  
-  // [CRITIQUE] Solde Réel Fin de Mois (Capacité - Investissements forcés)
-  // C'est ce chiffre qui détermine si tu es à découvert à cause de tes virements
   const endOfMonthBalance = rawCapacity - manualSavings;
-
-  // Pour l'affichage UI, on garde le 0 minimum pour ne pas casser les graphes
   const totalSavingsCapacity = Math.max(0, rawCapacity);
-  
-  // 7. CASHFLOW NET (Argent dispo pour les objectifs, après investissements manuels)
   const netCashflow = Math.max(0, totalSavingsCapacity - manualSavings);
 
-  // Allocation des objectifs
-  const { allocations, totalAllocated } = distributeGoals(profile.goals || [], netCashflow);
-  
-  // 8. PATRIMOINE
+  // Patrimoine (Récupération des valeurs pré-calculées par la page profil)
   const matelas = safeFloat(profile.savings);
   const investedStock = safeFloat(profile.investedAmount);
   const currentBalance = safeFloat(profile.currentBalance);
   const totalWealth = matelas + investedStock + currentBalance;
 
-  // KPIs pour le docteur
+  // KPIs
   const burnRate = mandatoryAndVital + Math.min(funBudget, 500); 
   const safetyMonths = burnRate > 0 ? matelas / burnRate : 0;
-  
   const debtTotal = calculateListTotal(profile.credits) + (profile.housing?.status === 'owner_loan' ? housingCost : 0);
   const debtRatio = income > 0 ? (debtTotal / income) * 100 : 0;
-  
-  const remainingBeforeFun = Math.max(0, income - mandatoryAndVital - manualSavings);
+
+  // Allocation
+  const { allocations, totalAllocated } = distributeGoals(profile.goals || [], netCashflow);
 
   return {
     budget: { 
-      income, 
-      fixed, 
-      variable, 
-      variableExpenses: variable, // Alias pour compatibilité
-      monthlyIncome: income, 
-      mandatoryExpenses: fixed,
-      variableExpenses: variable, 
-      discretionaryExpenses: funBudget,
-      
-      capacityToSave: totalSavingsCapacity, 
-      
-      // Les deux indicateurs de vérité
-      rawCapacity, 
-      endOfMonthBalance, 
-
-      profitableExpenses: manualSavings + totalAllocated, 
-      
-      totalRecurring: fixed + variable + manualSavings, 
-      
-      remainingToLive: remainingBeforeFun, 
-      realCashflow: netCashflow, 
-      
-      matelas, 
-      investments: investedStock, 
-      totalWealth,
-      safetyMonths, 
-      engagementRate: debtRatio,
-      rules: PERSONA_PRESETS.SALARIED.rules,
-      securityBuffer: 0, 
-      availableForProjects: 0,
-      currentBalance,
-      capacity: totalSavingsCapacity,
-      totalGoalsEffort: totalAllocated
+      income, fixed, variable, variableExpenses: variable, monthlyIncome: income, mandatoryExpenses: fixed, discretionaryExpenses: funBudget,
+      capacityToSave: totalSavingsCapacity, rawCapacity, endOfMonthBalance, profitableExpenses: manualSavings + totalAllocated, 
+      totalRecurring: fixed + variable + manualSavings, remainingToLive: Math.max(0, income - mandatoryAndVital - manualSavings), 
+      realCashflow: netCashflow, matelas, investments: investedStock, totalWealth, safetyMonths, engagementRate: debtRatio,
+      rules: PERSONA_PRESETS.SALARIED.rules, securityBuffer: 0, availableForProjects: 0, currentBalance, capacity: totalSavingsCapacity, totalGoalsEffort: totalAllocated
     },
-    allocations, 
-    freeCashFlow: netCashflow,
-    usedRates: RATES
+    allocations, freeCashFlow: netCashflow, usedRates: RATES
   };
 };
 
@@ -463,8 +366,9 @@ export const simulateGoalScenario = (goalInput: any, profile: any, context: any,
 };
 
 // ============================================================================
-// 5. LE DOCTEUR FINANCIER V2 (SUPERCHARGED - LOGIC GATES EDITION)
+// 5. LE DOCTEUR FINANCIER V2 (SMART RECOMMENDATION EDITION)
 // ============================================================================
+
 export const analyzeProfileHealth = (
     profile: Profile, 
     context: SimulationResult['budget'],
@@ -475,111 +379,57 @@ export const analyzeProfileHealth = (
   const opps: OptimizationOpportunity[] = [];
   const tags: string[] = [];
   
-  // Données de base
   const { safetyMonths, engagementRate } = context;
   const totalIncome = Math.max(1, context.monthlyIncome);
   const needsTotal = context.fixed + (context.variableExpenses || 0);
-  
-  // On récupère les deux indicateurs clés
   const rawCapacity = context.rawCapacity; 
   const endOfMonthBalance = context.endOfMonthBalance;
 
-  // =================================================================
-  // PORTE 1 : SURVIE & TRÉSORERIE (KILL SWITCH)
-  // On vérifie si le compte finit dans le rouge, quelle qu'en soit la cause.
-  // =================================================================
-  
+  // --- PORTE 1 : SURVIE (URGENCES) ---
   if (endOfMonthBalance < 0) {
-      // CAS A : DÉFICIT STRUCTUREL (On vit au-dessus de ses moyens avant même d'épargner)
       if (rawCapacity < 0) {
           return {
-              globalScore: 10,
-              tags: ["DANGER", "DÉFICIT"],
-              ratios: { 
-                needs: Math.round((needsTotal / totalIncome) * 100), 
-                wants: Math.round((context.discretionaryExpenses / totalIncome) * 100), 
-                savings: 0 
-              },
-              projections: { wealth10y: 0, wealth20y: 0, fireYear: 99 },
-              opportunities: [{
-                 id: 'CRITICAL_DEFICIT', type: 'BUDGET', level: 'CRITICAL',
-                 title: 'URGENCE ABSOLUE',
-                 message: `Vous vivez au-dessus de vos moyens. Déficit : ${formatCurrency(rawCapacity)}.`,
-                 guide: ACTION_GUIDES.BUDGET_CUT,
-                 potentialGain: Math.abs(rawCapacity) * 12
-              }]
+              globalScore: 10, tags: ["DANGER"], ratios: { needs: 100, wants: 0, savings: 0 }, projections: { wealth10y: 0, wealth20y: 0, fireYear: 99 },
+              opportunities: [{ id: 'CRITICAL_DEFICIT', type: 'BUDGET', level: 'CRITICAL', title: 'URGENCE ABSOLUE', message: `Déficit structurel de ${formatCurrency(rawCapacity)}.`, guide: ACTION_GUIDES.BUDGET_CUT }]
           };
-      } 
-      // CAS B : SURCHAUFFE D'INVESTISSEMENT (On investit l'argent qu'on n'a pas)
-      else {
-          const investAmount = context.profitableExpenses; // Montant investi
+      } else {
           return {
-              globalScore: 30, // Score faible car situation intenable
-              tags: ["SURCHAUFFE", "DÉFICIT"],
-              ratios: { 
-                  needs: Math.round((needsTotal / totalIncome) * 100), 
-                  wants: Math.round((context.discretionaryExpenses / totalIncome) * 100), 
-                  savings: Math.round((investAmount / totalIncome) * 100)
-              },
-              projections: { wealth10y: 0, wealth20y: 0, fireYear: 99 },
-              opportunities: [{
-                 id: 'OVER_INVESTMENT', type: 'INVESTMENT', level: 'CRITICAL',
-                 title: 'Surchauffe Investissement',
-                 message: `Vous investissez trop (${formatCurrency(investAmount)}) par rapport à votre reste à vivre. Vous êtes à découvert de ${formatCurrency(endOfMonthBalance)}. Réduisez vos versements.`,
-                 guide: ACTION_GUIDES.BUDGET_CUT,
-                 potentialGain: Math.abs(endOfMonthBalance) * 12
-              }]
+              globalScore: 30, tags: ["SURCHAUFFE"], ratios: { needs: 60, wants: 20, savings: 20 }, projections: { wealth10y: 0, wealth20y: 0, fireYear: 99 },
+              opportunities: [{ id: 'OVER_INVEST', type: 'INVESTMENT', level: 'CRITICAL', title: 'Surchauffe', message: `Vous investissez trop (${formatCurrency(context.profitableExpenses)}) par rapport à vos moyens.`, guide: ACTION_GUIDES.BUDGET_CUT }]
           };
       }
   }
 
-  // 1.2 Le Reste à Vivre (Pauvreté)
-  const rav = totalIncome - context.fixed; 
-  if (rav < FINANCIAL_KNOWLEDGE.THRESHOLDS.MIN_RAV) {
-      return {
-          globalScore: 20,
-          tags: ["SURVIE"],
-          ratios: { needs: 100, wants: 0, savings: 0 },
-          projections: { wealth10y: 0, wealth20y: 0, fireYear: 99 },
-          opportunities: [{
-             id: 'CRITICAL_POVERTY', type: 'BUDGET', level: 'CRITICAL',
-             title: 'Reste à vivre critique',
-             message: `Il vous reste moins de ${FINANCIAL_KNOWLEDGE.THRESHOLDS.MIN_RAV}€ pour vivre après vos charges fixes.`,
-             guide: ACTION_GUIDES.BUDGET_CUT
-          }]
-      };
-  }
-
-  // =================================================================
-  // PORTE 2 : SÉCURITÉ (SAFETY CHECK & CAPPING)
-  // =================================================================
-  
-  let scoreCap = 100; 
+  // --- PORTE 2 : SÉCURITÉ (MATELAS) ---
+  const savings = safeFloat(context.matelas);
   const isFreelance = profile.persona === 'freelance';
   const targetMonths = isFreelance ? 6 : 3;
   const idealSafety = (needsTotal + Math.min(context.discretionaryExpenses, 500)) * targetMonths;
-  const savings = safeFloat(context.matelas);
 
   if (savings < FINANCIAL_KNOWLEDGE.THRESHOLDS.SURVIVAL_BUFFER) {
-    scoreCap = 30;
     opps.push({
       id: 'safety_danger', type: 'SAVINGS', level: 'CRITICAL',
-      title: 'Zone Rouge', message: `Pas d'épargne de précaution. Priorité absolue : mettre 1000€ de côté.`,
-      guide: ACTION_GUIDES.MATELAS
+      title: 'Zone Rouge', message: `Pas d'épargne de précaution.`,
+      guide: ACTION_GUIDES.LIVRET_OPEN // Pas de matelas = on ouvre un livret
     });
   } else if (savings < idealSafety) {
-    scoreCap = 60;
-    const level = isFreelance ? 'CRITICAL' : 'WARNING';
-    opps.push({
-      id: 'safety_build', type: 'SAVINGS', level: level,
-      title: 'Sécurité Fragile',
-      message: `Visez ${targetMonths} mois de charges (${formatCurrency(idealSafety)}) pour être serein.`,
-      guide: ACTION_GUIDES.MATELAS
-    });
+    // Il a un peu de sous, mais pas assez. A-t-il déjà un Livret ?
+    if (hasAsset(profile, ['livret', 'ldd', 'lep'])) {
+      opps.push({
+        id: 'safety_boost', type: 'SAVINGS', level: isFreelance ? 'CRITICAL' : 'WARNING',
+        title: 'Sécurité Fragile', message: `Renforcez vos livrets pour atteindre ${targetMonths} mois (${formatCurrency(idealSafety)}).`,
+        guide: ACTION_GUIDES.LIVRET_BOOST // Il a déjà un début, on booste
+      });
+    } else {
+      opps.push({
+        id: 'safety_build', type: 'SAVINGS', level: isFreelance ? 'CRITICAL' : 'WARNING',
+        title: 'Sécurité Fragile', message: `Visez ${targetMonths} mois (${formatCurrency(idealSafety)}).`,
+        guide: ACTION_GUIDES.LIVRET_OPEN
+      });
+    }
   }
 
   if (engagementRate > FINANCIAL_KNOWLEDGE.THRESHOLDS.HCSF_DEBT_RATIO) {
-      scoreCap = Math.min(scoreCap, 50); 
       opps.push({
           id: 'debt_alert', type: 'DEBT', level: 'WARNING',
           title: 'Surchauffe Crédit',
@@ -588,88 +438,125 @@ export const analyzeProfileHealth = (
       });
   }
 
-  // =================================================================
-  // PORTE 3 : PERFORMANCE & OPTIMISATION
-  // =================================================================
-
+  // --- PORTE 3 : INVESTISSEMENT & OPTIMISATION (SMART LOGIC) ---
   const cash = safeFloat(context.currentBalance);
   const invested = context.investments;
   const totalWealth = context.totalWealth;
-  const age = safeFloat(profile.age) || 30;
-
-  const needsRatio = Math.round((needsTotal / totalIncome) * 100);
-  const wantsRatio = Math.round((context.discretionaryExpenses / totalIncome) * 100);
-  const savingsRatio = Math.round((context.capacityToSave / totalIncome) * 100);
-
-  const fireData = calculateFIRE((needsTotal + context.discretionaryExpenses) * 12, totalWealth, context.capacityToSave, RATES);
-  const wealth10y = simulateFutureWealth(totalWealth, context.capacityToSave, 10, RATES.MARKET_AVG);
-  const wealth20y = simulateFutureWealth(totalWealth, context.capacityToSave, 20, RATES.MARKET_AVG);
-
+  
+  // A. TROP DE CASH (CASH DRAG)
   if (savings >= idealSafety && cash > context.fixed * 1.5) {
        const overflow = cash - context.fixed * 1.5;
+       
+       let guideToUse = ACTION_GUIDES.PEA_OPEN; // Par défaut : Ouvre un PEA
+       let msg = `L'inflation mange vos ${formatCurrency(overflow)}. Placez-les.`;
+
+       if (hasAsset(profile, ['pea'])) {
+           guideToUse = ACTION_GUIDES.PEA_BOOST; // Il a un PEA -> On booste
+           msg = `Vos ${formatCurrency(overflow)} dorment. Envoyez-les vers votre PEA.`;
+       } else if (hasAsset(profile, ['av'])) {
+           guideToUse = ACTION_GUIDES.AV_BOOST; // Pas de PEA mais une AV -> On booste l'AV
+           msg = `Vos ${formatCurrency(overflow)} dorment. Renforcez votre Assurance Vie.`;
+       }
+
        opps.push({
           id: 'cash_drag', type: 'INVESTMENT', level: 'INFO',
-          title: 'Argent qui dort',
-          message: `Vous perdez de l'argent (inflation). Placez ces ${formatCurrency(overflow)}.`,
-          guide: ACTION_GUIDES.PEA,
-          potentialGain: overflow * 0.05 
+          title: 'Argent qui dort', message: msg,
+          guide: guideToUse, potentialGain: overflow * 0.05 
        });
   }
 
-  if (age > 30 && invested < 1000 && savings > 5000) {
+  // B. INVESTISSEUR DÉBUTANT (LATE STARTER)
+  const age = safeFloat(profile.age) || 30;
+  if (age > 25 && invested < 1000 && savings > 3000) {
+      let guideToUse = ACTION_GUIDES.PEA_OPEN;
+      if (hasAsset(profile, ['pea'])) guideToUse = ACTION_GUIDES.PEA_BOOST; // Cas rare (a un PEA vide)
+
       opps.push({
           id: 'late_starter', type: 'INVESTMENT', level: 'WARNING',
-          title: 'Réveil nécessaire',
-          message: `Votre argent stagne. Commencez l'investissement maintenant.`,
-          guide: ACTION_GUIDES.INVEST_START
+          title: 'Réveil nécessaire', message: `Votre argent stagne. Commencez l'investissement.`,
+          guide: guideToUse
       });
   }
 
-  if (totalIncome > 4000 && invested < 5000) {
-      opps.push({ 
-          id: 'tax_optim', type: 'INVESTMENT', level: 'INFO', 
-          title: 'Défiscalisation', 
-          message: 'Revenus élevés : regardez le PER.', 
-          guide: ACTION_GUIDES.PER, // Nouveau guide connecté
-          potentialGain: 1000 
-      });
+  // C. OPTIMISATION FISCALE (PER)
+  if (totalIncome > 3500 && invested < 20000) {
+      if (hasAsset(profile, ['per'])) {
+          opps.push({ 
+             id: 'tax_optim_boost', type: 'INVESTMENT', level: 'INFO', 
+             title: 'Défiscalisation', message: 'Optimisez vos versements PER avant fin d\'année.', 
+             guide: ACTION_GUIDES.PER_BOOST 
+          });
+      } else {
+          opps.push({ 
+             id: 'tax_optim_open', type: 'INVESTMENT', level: 'INFO', 
+             title: 'Trop d\'impôts ?', message: 'Avec vos revenus, le PER devient très intéressant.', 
+             guide: ACTION_GUIDES.PER_OPEN 
+          });
+      }
   }
-
+  
+  // D. LEP (Le Cheat Code)
   const isEligibleLEP = (profile.household?.adults === 1 && totalIncome * 12 < FINANCIAL_KNOWLEDGE.THRESHOLDS.LEP_INCOME_SINGLE) ||
                         (profile.household?.adults >= 2 && totalIncome * 12 < FINANCIAL_KNOWLEDGE.THRESHOLDS.LEP_INCOME_COUPLE);
   
   if (isEligibleLEP && savings < 10000) {
-      opps.push({
-          id: 'lep_opp', type: 'SAVINGS', level: 'SUCCESS',
-          title: 'Droit au LEP', message: `Livret à 5% net disponible. Foncez.`,
-          guide: ACTION_GUIDES.LEP,
-          potentialGain: (10000 - savings) * (0.05 - 0.03) 
-      });
+      if (!hasAsset(profile, ['lep', 'populaire'])) {
+          opps.push({
+              id: 'lep_opp', type: 'SAVINGS', level: 'SUCCESS',
+              title: 'Droit au LEP', message: `Livret à 5% net disponible. Foncez.`,
+              guide: ACTION_GUIDES.LEP_OPEN,
+              potentialGain: (10000 - savings) * 0.02
+          });
+      }
   }
 
-  // =================================================================
-  // SCORING FINAL
-  // =================================================================
+  // E. DIVERSIFICATION (SCPI / CRYPTO)
+  if (totalWealth > 50000 && invested > 10000) {
+      if (!hasAsset(profile, ['crypto']) && (profile.age as number) < 40) {
+          opps.push({
+              id: 'div_crypto', type: 'INVESTMENT', level: 'INFO',
+              title: 'Diversification Crypto', message: 'Allouez 1% à 5% de votre patrimoine aux actifs numériques.',
+              guide: ACTION_GUIDES.CRYPTO_OPEN
+          });
+      } else if (hasAsset(profile, ['crypto'])) {
+          opps.push({
+              id: 'div_crypto_boost', type: 'INVESTMENT', level: 'INFO',
+              title: 'Sécuriser Crypto', message: 'Pensez à sécuriser vos gains crypto sur un Cold Wallet.',
+              guide: ACTION_GUIDES.CRYPTO_BOOST
+          });
+      }
+
+      if (!hasAsset(profile, ['scpi', 'immo']) && !profile.housing?.status.includes('owner')) {
+          opps.push({
+              id: 'div_scpi', type: 'INVESTMENT', level: 'INFO',
+              title: 'Immobilier Papier', message: 'Ajoutez de la pierre à votre patrimoine sans gestion.',
+              guide: ACTION_GUIDES.SCPI_OPEN
+          });
+      }
+  }
+
+  // --- SCORING FINAL ---
   let score = 100;
-  
+  const needsRatio = Math.round((needsTotal / totalIncome) * 100);
+  const wantsRatio = Math.round((context.discretionaryExpenses / totalIncome) * 100);
+  const savingsRatio = Math.round((context.capacityToSave / totalIncome) * 100);
+
   if (needsRatio > 55) score -= (needsRatio - 55) * 1.5;
   if (wantsRatio > 30) score -= (wantsRatio - 30);
-  
   if (savingsRatio > 20) score += 5;
-  if (invested > savings && safetyMonths > targetMonths) score += 5;
-
-  score = Math.min(score, scoreCap);
-
+  
   if (savingsRatio > 25) tags.push("Fourmi");
   else if (wantsRatio > 40) tags.push("Cigale");
   if (invested > savings * 0.5) tags.push("Investisseur");
-  if (scoreCap < 50) tags.push("Fragile");
+
+  const wealth10y = simulateFutureWealth(totalWealth, context.capacityToSave, 10, RATES.MARKET_AVG);
+  const wealth20y = simulateFutureWealth(totalWealth, context.capacityToSave, 20, RATES.MARKET_AVG);
 
   return {
     globalScore: Math.max(0, Math.min(100, Math.round(score))),
     tags: [...new Set(tags)],
     ratios: { needs: needsRatio, wants: wantsRatio, savings: savingsRatio },
-    projections: { wealth10y, wealth20y, fireYear: fireData.years },
+    projections: { wealth10y, wealth20y, fireYear: 99 },
     opportunities: opps.sort((a, b) => {
         const levels: Record<string, number> = { 'CRITICAL': 0, 'WARNING': 1, 'SUCCESS': 2, 'INFO': 3 };
         return levels[a.level] - levels[b.level];

@@ -23,7 +23,7 @@ import {
   TrendingUp, ArrowRight, Zap, Layers, Wallet, Rocket, 
   AlertOctagon, BookOpen, X, CheckSquare, Stethoscope, ShieldCheck, 
   XCircle, PiggyBank, Crown, Target, HelpCircle, AlertTriangle,
-  Lightbulb, Gauge, Clock, HeartPulse, Thermometer // Nouveaux icones
+  Lightbulb, Gauge, Clock, HeartPulse, Thermometer
 } from 'lucide-react';
 
 // ============================================================================
