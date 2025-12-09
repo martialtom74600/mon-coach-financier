@@ -153,8 +153,8 @@ const LiveSummary = ({ formData, stats, currentStep }: LiveSummaryProps) => {
           <h3 className="text-xs font-bold text-indigo-500 uppercase tracking-widest mb-1">Votre Profil</h3>
           <div className="text-2xl font-black text-slate-800 truncate">{formData.firstName || "Invité"}</div>
           <div className="flex flex-wrap gap-2 mt-3">
-             {formData.age && <Badge variant="secondary" className="bg-slate-100 text-slate-600">{formData.age} ans</Badge>}
-             {formData.persona && <Badge className="bg-indigo-100 text-indigo-700 border-indigo-200 capitalize">{formData.persona === 'salaried' ? 'Salarié' : formData.persona}</Badge>}
+              {formData.age && <Badge variant="secondary" className="bg-slate-100 text-slate-600">{formData.age} ans</Badge>}
+              {formData.persona && <Badge className="bg-indigo-100 text-indigo-700 border-indigo-200 capitalize">{formData.persona === 'salaried' ? 'Salarié' : formData.persona}</Badge>}
           </div>
         </div>
       </Card>
@@ -231,33 +231,50 @@ const StepIdentite = ({ formData, updateForm, onNext }: StepProps) => (
 );
 
 const StepSituation = ({ formData, updateForm, onNext, onPrev }: StepProps) => (
-    <WizardLayout title="Votre Situation" subtitle="Adaptons la stratégie à votre profil." icon={Briefcase}
-        footer={<><Button variant="ghost" onClick={onPrev}>Retour</Button><Button onClick={onNext}>Continuer <ArrowRight className="ml-2" size={18}/></Button></>}>
-        <div className="space-y-8">
-            <div><label className="block text-xs font-bold text-slate-500 uppercase mb-3">Statut Pro</label>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <SelectionTile icon={Briefcase} title="Salarié" desc="CDI / CDD" selected={formData.persona === 'salaried'} onClick={() => updateForm({ ...formData, persona: 'salaried' })} />
-                    <SelectionTile icon={Target} title="Indépendant" desc="Freelance" selected={formData.persona === 'freelance'} onClick={() => updateForm({ ...formData, persona: 'freelance' })} />
-                    <SelectionTile icon={GraduationCap} title="Étudiant" desc="Études" selected={formData.persona === 'student'} onClick={() => updateForm({ ...formData, persona: 'student' })} />
-                    <SelectionTile icon={Armchair} title="Retraité" desc="Pension" selected={formData.persona === 'retired'} onClick={() => updateForm({ ...formData, persona: 'retired' })} />
-                </div>
-            </div>
-            <div><label className="block text-xs font-bold text-slate-500 uppercase mb-3">Logement</label>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <SelectionTile icon={Building} title="Locataire" desc="Loyer" selected={formData.housing?.status === 'tenant'} onClick={() => updateForm({ ...formData, housing: { ...formData.housing, status: 'tenant' } })} />
-                    <SelectionTile icon={Home} title="Propriétaire" desc="Crédit" selected={formData.housing?.status === 'owner_loan'} onClick={() => updateForm({ ...formData, housing: { ...formData.housing, status: 'owner_loan' } })} />
-                    <SelectionTile icon={CheckCircle} title="Propriétaire" desc="Payé" selected={formData.housing?.status === 'owner_paid'} onClick={() => updateForm({ ...formData, housing: { ...formData.housing, status: 'owner_paid' } })} />
-                    <SelectionTile icon={HeartHandshake} title="Gratuit" desc="Hébergé" selected={formData.housing?.status === 'free'} onClick={() => updateForm({ ...formData, housing: { ...formData.housing, status: 'free' } })} />
-                </div>
-            </div>
-            <div><label className="block text-xs font-bold text-slate-500 uppercase mb-3">Foyer</label>
-                <div className="flex gap-4">
-                    <CounterControl label="Adultes" value={formData.household?.adults || 1} onChange={(v:number) => updateForm({ ...formData, household: {...formData.household, adults: v}})} />
-                    <CounterControl label="Enfants" value={formData.household?.children || 0} onChange={(v:number) => updateForm({ ...formData, household: {...formData.household, children: v}})} />
-                </div>
-            </div>
-        </div>
-    </WizardLayout>
+  <WizardLayout title="Votre Situation" subtitle="Adaptons la stratégie à votre profil." icon={Briefcase}
+      footer={<><Button variant="ghost" onClick={onPrev}>Retour</Button><Button onClick={onNext}>Continuer <ArrowRight className="ml-2" size={18}/></Button></>}>
+      <div className="space-y-8">
+          <div><label className="block text-xs font-bold text-slate-500 uppercase mb-3">Statut Pro</label>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <SelectionTile icon={Briefcase} title="Salarié" desc="CDI / CDD" selected={formData.persona === 'salaried'} onClick={() => updateForm({ ...formData, persona: 'salaried' })} />
+                  <SelectionTile icon={Target} title="Indépendant" desc="Freelance" selected={formData.persona === 'freelance'} onClick={() => updateForm({ ...formData, persona: 'freelance' })} />
+                  <SelectionTile icon={GraduationCap} title="Étudiant" desc="Études" selected={formData.persona === 'student'} onClick={() => updateForm({ ...formData, persona: 'student' })} />
+                  <SelectionTile icon={Armchair} title="Retraité" desc="Pension" selected={formData.persona === 'retired'} onClick={() => updateForm({ ...formData, persona: 'retired' })} />
+              </div>
+          </div>
+          <div><label className="block text-xs font-bold text-slate-500 uppercase mb-3">Logement</label>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {/* Pour Locataire et Propriétaire (crédit), on garde l'ancien montant s'il existe (UX friendly en cas d'erreur de clic) */}
+                  <SelectionTile icon={Building} title="Locataire" desc="Loyer" selected={formData.housing?.status === 'tenant'} onClick={() => updateForm({ ...formData, housing: { ...formData.housing, status: 'tenant' } })} />
+                  <SelectionTile icon={Home} title="Propriétaire" desc="Crédit" selected={formData.housing?.status === 'owner_loan'} onClick={() => updateForm({ ...formData, housing: { ...formData.housing, status: 'owner_loan' } })} />
+                  
+                  {/* ✅ FIX UX : On force monthlyCost à 0 pour "Propriétaire Payé" */}
+                  <SelectionTile 
+                    icon={CheckCircle} 
+                    title="Propriétaire" 
+                    desc="Payé" 
+                    selected={formData.housing?.status === 'owner_paid'} 
+                    onClick={() => updateForm({ ...formData, housing: { ...formData.housing, status: 'owner_paid', monthlyCost: 0 } })} 
+                  />
+                  
+                  {/* ✅ FIX UX : On force monthlyCost à 0 pour "Gratuit / Hébergé" */}
+                  <SelectionTile 
+                    icon={HeartHandshake} 
+                    title="Gratuit" 
+                    desc="Hébergé" 
+                    selected={formData.housing?.status === 'free'} 
+                    onClick={() => updateForm({ ...formData, housing: { ...formData.housing, status: 'free', monthlyCost: 0 } })} 
+                  />
+              </div>
+          </div>
+          <div><label className="block text-xs font-bold text-slate-500 uppercase mb-3">Foyer</label>
+              <div className="flex gap-4">
+                  <CounterControl label="Adultes" value={formData.household?.adults || 1} onChange={(v:number) => updateForm({ ...formData, household: {...formData.household, adults: v}})} />
+                  <CounterControl label="Enfants" value={formData.household?.children || 0} onChange={(v:number) => updateForm({ ...formData, household: {...formData.household, children: v}})} />
+              </div>
+          </div>
+      </div>
+  </WizardLayout>
 );
 
 // ✅ STEP 3 : Charges FIXES (Dates précises)
@@ -468,12 +485,20 @@ export default function ProfilePage() {
     updateForm({ ...formData, [list]: currentList.filter((i) => i.id !== id) });
   };
 
+  // ✅ FONCTION SAVE BLINDÉE
   const handleSaveAndExit = async (lifestyle: number, savings: number) => {
     if (isSaving || !formData) return;
     setIsSaving(true);
     try {
         const stockAmount = formData.investedAmount || 0;
         const monthlyFlows = (formData.investments || []).map(item => ({ ...item, frequency: 'mensuel' }));
+
+        // 🛡️ SANITIZATION BACKEND/SAVE
+        // Sécurité supplémentaire : On force le coût à 0 si le statut est gratuit/payé
+        let finalHousingCost = formData.housing?.monthlyCost || 0;
+        if (formData.housing?.status === 'free' || formData.housing?.status === 'owner_paid') {
+            finalHousingCost = 0;
+        }
 
         const finalData = { 
             ...formData, 
@@ -482,7 +507,12 @@ export default function ProfilePage() {
             investedAmount: stockAmount,
             savingsContributions: monthlyFlows,
             investments: [], // On vide l'affichage Stock pour éviter doublons calcul
-            variableCosts: formData.variableCosts || [] // On sauvegarde bien le Step 4
+            variableCosts: formData.variableCosts || [], // On sauvegarde bien le Step 4
+            // On sauvegarde l'objet housing nettoyé
+            housing: {
+                ...formData.housing,
+                monthlyCost: finalHousingCost
+            }
         };
 
         await saveProfile(finalData);

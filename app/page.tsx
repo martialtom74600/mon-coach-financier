@@ -305,87 +305,101 @@ function DashboardView() {
   return (
     <>
       <style>{styles}</style>
-      <div className="space-y-8 pb-10">
-        
-        {selectedGuide && <EducationalModal guide={selectedGuide} onClose={() => setSelectedGuide(null)} />}
-          
-        {/* --- 1. LES CHIFFRES CLÉS (KPIs) --- */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 animate-fade-in-up">
-              
-              {/* KPI 1 : PATRIMOINE */}
-              <KpiCard 
-                  icon={Layers} 
-                  label="Patrimoine Net" 
-                  value={formatCurrency(currentNetWorth)} 
-                  subtext="Cash + Investissements"
-                  delay="delay-0"
-              />
+      {/* WRAPPER PRINCIPAL CONTRAINT */}
+      <div className="min-h-screen bg-slate-50/50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <div className="space-y-8 pb-10">
+                
+                {selectedGuide && <EducationalModal guide={selectedGuide} onClose={() => setSelectedGuide(null)} />}
+                  
+                {/* --- 1. LES CHIFFRES CLÉS (KPIs) --- */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 animate-fade-in-up">
+                      {/* KPI 1 : PATRIMOINE */}
+                      <KpiCard 
+                          icon={Layers} 
+                          label="Patrimoine Net" 
+                          value={formatCurrency(currentNetWorth)} 
+                          subtext="Cash + Investissements"
+                          delay="delay-0"
+                      />
 
-              {/* KPI 2 : CAPACITÉ / DÉFICIT */}
-              <KpiCard 
-                  icon={isDeficit ? AlertTriangle : Wallet} 
-                  label={isDeficit ? "Solde Fin de Mois" : "Capacité d'Épargne"} 
-                  value={formatCurrency(isDeficit ? balance : rawCapacity)}
-                  trend={isDeficit ? "Négatif" : `${analysis.ratios.savings}% des revenus`}
-                  colorClass={isDeficit ? "text-rose-600" : "text-emerald-600"}
-                  delay="delay-100"
-                  subtext={
-                      isOverInvested 
-                      ? <span className="text-rose-500 font-bold">Investissement excessif !</span>
-                      : (isDeficit 
-                          ? <span className="text-rose-500 font-bold">Déficit structurel</span>
-                          : (autoInvest > 0 ? `Dont ${formatCurrency(autoInvest)} investis` : "100% Cash")
-                      )
-                  }
-              />
+                      {/* KPI 2 : CAPACITÉ / DÉFICIT */}
+                      <KpiCard 
+                          icon={isDeficit ? AlertTriangle : Wallet} 
+                          label={isDeficit ? "Solde Fin de Mois" : "Capacité d'Épargne"} 
+                          value={formatCurrency(isDeficit ? balance : rawCapacity)}
+                          trend={isDeficit ? "Négatif" : `${analysis.ratios.savings}% des revenus`}
+                          colorClass={isDeficit ? "text-rose-600" : "text-emerald-600"}
+                          delay="delay-100"
+                          subtext={
+                              isOverInvested 
+                              ? <span className="text-rose-500 font-bold">Investissement excessif !</span>
+                              : (isDeficit 
+                                  ? <span className="text-rose-500 font-bold">Déficit structurel</span>
+                                  : (autoInvest > 0 ? `Dont ${formatCurrency(autoInvest)} investis` : "100% Cash")
+                              )
+                          }
+                      />
 
-              {/* KPI 3 : SÉCURITÉ */}
-              <KpiCard 
-                  icon={ShieldCheck} 
-                  label="Filet de Sécurité" 
-                  value={safetyMonths >= 99 ? "Infini" : `${safetyMonths.toFixed(1)} mois`} 
-                  subtext="Durée de vie sans revenus"
-                  colorClass={safetyMonths < 1 ? "text-rose-600" : (safetyMonths < 3 ? "text-amber-600" : "text-indigo-600")}
-                  delay="delay-200"
-              />
-        </div>
-
-        {/* --- 2. LE COEUR (SANKEY + DIAGNOSTIC CÔTE À CÔTE) --- */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-fade-in-up delay-200">
-             {/* GAUCHE : LE SANKEY (Prend 2/3) */}
-             <div className="lg:col-span-2 h-full">
-                  <FinancialSankey />
-             </div>
-             {/* DROITE : LE DOCTEUR (Prend 1/3) */}
-             <div className="h-full">
-                  <DoctorMiniCard analysis={analysis} />
-             </div>
-        </div>
-
-        {/* --- 3. LE PLAN D'ACTION --- */}
-        <div className="space-y-6 animate-fade-in-up delay-300">
-             <div className="flex items-center justify-between">
-                <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2"><Rocket className="text-indigo-600"/> Actions Recommandées</h2>
-             </div>
-
-             {/* Hero Action */}
-             {heroAction ? (
-                <HeroAction opp={heroAction} onAction={() => handleAction(heroAction)} />
-             ) : (
-                <div className="p-10 text-center bg-emerald-50 rounded-2xl border border-emerald-100">
-                    <Crown size={48} className="text-emerald-600 mx-auto mb-4" />
-                    <h3 className="text-lg font-bold text-emerald-900">Tout est optimisé !</h3>
+                      {/* KPI 3 : SÉCURITÉ */}
+                      <KpiCard 
+                          icon={ShieldCheck} 
+                          label="Filet de Sécurité" 
+                          value={safetyMonths >= 99 ? "Infini" : `${safetyMonths.toFixed(1)} mois`} 
+                          subtext="Durée de vie sans revenus"
+                          colorClass={safetyMonths < 1 ? "text-rose-600" : (safetyMonths < 3 ? "text-amber-600" : "text-indigo-600")}
+                          delay="delay-200"
+                      />
                 </div>
-             )}
 
-             {/* Secondary Actions */}
-             {secondaryActions.length > 0 && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {secondaryActions.map((opp) => (
-                        <OpportunityItem key={opp.id} opp={opp} onAction={() => handleAction(opp)} />
-                    ))}
+                {/* --- 2. LE SANKEY (PLEINE LARGEUR) --- */}
+                <div className="animate-fade-in-up delay-200">
+                     <FinancialSankey />
                 </div>
-             )}
+
+                {/* --- 3. DIAGNOSTIC + PLAN D'ACTION (CÔTE À CÔTE) --- */}
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 animate-fade-in-up delay-300">
+                    
+                    {/* COLONNE GAUCHE (1/3) : LE DOCTEUR */}
+                    <div className="lg:col-span-1 flex flex-col gap-6">
+                         <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
+                            <Stethoscope className="text-indigo-600"/> Diagnostic
+                         </h2>
+                         <div className="h-full">
+                            <DoctorMiniCard analysis={analysis} />
+                         </div>
+                    </div>
+
+                    {/* COLONNE DROITE (2/3) : LES ACTIONS */}
+                    <div className="lg:col-span-2 space-y-6">
+                        <div className="flex items-center justify-between">
+                            <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
+                                <Rocket className="text-indigo-600"/> Actions Recommandées
+                            </h2>
+                        </div>
+
+                        {/* Hero Action */}
+                        {heroAction ? (
+                            <HeroAction opp={heroAction} onAction={() => handleAction(heroAction)} />
+                        ) : (
+                            <div className="p-10 text-center bg-emerald-50 rounded-2xl border border-emerald-100">
+                                <Crown size={48} className="text-emerald-600 mx-auto mb-4" />
+                                <h3 className="text-lg font-bold text-emerald-900">Tout est optimisé !</h3>
+                            </div>
+                        )}
+
+                        {/* Secondary Actions */}
+                        {secondaryActions.length > 0 && (
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                {secondaryActions.map((opp) => (
+                                    <OpportunityItem key={opp.id} opp={opp} onAction={() => handleAction(opp)} />
+                                ))}
+                            </div>
+                        )}
+                    </div>
+
+                </div>
+            </div>
         </div>
       </div>
     </>
