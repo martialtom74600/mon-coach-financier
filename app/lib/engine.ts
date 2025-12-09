@@ -1,3 +1,4 @@
+// app/lib/engine.ts
 import { differenceInMonths, isValid, addMonths, addYears, isSameMonth } from 'date-fns';
 import { 
   Profile, Goal, SimulationResult, GoalDiagnosis, GoalStrategy, 
@@ -37,13 +38,183 @@ const FINANCIAL_KNOWLEDGE = {
   ]
 };
 
-const ACTION_GUIDES = {
-  LEP: { title: "Ouvrir un LEP", definition: "5% net d'impôt. Le meilleur livret sécurisé.", steps: ["Vérifier avis d'imposition", "Contacter banque"], tips: ["Plafond 10k€"] },
-  PEA: { title: "Ouvrir un PEA", definition: "L'enveloppe fiscale reine pour la bourse.", steps: ["Ouvrir chez un courtier en ligne", "Prendre date"], tips: ["Fiscalité après 5 ans"] },
-  MATELAS: { title: "Épargne de Précaution", definition: "Argent dispo pour les coups durs.", steps: ["Viser 3 mois de charges", "Ouvrir un Livret A ou LDDS", "Mettre en place un virement auto"], tips: ["Ne jamais toucher sauf urgence"] },
-  DETTE: { title: "Tuer les dettes", definition: "Rembourser c'est s'enrichir.", steps: ["Lister les taux", "Rembourser le plus haut en priorité", "Négocier un rachat si possible"], tips: ["Éviter les pénalités"] },
-  BUDGET_CUT: { title: "Réduire les charges", definition: "Optimiser les dépenses contraintes.", steps: ["Lister les abonnements", "Résilier le superflu", "Renégocier assurances"], tips: ["Utiliser la loi Hamon"] },
-  INVEST_START: { title: "Démarrer l'investissement", definition: "Faire travailler son argent.", steps: ["Ouvrir une Assurance Vie ou un PEA", "Mettre 50€/mois en DCA"], tips: ["Penser long terme"] }
+type ActionGuide = {
+    title: string;
+    definition: string;
+    steps: string[];
+    tips: string[];
+    difficulty?: 'Facile' | 'Moyen' | 'Difficile';
+    impact?: 'Immédiat' | 'Long terme';
+};
+
+const ACTION_GUIDES: Record<string, ActionGuide> = {
+  // --- NIVEAU 1 : SÉCURITÉ & TRÉSORERIE ---
+  
+  LEP: { 
+    title: "Ouvrir un Livret d'Épargne Populaire (LEP)", 
+    definition: "Le placement sans risque le plus rentable de France (net d'impôt). Réservé aux revenus modestes.", 
+    steps: [
+      "Retrouver votre dernier avis d'imposition (Revenu Fiscal de Référence).", 
+      "Vérifier l'éligibilité (Plafond env. 22k€ pour 1 part, 34k€ pour 2 parts).", 
+      "Prendre rendez-vous avec votre banque (ou changer si elle ne le propose pas)."
+    ], 
+    tips: [
+      "Même si vous ne payez pas d'impôts, déclarez vos revenus pour avoir l'avis d'imposition nécessaire.",
+      "Plafond de versement : 10 000€."
+    ],
+    difficulty: 'Facile',
+    impact: 'Immédiat'
+  },
+
+  MATELAS: { 
+    title: "Constituer son Épargne de Précaution", 
+    definition: "Votre pare-feu contre les imprévus (panne auto, chômage, santé). C'est la priorité n°1 avant d'investir.", 
+    steps: [
+      "Calculer 3 mois de dépenses contraintes (Loyer + Courses + Factures).", 
+      "Ouvrir un Livret A ou un LDDS dédié uniquement à ça.", 
+      "Mettre en place un virement automatique (ex: 50€) dès le début du mois."
+    ], 
+    tips: [
+      "Ne touchez JAMAIS à cet argent pour des loisirs ou des vacances.",
+      "Si vous puisez dedans, la priorité absolue est de le reconstituer."
+    ],
+    difficulty: 'Moyen',
+    impact: 'Immédiat'
+  },
+
+  // --- NIVEAU 2 : ASSAINISSEMENT ---
+
+  DETTE: { 
+    title: "Éradiquer les Mauvaises Dettes", 
+    definition: "Les crédits conso (revolving) coûtent plus cher que ce que l'épargne rapporte. S'en débarrasser est le meilleur investissement.", 
+    steps: [
+      "Lister toutes les dettes avec leur taux d'intérêt et capital restant.", 
+      "Méthode Avalanche : Rembourser en priorité la dette avec le taux le plus élevé.", 
+      "Méthode Boule de Neige : Rembourser la plus petite dette pour se motiver psychologiquement."
+    ], 
+    tips: [
+      "Contactez les créanciers pour négocier un échelonnement si besoin.",
+      "Coupez les cartes de crédit revolving."
+    ],
+    difficulty: 'Difficile',
+    impact: 'Immédiat'
+  },
+
+  BUDGET_CUT: { 
+    title: "Optimiser les Charges Fixes", 
+    definition: "Récupérer du pouvoir d'achat sans baisser son niveau de vie, juste en arrêtant de payer pour rien.", 
+    steps: [
+      "Lister les abonnements récurrents (Netflix, Salle de sport, Box).", 
+      "Utiliser la Loi Hamon pour changer d'assurance auto/habitation (souvent -20% de gain).", 
+      "Appeler son opérateur mobile/internet pour menacer de partir."
+    ], 
+    tips: [
+      "Supprimez les abonnements que vous n'avez pas utilisés depuis 30 jours.",
+      "Utilisez des comparateurs en ligne (LeLynx, LesFurets...)."
+    ],
+    difficulty: 'Facile',
+    impact: 'Immédiat'
+  },
+
+  // --- NIVEAU 3 : INVESTISSEMENT LONG TERME ---
+
+  INVEST_START: { 
+    title: "Démarrer l'investissement", 
+    definition: "Faire travailler son argent pour battre l'inflation.", 
+    steps: [
+      "Ouvrir une Assurance Vie ou un PEA.", 
+      "Mettre 50€/mois en DCA (versement programmé).", 
+      "Ne pas regarder les courbes tous les jours."
+    ], 
+    tips: [
+      "Le temps est votre meilleur allié.",
+      "Commencez petit, mais commencez maintenant."
+    ],
+    difficulty: 'Moyen',
+    impact: 'Long terme'
+  },
+
+  PEA: { 
+    title: "Ouvrir un PEA (Plan Épargne Actions)", 
+    definition: "L'enveloppe fiscale royale pour investir en Bourse avec une fiscalité adoucie après 5 ans.", 
+    steps: [
+      "Choisir un courtier en ligne ou une banque en ligne (frais < 0.5% par ordre).", 
+      "Ouvrir le compte pour 'prendre date' (le compteur fiscal de 5 ans démarre).", 
+      "Mettre en place un versement mensuel programmé (DCA)."
+    ], 
+    tips: [
+      "Fuyez les grandes banques traditionnelles (frais de garde trop élevés).",
+      "Privilégiez les ETF Monde (MSCI World) pour diversifier sans effort."
+    ],
+    difficulty: 'Moyen',
+    impact: 'Long terme'
+  },
+
+  AV_FONDS_EUROS: {
+    title: "Ouvrir une Assurance Vie (Fonds Euros)",
+    definition: "Le couteau suisse de l'épargne. Plus souple que le PER, plus rentable que le Livret A (sur les bons contrats).",
+    steps: [
+      "Comparer les contrats : 0€ frais d'entrée, 0€ frais d'arbitrage.",
+      "Vérifier le rendement du Fonds Euros sur les 3 dernières années.",
+      "Désigner proprement sa clause bénéficiaire (transmission)."
+    ],
+    tips: [
+      "Idéal pour les projets à moyen terme (achat immo dans 3-5 ans).",
+      "Évitez les contrats proposés par votre banquier (souvent chargés en frais)."
+    ],
+    difficulty: 'Moyen',
+    impact: 'Long terme'
+  },
+
+  SCPI: {
+    title: "Investir en SCPI (Pierre-Papier)",
+    definition: "Devenir propriétaire immobilier sans gérer les locataires ni les fuites d'eau.",
+    steps: [
+      "Définir si on achète en direct (revenus complémentaires) ou dans une Assurance Vie (capitalisation).",
+      "Diversifier sur 2 ou 3 SCPI (Santé, Logistique, Bureaux).",
+      "Étudier l'achat à crédit pour profiter de l'effet de levier."
+    ],
+    tips: [
+      "Attention aux frais d'entrée élevés (env. 10%). C'est un placement sur 8-10 ans minimum.",
+      "Les revenus sont imposés comme des revenus fonciers (attention à la tranche d'impôt)."
+    ],
+    difficulty: 'Difficile',
+    impact: 'Long terme'
+  },
+
+  // --- NIVEAU 4 : OPTIMISATION FISCALE & REVENUS ---
+
+  PER: {
+    title: "Ouvrir un PER (Plan Épargne Retraite)",
+    definition: "Bloquer de l'argent pour la retraite en réduisant ses impôts aujourd'hui. Puissant si vous payez beaucoup d'impôts.",
+    steps: [
+      "Vérifier votre Tranche Marginale d'Imposition (TMI). Intéressant surtout si TMI ≥ 30%.",
+      "Calculer le plafond de déduction disponible sur votre avis d'impôt.",
+      "Choisir un PER en gestion libre avec des frais bas (ETF)."
+    ],
+    tips: [
+      "Attention : l'argent est bloqué jusqu'à la retraite (sauf achat résidence principale).",
+      "L'économie d'impôt à l'entrée est 'rendue' à la sortie, mais vous aurez sûrement une TMI plus faible à la retraite."
+    ],
+    difficulty: 'Difficile',
+    impact: 'Long terme'
+  },
+
+  SALARY_NEGOTIATION: {
+    title: "Négocier une Augmentation",
+    definition: "La meilleure façon d'augmenter son épargne n'est pas de moins dépenser, mais de plus gagner.",
+    steps: [
+      "Lister vos réalisations concrètes des 12 derniers mois.",
+      "Faire une étude de marché sur les salaires de votre poste (Glassdoor, LinkedIn).",
+      "Solliciter un entretien formel avec votre manager."
+    ],
+    tips: [
+      "Ne parlez pas de vos besoins perso ('J'ai un loyer à payer'), mais de votre valeur pro.",
+      "Si le salaire est bloqué, négociez des avantages (télétravail, formation, prime)."
+    ],
+    difficulty: 'Difficile',
+    impact: 'Immédiat'
+  }
 };
 
 // ============================================================================
@@ -455,7 +626,13 @@ export const analyzeProfileHealth = (
   }
 
   if (totalIncome > 4000 && invested < 5000) {
-      opps.push({ id: 'tax_optim', type: 'INVESTMENT', level: 'INFO', title: 'Défiscalisation', message: 'Revenus élevés : regardez le PER.', potentialGain: 1000 });
+      opps.push({ 
+          id: 'tax_optim', type: 'INVESTMENT', level: 'INFO', 
+          title: 'Défiscalisation', 
+          message: 'Revenus élevés : regardez le PER.', 
+          guide: ACTION_GUIDES.PER, // Nouveau guide connecté
+          potentialGain: 1000 
+      });
   }
 
   const isEligibleLEP = (profile.household?.adults === 1 && totalIncome * 12 < FINANCIAL_KNOWLEDGE.THRESHOLDS.LEP_INCOME_SINGLE) ||

@@ -18,14 +18,12 @@ import { formatCurrency } from '@/app/lib/logic';
 
 // --- UI COMPONENTS ---
 import Button from '@/app/components/ui/Button';
-import Badge from '@/app/components/ui/Badge';
 import FinancialSankey from '@/app/components/FinancialSankey';
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip } from 'recharts';
 import {
   TrendingUp, ArrowRight, Zap, Layers, Wallet, Rocket, 
   AlertOctagon, BookOpen, X, CheckSquare, Stethoscope, ShieldCheck, 
-  XCircle, PiggyBank, Crown, Target, Activity, HelpCircle, ArrowUpRight, Lock,
-  HeartPulse, Thermometer, ClipboardList, AlertTriangle
+  XCircle, PiggyBank, Crown, Target, HelpCircle, AlertTriangle,
+  Lightbulb, Gauge, Clock, HeartPulse, Thermometer // Nouveaux icones
 } from 'lucide-react';
 
 // ============================================================================
@@ -37,20 +35,21 @@ const styles = `
   .delay-100 { animation-delay: 100ms; } .delay-200 { animation-delay: 200ms; } .delay-300 { animation-delay: 300ms; }
   .shimmer { background: linear-gradient(90deg, #f1f5f9 0%, #e2e8f0 50%, #f1f5f9 100%); background-size: 200% 100%; animation: shimmer 1.5s infinite; }
   @keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
-  .pulse-ring { animation: pulse-ring 2s cubic-bezier(0.215, 0.61, 0.355, 1) infinite; }
-  @keyframes pulse-ring { 0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); } 70% { transform: scale(1); box-shadow: 0 0 0 10px rgba(16, 185, 129, 0); } 100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); } }
+  .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+  .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+  .custom-scrollbar::-webkit-scrollbar-thumb { background-color: #cbd5e1; border-radius: 20px; }
 `;
 
 // ============================================================================
 // 1. CONFIG
 // ============================================================================
-const COLORS = { needs: '#6366f1', wants: '#a855f7', savings: '#10b981' };
 
 const getTheme = (level: string) => {
   switch (level) {
     case 'CRITICAL': return { bg: 'bg-rose-50/50', border: 'border-rose-100', text: 'text-rose-900', iconBg: 'bg-rose-100', icon: 'text-rose-600' };
     case 'WARNING':  return { bg: 'bg-amber-50/50', border: 'border-amber-100', text: 'text-amber-900', iconBg: 'bg-amber-100', icon: 'text-amber-600' };
     case 'SUCCESS':  return { bg: 'bg-emerald-50/50', border: 'border-emerald-100', text: 'text-emerald-900', iconBg: 'bg-emerald-100', icon: 'text-emerald-600' };
+    case 'INFO':     return { bg: 'bg-indigo-50/50', border: 'border-indigo-100', text: 'text-indigo-900', iconBg: 'bg-indigo-100', icon: 'text-indigo-600' }; // Ajout INFO
     default:         return { bg: 'bg-slate-50/50', border: 'border-slate-100', text: 'text-slate-900', iconBg: 'bg-slate-100', icon: 'text-slate-500' };
   }
 };
@@ -83,18 +82,6 @@ const DashboardSkeleton = () => (
   </div>
 );
 
-const CustomTooltip = ({ active, payload }: any) => {
-  if (active && payload && payload.length) {
-    return (
-      <div className="bg-slate-900 text-white text-xs p-3 rounded-lg shadow-xl border border-slate-800">
-        <p className="font-bold mb-1">{payload[0].name}</p>
-        <p className="flex items-center gap-2"><span className="w-2 h-2 rounded-full" style={{ backgroundColor: payload[0].payload.color }}></span>{Math.round(payload[0].value)}% du budget</p>
-      </div>
-    );
-  }
-  return null;
-};
-
 const KpiCard = ({ icon: Icon, label, value, subtext, trend, colorClass = "text-slate-900", delay = "" }: any) => (
     <div className={`bg-white p-6 rounded-2xl border border-slate-100 shadow-sm flex flex-col justify-between h-full hover:shadow-xl hover:border-indigo-100 transition-all duration-300 group ${delay}`}>
         <div className="flex justify-between items-start mb-4">
@@ -118,31 +105,98 @@ const KpiCard = ({ icon: Icon, label, value, subtext, trend, colorClass = "text-
 // 3. BUSINESS COMPONENTS
 // ============================================================================
 
+// --- MODAL ÉDUCATIVE ENRICHIE (V2) ---
 const EducationalModal = ({ guide, onClose }: { guide: any, onClose: () => void }) => {
     if (!guide) return null;
+    
+    // Badge utilitaire pour la difficulté/impact
+    const MetaBadge = ({ icon: Icon, label, color }: any) => (
+        <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-bold ${color}`}>
+            <Icon size={14} />
+            {label}
+        </div>
+    );
+
     return (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-md animate-fade-in" onClick={onClose}>
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh] border border-white/20 animate-fade-in-up" onClick={e => e.stopPropagation()}>
-                <div className="bg-indigo-600 p-6 text-white flex justify-between items-start shrink-0">
-                    <div className="flex gap-4">
-                        <div className="p-3 bg-white/10 rounded-xl backdrop-blur-sm shrink-0 border border-white/10 shadow-inner"><BookOpen size={24} /></div>
-                        <div><h3 className="text-xl font-bold leading-tight">{guide.title}</h3><p className="text-indigo-100 text-sm mt-1 leading-relaxed opacity-90">{guide.definition}</p></div>
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in" onClick={onClose}>
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh] animate-fade-in-up" onClick={e => e.stopPropagation()}>
+                
+                {/* Header */}
+                <div className="bg-slate-900 p-8 text-white flex justify-between items-start shrink-0 relative overflow-hidden">
+                    <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/20 rounded-full blur-3xl -mr-16 -mt-16"></div>
+                    <div className="flex gap-5 relative z-10">
+                        <div className="p-3.5 bg-white/10 rounded-xl backdrop-blur-md shrink-0 border border-white/10 shadow-inner">
+                            <BookOpen size={28} className="text-indigo-300" />
+                        </div>
+                        <div>
+                            <h3 className="text-2xl font-bold leading-tight mb-2">{guide.title}</h3>
+                            <p className="text-slate-300 text-sm leading-relaxed max-w-md">{guide.definition}</p>
+                            
+                            {/* Badges Difficulté / Impact */}
+                            <div className="flex gap-3 mt-4">
+                                {guide.difficulty && (
+                                    <MetaBadge 
+                                        icon={Gauge} 
+                                        label={guide.difficulty} 
+                                        color="bg-slate-800 border-slate-700 text-slate-300" 
+                                    />
+                                )}
+                                {guide.impact && (
+                                    <MetaBadge 
+                                        icon={Clock} 
+                                        label={guide.impact} 
+                                        color="bg-indigo-500/20 border-indigo-500/30 text-indigo-200" 
+                                    />
+                                )}
+                            </div>
+                        </div>
                     </div>
-                    <button onClick={onClose} className="p-1 hover:bg-white/20 rounded-full transition-colors shrink-0"><X size={20} /></button>
+                    <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-full transition-colors shrink-0 text-slate-400 hover:text-white relative z-10"><X size={24} /></button>
                 </div>
-                <div className="p-6 overflow-y-auto custom-scrollbar">
-                    <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2"><CheckSquare size={14} className="text-emerald-500" /> Plan d'action</h4>
-                    <ul className="space-y-0 relative">
-                        <div className="absolute left-3 top-2 bottom-2 w-0.5 bg-indigo-50"></div>
-                        {guide.steps.map((step: string, i: number) => (
-                            <li key={i} className="flex gap-4 relative py-3 group">
-                                <span className="relative z-10 flex-shrink-0 w-6 h-6 rounded-full bg-white text-indigo-600 font-bold flex items-center justify-center text-xs border-2 border-indigo-100 group-hover:border-indigo-600 group-hover:scale-110 transition-all shadow-sm">{i + 1}</span>
-                                <span className="text-sm text-slate-600 leading-relaxed pt-0.5 group-hover:text-slate-900 transition-colors">{step}</span>
-                            </li>
-                        ))}
-                    </ul>
+
+                {/* Content */}
+                <div className="p-0 overflow-y-auto custom-scrollbar flex-1 bg-slate-50">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-px bg-slate-200 border-b border-slate-200">
+                        
+                        {/* Colonne Plan d'action */}
+                        <div className="p-6 bg-white">
+                            <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-5 flex items-center gap-2">
+                                <CheckSquare size={16} className="text-indigo-600" /> Plan d'action
+                            </h4>
+                            <ul className="space-y-4">
+                                {guide.steps?.map((step: string, i: number) => (
+                                    <li key={i} className="flex gap-4 group">
+                                        <span className="flex-shrink-0 w-6 h-6 rounded-full bg-indigo-50 text-indigo-600 font-bold flex items-center justify-center text-xs border border-indigo-100 group-hover:bg-indigo-600 group-hover:text-white transition-colors">
+                                            {i + 1}
+                                        </span>
+                                        <span className="text-sm text-slate-700 leading-relaxed font-medium">{step}</span>
+                                    </li>
+                                ))}
+                            </ul>
+                        </div>
+
+                        {/* Colonne Conseils Pro */}
+                        <div className="p-6 bg-slate-50/50">
+                            <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-5 flex items-center gap-2">
+                                <Lightbulb size={16} className="text-amber-500" /> Conseils de Pro
+                            </h4>
+                            <div className="space-y-3">
+                                {guide.tips?.map((tip: string, i: number) => (
+                                    <div key={i} className="flex gap-3 text-sm text-slate-600 bg-white p-3 rounded-xl border border-slate-100 shadow-sm">
+                                        <div className="w-1 h-full bg-amber-400 rounded-full shrink-0"></div>
+                                        <span className="leading-relaxed">{tip}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
+                    </div>
                 </div>
-                <div className="p-4 border-t border-slate-100 bg-slate-50 shrink-0"><Button onClick={onClose} className="w-full bg-slate-900 hover:bg-slate-800 text-white shadow-lg py-3 rounded-xl transition-all hover:scale-[1.01]">C'est noté</Button></div>
+
+                {/* Footer */}
+                <div className="p-5 border-t border-slate-200 bg-white shrink-0 flex justify-end">
+                    <Button onClick={onClose} className="px-8 bg-slate-900 hover:bg-indigo-600 text-white shadow-xl rounded-xl transition-all">J'ai compris</Button>
+                </div>
             </div>
         </div>
     );
@@ -178,6 +232,7 @@ const OpportunityItem = ({ opp, onAction }: { opp: OptimizationOpportunity, onAc
   const theme = getTheme(opp.level);
   const Icon = getIcon(opp.type);
   const isClickable = !!opp.guide || !!opp.link;
+  
   return (
     <div onClick={isClickable ? onAction : undefined} className={`p-5 rounded-2xl border ${theme.border} ${theme.bg} flex gap-4 transition-all relative group items-start ${isClickable ? 'hover:shadow-lg cursor-pointer hover:border-indigo-200 hover:bg-white hover:-translate-y-0.5' : ''}`}>
       <div className={`mt-1 flex-shrink-0 h-10 w-10 rounded-full flex items-center justify-center ${theme.iconBg} ${theme.icon} border border-white/50 shadow-sm`}><Icon size={18} /></div>
@@ -193,7 +248,7 @@ const OpportunityItem = ({ opp, onAction }: { opp: OptimizationOpportunity, onAc
   );
 };
 
-// --- LE "DOCTOR CARD" (Version Mini pour Dashboard) ---
+// --- LE "DOCTOR CARD" ---
 const DoctorMiniCard = ({ analysis }: { analysis: any }) => {
     const getHealthStatus = (score: number) => {
         if (score >= 80) return { label: "Santé Excellente", color: "text-emerald-600", bg: "bg-emerald-100", icon: HeartPulse };
@@ -261,9 +316,19 @@ function DashboardView() {
       } catch (e) { console.error(e); return null; }
   }, [profile]);
 
+  // LOGIQUE DE NAVIGATION & MONÉTISATION
   const handleAction = (opp: OptimizationOpportunity) => {
-      if (opp.guide) setSelectedGuide(opp.guide);
-      else if (opp.link) router.push(opp.link);
+      if (opp.guide) {
+          // Si c'est un guide éducatif (Engine)
+          setSelectedGuide(opp.guide);
+      } else if (opp.link) {
+          // Si c'est un lien d'affiliation (Monétisation) ou interne
+          if (opp.link.startsWith('http')) {
+              window.open(opp.link, '_blank');
+          } else {
+              router.push(opp.link);
+          }
+      }
   };
 
   if (!isProfileLoaded) return <DashboardSkeleton />;
@@ -354,7 +419,7 @@ function DashboardView() {
 
                 {/* --- 2. LE SANKEY (PLEINE LARGEUR) --- */}
                 <div className="animate-fade-in-up delay-200">
-                     <FinancialSankey />
+                      <FinancialSankey />
                 </div>
 
                 {/* --- 3. DIAGNOSTIC + PLAN D'ACTION (CÔTE À CÔTE) --- */}
@@ -362,12 +427,12 @@ function DashboardView() {
                     
                     {/* COLONNE GAUCHE (1/3) : LE DOCTEUR */}
                     <div className="lg:col-span-1 flex flex-col gap-6">
-                         <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
-                            <Stethoscope className="text-indigo-600"/> Diagnostic
-                         </h2>
-                         <div className="h-full">
-                            <DoctorMiniCard analysis={analysis} />
-                         </div>
+                          <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
+                             <Stethoscope className="text-indigo-600"/> Diagnostic
+                          </h2>
+                          <div className="h-full">
+                             <DoctorMiniCard analysis={analysis} />
+                          </div>
                     </div>
 
                     {/* COLONNE DROITE (2/3) : LES ACTIONS */}
