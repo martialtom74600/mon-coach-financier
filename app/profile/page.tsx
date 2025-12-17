@@ -28,29 +28,34 @@ import {
   CreditCard, ArrowRight, Home, Building, Target,
   HeartHandshake, Plus, Loader2, AlertCircle, User, ShieldCheck, Banknote,
   Zap, Calendar, TrendingUp, Flag, LucideIcon, ShoppingCart, Coffee, Car,
-  Coins, Landmark, Sprout, Building2, PiggyBank, Gem, Key, Trash2, CalendarDays
+  Coins, Landmark, Sprout, Building2, PiggyBank, Gem, Key, Trash2, AlertTriangle
 } from 'lucide-react';
 
 // ============================================================================
-// 1. TYPES UI SPÉCIFIQUES (CLEAN ARCHITECTURE)
+// 1. TYPES UI SPÉCIFIQUES & DEFINITIONS
 // ============================================================================
 
-// Représente une ligne unifiée dans l'écran Patrimoine
+type UserPersona = 'SALARIED' | 'FREELANCE' | 'STUDENT' | 'RETIRED';
+type HousingStatus = 'TENANT' | 'OWNER_LOAN' | 'OWNER_PAID' | 'FREE';
+type ItemCategory = 'INCOME' | 'FIXED_COST' | 'SUBSCRIPTION' | 'CREDIT' | 'ANNUAL_EXPENSE' | 'VARIABLE_COST';
+type AssetType = 'CC' | 'LIVRET' | 'PEA' | 'CTO' | 'AV' | 'PER' | 'PEE' | 'CRYPTO' | 'REAL_ESTATE' | 'GOLD' | 'CROWD' | 'OTHER';
+
 interface AssetUiRow {
   id: string;
   type: string;
   name: string;
-  stock: number;       // Solde Actuel (Ce que j'ai)
-  monthlyFlow: number; // Versement (Ce que je mets)
-  transferDay: number; // Jour du prélèvement
+  stock: number;       
+  monthlyFlow: number; 
+  transferDay: number; 
 }
 
-// Extension du profil pour le formulaire local
 interface FormProfile extends Omit<Profile, 'investments' | 'savingsContributions'> {
-  // On remplace les listes complexes par notre liste UI propre
   assetsUi: AssetUiRow[];
-  
-  // Les autres listes restent standard
+  housing: {
+      status: string;
+      monthlyCost: number;
+      paymentDay?: number;
+  };
   incomes: FinancialItem[];
   fixedCosts: FinancialItem[];
   variableCosts: FinancialItem[];
@@ -60,24 +65,14 @@ interface FormProfile extends Omit<Profile, 'investments' | 'savingsContribution
 }
 
 // ============================================================================
-// 2. MAPPERS (LA LOGIQUE PROPRE)
+// 2. MAPPERS (LOGIQUE DE TRADUCTION UI <-> DB)
 // ============================================================================
 
-/**
- * LECTURE : DB (Complexe) -> Formulaire UI (Simple)
- * Fusionne Investments (Stock) et SavingsContributions (Flux)
- */
 const mapProfileToForm = (profile: Profile): FormProfile => {
   const assetsUi: AssetUiRow[] = [];
-  
-  // On itère sur les STOCKS (Investments) car c'est la source de vérité des comptes ouverts
   (profile.investments || []).forEach(inv => {
-    // On cherche le FLUX correspondant via l'ID
     const matchingFlow = (profile.savingsContributions || []).find(f => f.id === inv.id);
-    
-    // Rétro-compatibilité : si currentValue n'existe pas, on prend amount
     const stockValue = (inv as any).currentValue ?? inv.amount;
-
     assetsUi.push({
       id: inv.id,
       type: inv.type || 'unknown',
@@ -88,15 +83,23 @@ const mapProfileToForm = (profile: Profile): FormProfile => {
     });
   });
 
-  // Initialisation par défaut si vide (au moins un Compte Courant)
   if (assetsUi.length === 0) {
     assetsUi.push({ id: generateId(), type: 'cc', name: 'Compte Courant', stock: 0, monthlyFlow: 0, transferDay: 1 });
   }
 
   return {
     ...profile,
+    // ✅ CORRECTION 1 : On force le minuscule pour le Persona (SALARIED -> salaried)
+    persona: (profile.persona as string)?.toLowerCase() as any,
+
     assetsUi,
-    // Garantir que les tableaux ne sont jamais undefined
+    housing: {
+        // ✅ CORRECTION 2 : On force le minuscule pour le Statut Logement (TENANT -> tenant)
+        status: (profile.housing?.status as string)?.toLowerCase() || 'free',
+        
+        monthlyCost: profile.housing?.monthlyCost || 0,
+        paymentDay: (profile.housing as any)?.paymentDay || 5
+    },
     incomes: profile.incomes || [],
     fixedCosts: profile.fixedCosts || [],
     variableCosts: profile.variableCosts || [],
@@ -106,64 +109,91 @@ const mapProfileToForm = (profile: Profile): FormProfile => {
   } as FormProfile;
 };
 
-/**
- * ÉCRITURE : Formulaire UI (Simple) -> DB (Complexe)
- * Sépare la liste UI en deux listes distinctes pour le moteur
- */
-const mapFormToProfile = (formData: FormProfile, lifestyle: number): Profile => {
+const mapFormToPayload = (formData: FormProfile, lifestyle: number) => {
   
-  // 1. Calcul des totaux
-  let totalCash = 0;
-  let totalInvested = 0;
-  let totalSavings = 0; 
-
-  formData.assetsUi.forEach(asset => {
-    const def = ASSET_TYPES.find(a => a.id === asset.type);
-    const val = asset.stock;
-
-    if (asset.type === 'cc') totalCash += val;
-    else if (def?.category === 'CASH' || def?.category === 'LIQUIDITY') totalSavings += val;
-    else totalInvested += val;
-  });
-
-  // 2. Génération liste STOCK (Investments)
-  // Pour le moteur : amount = stock. Pour l'UI future : currentValue = stock.
-  const investments = formData.assetsUi.map(a => ({
-    id: a.id,
-    type: a.type,
-    name: a.name,
-    amount: a.stock, 
-    currentValue: a.stock, 
-    frequency: 'mensuel'
+  // 1. Préparation de la LISTE UNIQUE "ITEMS" (Flux)
+  const items = [
+    ...formData.incomes.map(i => ({ ...i, category: 'INCOME' })),
+    ...formData.fixedCosts.map(i => ({ ...i, category: 'FIXED_COST' })),
+    ...formData.subscriptions.map(i => ({ ...i, category: 'SUBSCRIPTION' })),
+    ...formData.credits.map(i => ({ ...i, category: 'CREDIT' })),
+    ...formData.annualExpenses.map(i => ({ ...i, category: 'ANNUAL_EXPENSE' })),
+    ...formData.variableCosts.map(i => ({ ...i, category: 'VARIABLE_COST' })),
+  ].map(item => ({
+    name: item.name,
+    amount: typeof item.amount === 'string' ? parseFloat(item.amount) : item.amount,
+    category: item.category as ItemCategory,
+    frequency: 'mensuel',
+    dayOfMonth: (item as any).category === 'VARIABLE_COST' ? null : ((item as any).dayOfMonth || 1)
   }));
 
-  // 3. Génération liste FLUX (SavingsContributions)
-  // On ne garde que ceux qui ont un versement > 0 et qui ne sont pas le compte courant
-  const savingsContributions = formData.assetsUi
-    .filter(a => a.type !== 'cc' && a.monthlyFlow > 0)
-    .map(a => ({
-      id: a.id, 
-      name: a.name,
-      amount: a.monthlyFlow,
-      dayOfMonth: a.transferDay,
-      frequency: 'mensuel'
-    }));
+  // 2. Préparation de la LISTE UNIQUE "ASSETS" (Patrimoine)
+  const assets = formData.assetsUi.map(asset => {
+    let typeKey = asset.type.toUpperCase();
+    if (typeKey === 'IMMO_PHYS' || typeKey === 'IMMO_PAPER') typeKey = 'REAL_ESTATE';
+    if (typeKey === 'CC') typeKey = 'CC';
+    
+    const validTypes = ['CC','LIVRET','PEA','CTO','AV','PER','PEE','CRYPTO','REAL_ESTATE','GOLD','CROWD','OTHER'];
+    if (!validTypes.includes(typeKey)) typeKey = 'OTHER';
 
-  // 4. Nettoyage Housing
-  let housingCost = formData.housing?.monthlyCost || 0;
-  if (['free', 'owner_paid'].includes(formData.housing?.status)) housingCost = 0;
+    return {
+      name: asset.name,
+      type: typeKey as AssetType, 
+      currentValue: asset.stock,      
+      monthlyFlow: asset.monthlyFlow, 
+      transferDay: asset.transferDay
+    };
+  });
 
+  // 3. Préparation du PROFIL (Champs simples)
   return {
-    ...formData,
-    funBudget: lifestyle,
-    investedAmount: totalInvested,
-    savings: totalSavings,
-    currentBalance: totalCash,
-    investments,           // ✅ Liste 1 : Patrimoine
-    savingsContributions,  // ✅ Liste 2 : Budget Mensuel
-    housing: { ...formData.housing, monthlyCost: housingCost },
-    updatedAt: new Date().toISOString()
-  } as Profile;
+    firstName: formData.firstName,
+    profile: {
+      age: parseInt(String(formData.age)),
+      persona: formData.persona?.toUpperCase() as UserPersona,
+      housingStatus: formData.housing?.status?.toUpperCase() === 'OWNER_LOAN' ? 'OWNER_LOAN' 
+                    : formData.housing?.status?.toUpperCase() === 'OWNER_PAID' ? 'OWNER_PAID'
+                    : formData.housing?.status?.toUpperCase() as HousingStatus,
+      housingCost: formData.housing?.monthlyCost || 0,
+      
+      // ✅ C'EST ICI QUE C'EST CORRIGÉ (housingPaymentDay au lieu de paymentDay)
+      housingPaymentDay: formData.housing?.paymentDay || 1, 
+      
+      adults: formData.household?.adults || 1,
+      children: formData.household?.children || 0,
+      funBudget: lifestyle,
+    },
+    items: items,   
+    assets: assets  
+  };
+};
+
+const mapFormToEngineProfile = (formData: FormProfile): Profile => {
+    let totalCash = 0, totalInvested = 0, totalSavings = 0;
+    formData.assetsUi.forEach(a => {
+        if (a.type === 'cc') totalCash += a.stock;
+        else if (['livret', 'lep', 'ldds'].includes(a.type)) totalSavings += a.stock;
+        else totalInvested += a.stock;
+    });
+
+    const investments = formData.assetsUi.map(a => ({
+        id: a.id, name: a.name, type: a.type, amount: a.stock, currentValue: a.stock, frequency: 'mensuel'
+    }));
+    
+    const savingsContributions = formData.assetsUi
+        .filter(a => a.type !== 'cc' && a.monthlyFlow > 0)
+        .map(a => ({ id: a.id, name: a.name, amount: a.monthlyFlow, dayOfMonth: a.transferDay, frequency: 'mensuel' }));
+
+    return {
+        ...formData,
+        investedAmount: totalInvested,
+        savings: totalSavings,
+        currentBalance: totalCash,
+        investments,
+        savingsContributions,
+        housing: { ...formData.housing },
+        updatedAt: new Date().toISOString()
+    } as Profile;
 };
 
 // ============================================================================
@@ -181,9 +211,9 @@ const generateIdHelper = () => Math.random().toString(36).substr(2, 9);
 // 4. LAYOUT & COMPOSANTS VISUELS
 // ============================================================================
 
-interface WizardLayoutProps { title: string; subtitle: string; icon: LucideIcon; children: ReactNode; footer?: ReactNode; }
+interface WizardLayoutProps { title: string; subtitle: string; icon: LucideIcon; children: ReactNode; footer?: ReactNode; error?: string | null; }
 
-const WizardLayout = ({ title, subtitle, icon: Icon, children, footer }: WizardLayoutProps) => (
+const WizardLayout = ({ title, subtitle, icon: Icon, children, footer, error }: WizardLayoutProps) => (
   <div className="w-full max-w-2xl mx-auto lg:mx-0 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <div className="text-center lg:text-left mb-8">
           <div className="inline-flex p-3 bg-indigo-50 text-indigo-600 rounded-2xl mb-4"><Icon size={28} /></div>
@@ -192,6 +222,15 @@ const WizardLayout = ({ title, subtitle, icon: Icon, children, footer }: WizardL
       </div>
       <Card className="p-6 md:p-10 shadow-xl shadow-slate-200/40 border-slate-100">
           {children}
+          
+          {/* ✅ AFFICHAGE DES ERREURS */}
+          {error && (
+            <div className="mt-6 p-4 bg-rose-50 border border-rose-200 rounded-xl flex items-start gap-3 text-rose-700 animate-in slide-in-from-top-2">
+                <AlertTriangle className="shrink-0 mt-0.5" size={20} />
+                <div className="text-sm font-bold">{error}</div>
+            </div>
+          )}
+
           {footer && <div className="mt-8 pt-6 border-t border-slate-50 flex items-center justify-between gap-4">{footer}</div>}
       </Card>
   </div>
@@ -262,7 +301,7 @@ const LiveSummary = ({ formData, stats, currentStep }: LiveSummaryProps) => {
                 </div>
                 {variable > 0 && (
                     <div className="flex justify-between items-center text-sm">
-                        <span className="text-slate-500 flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-yellow-400"/> Vie Quotidienne</span>
+                        <span className="text-slate-500 flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-yellow-400"/> Dépenses Courantes</span>
                         <span className="font-bold text-slate-700">-{formatCurrency(variable)}</span>
                     </div>
                 )}
@@ -298,11 +337,12 @@ interface StepProps {
     onConfirm?: (lifestyle: number, savings: number) => void;
     isSaving?: boolean;
     stats?: any;
+    error?: string | null; // ✅ On passe l'erreur aux steps
 }
 
-const StepIdentite = ({ formData, updateForm, onNext }: StepProps) => (
-    <WizardLayout title="Qui êtes-vous ?" subtitle="Ces infos calibrent nos projections." icon={User}
-        footer={<Button onClick={onNext} disabled={!formData.firstName || !formData.age} className="w-full" size="lg">C'est parti <ArrowRight className="ml-2" size={18}/></Button>}>
+const StepIdentite = ({ formData, updateForm, onNext, error }: StepProps) => (
+    <WizardLayout title="Qui êtes-vous ?" subtitle="Ces infos calibrent nos projections." icon={User} error={error}
+        footer={<Button onClick={onNext} className="w-full" size="lg">C'est parti <ArrowRight className="ml-2" size={18}/></Button>}>
         <div className="space-y-6">
             <InputGroup label="Votre Prénom" placeholder="Ex: Thomas" value={formData.firstName || ''} onChange={(e: any) => updateForm({...formData, firstName: getInputValue(e) as string})} autoFocus />
             <div className={`transition-opacity duration-500 ${formData.firstName ? 'opacity-100' : 'opacity-30'}`}>
@@ -312,8 +352,8 @@ const StepIdentite = ({ formData, updateForm, onNext }: StepProps) => (
     </WizardLayout>
 );
 
-const StepSituation = ({ formData, updateForm, onNext, onPrev }: StepProps) => (
-  <WizardLayout title="Votre Situation" subtitle="Adaptons la stratégie à votre profil." icon={Briefcase}
+const StepSituation = ({ formData, updateForm, onNext, onPrev, error }: StepProps) => (
+  <WizardLayout title="Votre Situation" subtitle="Adaptons la stratégie à votre profil." icon={Briefcase} error={error}
       footer={<><Button variant="ghost" onClick={onPrev}>Retour</Button><Button onClick={onNext}>Continuer <ArrowRight className="ml-2" size={18}/></Button></>}>
       <div className="space-y-8">
           <div><label className="block text-xs font-bold text-slate-500 uppercase mb-3">Statut Pro</label>
@@ -342,16 +382,29 @@ const StepSituation = ({ formData, updateForm, onNext, onPrev }: StepProps) => (
   </WizardLayout>
 );
 
-const StepFixedFinances = ({ formData, updateForm, addItem, removeItem, updateItem, onNext, onPrev }: StepProps) => (
-    <WizardLayout title="Revenus & Charges Fixes" subtitle="Ce qui tombe à date fixe chaque mois." icon={Wallet}
+const StepFixedFinances = ({ formData, updateForm, addItem, removeItem, updateItem, onNext, onPrev, error }: StepProps) => (
+    <WizardLayout title="Revenus & Charges Fixes" subtitle="Ce qui tombe à date fixe chaque mois." icon={Wallet} error={error}
         footer={<><Button variant="ghost" onClick={onPrev}>Retour</Button><Button onClick={onNext}>Vie Quotidienne <ArrowRight className="ml-2" size={18}/></Button></>}>
         <div className="space-y-6">
             <AccordionSection mode="expert" defaultOpen={true} title="Revenus (Net)" icon={Banknote} colorClass="text-emerald-600" items={formData.incomes} onItemChange={(id: string, f: string, v: any) => updateItem!('incomes', id, f, v)} onItemAdd={() => addItem!('incomes')} onItemRemove={(id: string) => removeItem!('incomes', id)} />
+            
             {formData.housing?.status !== 'free' && formData.housing?.status !== 'owner_paid' && (
-                <div className="p-4 bg-slate-50 rounded-xl border border-slate-100">
-                      <InputGroup label={formData.housing?.status === 'tenant' ? "Loyer Mensuel" : "Mensualité Crédit"} type="number" placeholder="800" value={formData.housing?.monthlyCost || ''} onChange={(e: any) => updateForm({ ...formData, housing: { ...formData.housing, monthlyCost: parseNumber(getInputValue(e)) } })} endAdornment={<span className="text-slate-400 font-bold px-3">€</span>} />
+                <div className="p-4 bg-slate-50 rounded-xl border border-slate-100 mb-6">
+                    <h3 className="text-sm font-bold text-slate-700 mb-3 flex items-center gap-2">
+                        <Home size={16} className="text-indigo-500"/> 
+                        {formData.housing?.status === 'tenant' ? "Votre Loyer" : "Votre Crédit Immo"}
+                    </h3>
+                    <div className="flex gap-4">
+                         <div className="flex-1">
+                            <InputGroup label="Montant Mensuel" type="number" placeholder="800" value={formData.housing?.monthlyCost || ''} onChange={(e: any) => updateForm({ ...formData, housing: { ...formData.housing, monthlyCost: parseNumber(getInputValue(e)) } })} endAdornment={<span className="text-slate-400 font-bold px-3">€</span>} />
+                         </div>
+                         <div className="w-24">
+                             <InputGroup label="Jour" type="number" placeholder="5" max={31} min={1} value={formData.housing?.paymentDay || ''} onChange={(e: any) => updateForm({ ...formData, housing: { ...formData.housing, paymentDay: parseNumber(getInputValue(e)) } })} />
+                         </div>
+                    </div>
                 </div>
             )}
+
             <AccordionSection mode="expert" defaultOpen={false} title="Factures Fixes" icon={CreditCard} colorClass="text-slate-600" items={formData.fixedCosts} onItemChange={(id: string, f: string, v: any) => updateItem!('fixedCosts', id, f, v)} onItemAdd={() => addItem!('fixedCosts')} onItemRemove={(id: string) => removeItem!('fixedCosts', id)} />
             <AccordionSection mode="expert" defaultOpen={false} title="Abonnements" icon={Zap} colorClass="text-purple-500" items={formData.subscriptions} onItemChange={(id: string, f: string, v: any) => updateItem!('subscriptions', id, f, v)} onItemAdd={() => addItem!('subscriptions')} onItemRemove={(id: string) => removeItem!('subscriptions', id)} />
             <AccordionSection mode="expert" defaultOpen={false} title="Dépenses Annuelles" icon={Calendar} colorClass="text-orange-500" items={formData.annualExpenses} onItemChange={(id: string, f: string, v: any) => updateItem!('annualExpenses', id, f, v)} onItemAdd={() => addItem!('annualExpenses')} onItemRemove={(id: string) => removeItem!('annualExpenses', id)} />
@@ -360,8 +413,8 @@ const StepFixedFinances = ({ formData, updateForm, addItem, removeItem, updateIt
     </WizardLayout>
 );
 
-const StepDailyLife = ({ formData, updateForm, addItem, removeItem, updateItem, onNext, onPrev }: StepProps) => (
-    <WizardLayout title="Vie Quotidienne" subtitle="Estimation des dépenses variables (Courses, Essence...)" icon={ShoppingCart}
+const StepDailyLife = ({ formData, updateForm, addItem, removeItem, updateItem, onNext, onPrev, error }: StepProps) => (
+    <WizardLayout title="Dépenses Courantes" subtitle="Tout ce qui est variable et lissé (Courses, Loisirs...)" icon={ShoppingCart} error={error}
         footer={<><Button variant="ghost" onClick={onPrev}>Retour</Button><Button onClick={onNext}>Patrimoine <ArrowRight className="ml-2" size={18}/></Button></>}>
         <div className="space-y-6">
             <div className="p-4 bg-yellow-50 rounded-xl text-sm text-yellow-800 mb-4 border border-yellow-100 flex items-start gap-3">
@@ -372,7 +425,18 @@ const StepDailyLife = ({ formData, updateForm, addItem, removeItem, updateItem, 
                 </div>
             </div>
             
-            <AccordionSection mode="expert" defaultOpen={true} title="Courses & Alimentation" icon={ShoppingCart} colorClass="text-indigo-600" items={formData.variableCosts} onItemChange={(id: string, f: string, v: any) => updateItem!('variableCosts', id, f, v)} onItemAdd={() => addItem!('variableCosts')} onItemRemove={(id: string) => removeItem!('variableCosts', id)} />
+            <AccordionSection 
+                mode="expert" 
+                hideDate={true} 
+                defaultOpen={true} 
+                title="Dépenses Courantes & Loisirs" 
+                icon={ShoppingCart} 
+                colorClass="text-indigo-600" 
+                items={formData.variableCosts} 
+                onItemChange={(id: string, f: string, v: any) => updateItem!('variableCosts', id, f, v)} 
+                onItemAdd={() => addItem!('variableCosts')} 
+                onItemRemove={(id: string) => removeItem!('variableCosts', id)} 
+            />
             
             <div className="grid grid-cols-2 gap-3 mt-4">
                 <Button variant="outline" size="sm" className="w-full text-xs" onClick={() => updateForm({ ...formData, variableCosts: [...formData.variableCosts, { id: generateIdHelper(), name: 'Essence / Péage', amount: 0, frequency: 'mensuel' }] })}>
@@ -392,14 +456,12 @@ const StepDailyLife = ({ formData, updateForm, addItem, removeItem, updateItem, 
     </WizardLayout>
 );
 
-// ✅ STEP 5 : PATRIMOINE (REFAITE ET PROPRE)
-const StepAssets = ({ formData, updateForm, addItem, removeItem, updateItem, onNext, onPrev }: StepProps) => {
+const StepAssets = ({ formData, updateForm, addItem, removeItem, updateItem, onNext, onPrev, error }: StepProps) => {
   
-    // MAPPING DES ICONES
     const ICON_MAPPING: Record<string, LucideIcon> = {
         cc: Wallet, pea: TrendingUp, av: ShieldCheck, cto: TrendingUp, per: PiggyBank,
         livret: Landmark, lep: Landmark, pel: Key, pee: Briefcase, immo_paper: Building2,
-        crowd: Sprout, immo_phys: Building, crypto: Coins, gold: Gem
+        immo_phys: Building, crypto: Coins, gold: Gem
     };
   
     const hasAsset = (labelSubString: string) => {
@@ -424,16 +486,13 @@ const StepAssets = ({ formData, updateForm, addItem, removeItem, updateItem, onN
         updateForm({ ...formData, assetsUi: formData.assetsUi.filter(a => a.id !== id) });
     };
 
-    // Calcul du total affiché
     const totalAssets = formData.assetsUi.reduce((acc, item) => acc + (item.stock || 0), 0);
 
     return (
-      <WizardLayout title="Votre Patrimoine" subtitle="Faisons l'inventaire complet (Comptes & Investissements)." icon={ShieldCheck}
+      <WizardLayout title="Votre Patrimoine" subtitle="Faisons l'inventaire complet (Comptes & Investissements)." icon={ShieldCheck} error={error}
         footer={<><Button variant="ghost" onClick={onPrev}>Retour</Button><Button onClick={onNext} className="w-full sm:w-auto" size="lg">Découvrir mon verdict <ArrowRight className="ml-2" size={18}/></Button></>}>
         
         <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2">
-            
-            {/* 1. SÉLECTEUR */}
             <div>
               <label className="block text-xs font-bold text-slate-500 uppercase mb-3">Qu'est-ce que vous possédez ?</label>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
@@ -453,7 +512,6 @@ const StepAssets = ({ formData, updateForm, addItem, removeItem, updateItem, onN
               </div>
             </div>
 
-            {/* 2. LISTE ÉDITABLE */}
             {formData.assetsUi.length > 0 && (
                 <div className="space-y-4">
                     <div className="flex items-center gap-2 mb-2">
@@ -476,7 +534,6 @@ const StepAssets = ({ formData, updateForm, addItem, removeItem, updateItem, onN
                                         )}
                                     </div>
                                     <div className={`grid ${isCC ? 'grid-cols-1' : 'grid-cols-12'} gap-4`}>
-                                        {/* COLONNE 1 : STOCK (Solde) */}
                                         <div className={isCC ? 'col-span-1' : 'col-span-5'}>
                                             <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Solde Actuel (Stock)</label>
                                             <div className="relative">
@@ -485,8 +542,6 @@ const StepAssets = ({ formData, updateForm, addItem, removeItem, updateItem, onN
                                                 <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3"><span className="text-slate-400 text-xs">€</span></div>
                                             </div>
                                         </div>
-                                        
-                                        {/* COLONNE 2 : FLUX (Mensualité) - Caché pour CC */}
                                         {!isCC && (
                                             <>
                                                 <div className="col-span-4">
@@ -580,11 +635,11 @@ export default function ProfilePage() {
   const [currentStep, setCurrentStep] = useState(1);
   const [formData, setFormData] = useState<FormProfile | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  // 1. Initialisation : On convertit la DB (Profile) vers l'UI (FormProfile) via le Mapper
+  // 1. Initialisation
   useEffect(() => {
     if (isLoaded && profile) {
-        // On vérifie si on doit mettre à jour le state local
         if (!formData || profile.updatedAt !== formData.updatedAt) {
              const cleanForm = mapProfileToForm(profile);
              setFormData(cleanForm);
@@ -592,10 +647,10 @@ export default function ProfilePage() {
     }
   }, [isLoaded, profile]);
 
-  // 2. Simulation Live : On convertit l'UI vers la DB pour nourrir le moteur
+  // 2. Simulation Live
   const simulation = useMemo(() => {
     if (!formData) return null;
-    const profileForEngine = mapFormToProfile(formData, 0); // Le lifestyle n'importe pas pour le budget brut
+    const profileForEngine = mapFormToEngineProfile(formData);
     return runSimulation(profileForEngine);
   }, [formData]);
 
@@ -604,7 +659,6 @@ export default function ProfilePage() {
     if (!simulation || !formData) return null;
 
     const { budget } = simulation;
-    // On calcule les investissements mensuels directement depuis notre UI propre
     const monthlyInvestments = formData.assetsUi
         .filter(a => a.type !== 'cc')
         .reduce((sum, item) => sum + (item.monthlyFlow || 0), 0);
@@ -625,9 +679,93 @@ export default function ProfilePage() {
     };
   }, [simulation, formData]);
 
-  const updateForm = (newData: FormProfile) => setFormData(newData);
-  const goNext = () => { setCurrentStep(s => s + 1); window.scrollTo({ top: 0, behavior: 'smooth' }); };
-  const goPrev = () => setCurrentStep(s => Math.max(1, s - 1));
+  const updateForm = (newData: FormProfile) => {
+      setFormData(newData);
+      if (error) setError(null); // On efface l'erreur si l'utilisateur modifie quelque chose
+  };
+
+  // ✅ LOGIQUE DE VALIDATION ROBUSTE
+  const validateCurrentStep = (step: number): boolean => {
+    if (!formData) return false;
+
+    // STEP 1 : Identité
+    if (step === 1) {
+        if (!formData.firstName) { setError("Veuillez renseigner votre prénom."); return false; }
+        if (!formData.age || parseInt(String(formData.age)) <= 0) { setError("Veuillez renseigner un âge valide."); return false; }
+    }
+
+    // STEP 2 : Situation (Defaults are safe usually, but good to check housing consistency)
+    if (step === 2) {
+        // Rien de critique ici car tout a des valeurs par défaut
+    }
+
+    // STEP 3 : Fixes (Logement + Listes)
+    if (step === 3) {
+        // Logement : Si pas gratuit, on veut un montant et une date
+        const s = formData.housing?.status;
+        if (s === 'tenant' || s === 'owner_loan') {
+            if (!formData.housing.monthlyCost || formData.housing.monthlyCost <= 0) {
+                setError("Veuillez indiquer le montant de votre loyer/crédit."); return false;
+            }
+            if (!formData.housing.paymentDay || formData.housing.paymentDay < 1 || formData.housing.paymentDay > 31) {
+                setError("Veuillez indiquer le jour de prélèvement du logement (1-31)."); return false;
+            }
+        }
+
+        // Vérification générique des listes fixes (Nom + Montant + Date)
+        const checkList = (list: FinancialItem[], name: string) => {
+            for (const item of list) {
+                if (!item.name || item.name.trim() === '') return `Une ligne dans "${name}" n'a pas de nom.`;
+                if (!item.amount || isNaN(Number(item.amount))) return `Une ligne dans "${name}" n'a pas de montant.`;
+                if (item.category !== 'ANNUAL_EXPENSE' && (!item.dayOfMonth || item.dayOfMonth < 1 || item.dayOfMonth > 31)) 
+                    return `Une ligne dans "${name}" n'a pas de date de prélèvement valide.`;
+            }
+            return null;
+        };
+
+        let err = checkList(formData.incomes, "Revenus");
+        if (err) { setError(err); return false; }
+        err = checkList(formData.fixedCosts, "Factures Fixes");
+        if (err) { setError(err); return false; }
+        err = checkList(formData.credits, "Crédits");
+        if (err) { setError(err); return false; }
+        // Pour les dépenses annuelles, la date (jour) est moins critique, on vérifie juste montant/nom via checkList (qui ignore date si annual - à adapter si besoin, ici j'ai exclu dans la condition)
+    }
+
+    // STEP 4 : Variable (Nom + Montant, Pas de Date)
+    if (step === 4) {
+        for (const item of formData.variableCosts) {
+            if (!item.name || item.name.trim() === '') { setError("Une dépense courante n'a pas de nom."); return false; }
+            if (!item.amount && item.amount !== 0) { setError("Une dépense courante n'a pas de montant valide."); return false; } // Amount 0 is technically allowed but weird, assuming inputs force number
+        }
+    }
+
+    // STEP 5 : Patrimoine
+    if (step === 5) {
+        for (const asset of formData.assetsUi) {
+            if (!asset.name || asset.name.trim() === '') { setError("Un de vos comptes n'a pas de nom."); return false; }
+            if (asset.stock === undefined || isNaN(asset.stock)) { setError(`Le solde du compte "${asset.name}" est invalide.`); return false; }
+            
+            // Si c'est pas un compte courant et qu'il y a un versement, il faut une date
+            if (asset.type !== 'cc' && asset.monthlyFlow > 0) {
+                 if (!asset.transferDay || asset.transferDay < 1 || asset.transferDay > 31) {
+                     setError(`Veuillez indiquer le jour du virement pour "${asset.name}".`); return false;
+                 }
+            }
+        }
+    }
+
+    setError(null);
+    return true;
+  };
+
+  const goNext = () => { 
+      if (validateCurrentStep(currentStep)) {
+          setCurrentStep(s => s + 1); 
+          window.scrollTo({ top: 0, behavior: 'smooth' }); 
+      }
+  };
+  const goPrev = () => { setError(null); setCurrentStep(s => Math.max(1, s - 1)); };
 
   const updateItem = (list: keyof FormProfile, id: string, field: string, val: any) => {
     if (!formData) return;
@@ -637,7 +775,9 @@ export default function ProfilePage() {
   const addItem = (list: keyof FormProfile) => {
     if (!formData) return;
     const currentList = formData[list] as FinancialItem[];
-    updateForm({ ...formData, [list]: [...currentList, { id: generateIdHelper(), name: '', amount: '', frequency: 'mensuel' }] });
+    // Initialisation intelligente : si c'est income/fixed/credit, on met le jour 1 par défaut pour éviter l'erreur de validation immédiate
+    const defaultDay = list === 'variableCosts' ? undefined : 1; 
+    updateForm({ ...formData, [list]: [...currentList, { id: generateIdHelper(), name: '', amount: '', frequency: 'mensuel', dayOfMonth: defaultDay }] });
   };
   const removeItem = (list: keyof FormProfile, id: string) => {
     if (!formData) return;
@@ -645,16 +785,24 @@ export default function ProfilePage() {
     updateForm({ ...formData, [list]: currentList.filter((i) => i.id !== id) });
   };
 
-  // ✅ SAUVEGARDE FINALE
   const handleSaveAndExit = async (lifestyle: number, savingsFromWizard: number) => {
     if (isSaving || !formData) return;
     setIsSaving(true);
     try {
-        // On utilise le Mapper pour générer un profil propre pour la DB
-        const finalProfile = mapFormToProfile(formData, lifestyle);
-        await saveProfile(finalProfile);
+        const finalPayload = mapFormToPayload(formData, lifestyle);
+        const response = await fetch('/api/user', {
+            method: 'POST',
+            body: JSON.stringify(finalPayload),
+            headers: { 'Content-Type': 'application/json' },
+        });
+
+        if (!response.ok) throw new Error("Erreur API");
         window.location.href = '/'; 
-    } catch (e) { console.error(e); setIsSaving(false); alert("Erreur lors de la sauvegarde."); }
+    } catch (e) { 
+        console.error(e); 
+        setIsSaving(false); 
+        alert("Erreur lors de la sauvegarde."); 
+    }
   };
 
   if (!isLoaded || !formData) return <div className="h-[50vh] flex items-center justify-center"><Loader2 className="animate-spin text-indigo-600" size={32}/></div>;
@@ -669,20 +817,13 @@ export default function ProfilePage() {
 
             <div className="lg:grid lg:grid-cols-12 lg:gap-12 items-start">
                 <div className="lg:col-span-7 xl:col-span-8">
-                    {currentStep === 1 && <StepIdentite formData={formData} updateForm={updateForm} onNext={goNext} />}
-                    {currentStep === 2 && <StepSituation formData={formData} updateForm={updateForm} onNext={goNext} onPrev={goPrev} />}
-                    
-                    {/* Step 3 : Fixe */}
-                    {currentStep === 3 && <StepFixedFinances formData={formData} updateForm={updateForm} addItem={addItem} removeItem={removeItem} updateItem={updateItem} onNext={goNext} onPrev={goPrev} />}
-                    
-                    {/* Step 4 : Variable */}
-                    {currentStep === 4 && <StepDailyLife formData={formData} updateForm={updateForm} addItem={addItem} removeItem={removeItem} updateItem={updateItem} onNext={goNext} onPrev={goPrev} />}
-                    
-                    {/* Step 5 : Patrimoine (CLEAN ARCHITECTURE) */}
-                    {currentStep === 5 && <StepAssets formData={formData} updateForm={updateForm} addItem={addItem} removeItem={removeItem} updateItem={updateItem} onNext={goNext} onPrev={goPrev} />}
-                    
-                    {/* Step 6 : Verdict */}
-                    {currentStep === 6 && <StepStrategy formData={formData} updateForm={updateForm} onConfirm={handleSaveAndExit} isSaving={isSaving} onPrev={goPrev} stats={wizardStats} />}
+                    {/* ✅ On passe la prop 'error' à tous les steps */}
+                    {currentStep === 1 && <StepIdentite formData={formData} updateForm={updateForm} onNext={goNext} error={error} />}
+                    {currentStep === 2 && <StepSituation formData={formData} updateForm={updateForm} onNext={goNext} onPrev={goPrev} error={error} />}
+                    {currentStep === 3 && <StepFixedFinances formData={formData} updateForm={updateForm} addItem={addItem} removeItem={removeItem} updateItem={updateItem} onNext={goNext} onPrev={goPrev} error={error} />}
+                    {currentStep === 4 && <StepDailyLife formData={formData} updateForm={updateForm} addItem={addItem} removeItem={removeItem} updateItem={updateItem} onNext={goNext} onPrev={goPrev} error={error} />}
+                    {currentStep === 5 && <StepAssets formData={formData} updateForm={updateForm} addItem={addItem} removeItem={removeItem} updateItem={updateItem} onNext={goNext} onPrev={goPrev} error={error} />}
+                    {currentStep === 6 && <StepStrategy formData={formData} updateForm={updateForm} onConfirm={handleSaveAndExit} isSaving={isSaving} onPrev={goPrev} stats={wizardStats} error={error} />}
                 </div>
 
                 <div className="hidden lg:block lg:col-span-5 xl:col-span-4">

@@ -1,31 +1,139 @@
-// Ce fichier définit la structure de ta vraie base de données Vercel
-// Il remplace le fichier temporaire que tu avais avant.
+// =========================================================
+// 1. CONFIGURATION (Standard Vercel / Postgres)
+// =========================================================
 
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "postgresql"
-  // Vercel utilise ces noms de variables spécifiques pour Postgres
-  // Ces variables sont dans ton .env.local grâce à "npx vercel env pull"
-  url       = env("POSTGRES_PRISMA_URL")
-  // On utilise POSTGRES_URL pour la connexion directe (migrations/push)
-  directUrl = env("POSTGRES_URL")
+  provider  = "postgresql"
+  url       = env("POSTGRES_PRISMA_URL") // Connection pooling
+  directUrl = env("POSTGRES_URL")        // Direct connection (Migrations)
 }
 
-model User {
-  // --- IDENTITÉ (Colonnes strictes SQL) ---
-  id        String  @id // On utilisera l'ID de Clerk ici (ex: user_2bX...)
-  email     String  @unique
-  firstName String?
+// =========================================================
+// 2. ENUMS (Listes de choix fixes)
+// =========================================================
 
+enum UserPersona {
+  SALARIED   // Salarié
+  FREELANCE  // Indépendant
+  STUDENT    // Étudiant
+  RETIRED    // Retraité
+}
+
+enum HousingStatus {
+  TENANT      // Locataire
+  OWNER_LOAN  // Propriétaire (Crédit en cours)
+  OWNER_PAID  // Propriétaire (Payé)
+  FREE        // Hébergé à titre gratuit
+}
+
+enum ItemCategory {
+  INCOME           // Revenus (Salaires, Primes...)
+  FIXED_COST       // Charges Fixes (Électricité, Assurance...)
+  SUBSCRIPTION     // Abonnements (Netflix, Sport...)
+  CREDIT           // Crédits Conso
+  ANNUAL_EXPENSE   // Dépenses Annuelles (Taxe foncière...)
+  VARIABLE_COST    // Vie Quotidienne (Courses, Resto...) -> Souvent lissées
+}
+
+enum AssetType {
+  CC            // Compte Courant
+  LIVRET        // Livret A, LDDS, LEP...
+  PEA           // Plan Épargne Actions
+  CTO           // Compte Titres
+  AV            // Assurance Vie
+  PER           // Épargne Retraite
+  PEE           // Épargne Entreprise
+  CRYPTO        // Bitcoin, Eth...
+  REAL_ESTATE   // Immobilier Physique ou Papier (SCPI)
+  GOLD          // Or / Matières premières
+  CROWD         // Crowdfunding / Lending
+  OTHER         // Montres, Art, Vin...
+}
+
+// =========================================================
+// 3. TABLES (MODÈLES)
+// =========================================================
+
+// L'utilisateur (Authentification via Clerk)
+model User {
+  id        String   @id // ID Clerk (ex: user_2bX...)
+  email     String   @unique
+  firstName String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  // --- DONNÉES FINANCIÈRES (Flexible JSON) ---
-  // C'est ici que toute la magie opère : on stocke tes objets JS (revenus, dépenses...)
-  // directement dans la base sans avoir besoin de créer 50 tables.
-  // Le type 'Json' est une spécificité puissante de Postgres.
-  financialData Json @default("{}")
+  // Un User possède un seul Profil Financier
+  profile   FinancialProfile?
+}
+
+// La fiche d'identité financière
+model FinancialProfile {
+  id     String @id @default(cuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // --- STEP 1 & 2 : IDENTITÉ & SITUATION ---
+  age           Int?
+  persona       UserPersona?
+  housingStatus HousingStatus?
+  housingCost   Float         @default(0) // Loyer ou Mensualité Crédit
+  
+  // ✅ CHAMP AJOUTÉ : Jour du prélèvement Loyer/Crédit
+  housingPaymentDay Int?      @default(5) 
+
+  adults        Int           @default(1)
+  children      Int           @default(0)
+
+  // --- STEP 6 : STRATÉGIE ---
+  funBudget     Float         @default(0) // "Reste à vivre" plaisir choisi
+
+  // --- RELATIONS ---
+  items  FinancialItem[] // Flux (Revenus / Dépenses)
+  assets Asset[]         // Patrimoine (Comptes / Investissements)
+
+  updatedAt DateTime @updatedAt
+}
+
+// Gestion des Flux (Revenus et Dépenses) - Steps 3 & 4
+model FinancialItem {
+  id        String       @id @default(cuid())
+  profileId String
+  profile   FinancialProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  name      String
+  amount    Float        @default(0)
+  category  ItemCategory // Définit le type (Revenu, Charge Fixe, Variable...)
+  frequency String     @default("mensuel")
+
+  // ✅ GESTION DU TEMPS :
+  // - Si category == INCOME ou FIXED_COST : dayOfMonth est important (ex: le 5 du mois).
+  // - Si category == VARIABLE_COST : dayOfMonth est souvent NULL ou ignoré (montant lissé / 30j).
+  dayOfMonth Int?       @default(1) 
+
+  createdAt DateTime @default(now())
+}
+
+// Gestion du Patrimoine (Hybride Stock/Flux) - Step 5
+model Asset {
+  id        String    @id @default(cuid())
+  profileId String
+  profile   FinancialProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  name      String
+  type      AssetType
+  
+  // Stock : Combien j'ai aujourd'hui
+  currentValue    Float @default(0) 
+  
+  // Flux : Combien j'épargne tous les mois
+  monthlyFlow     Float @default(0) 
+  
+  // Date : Quand le virement part-il ?
+  transferDay     Int   @default(1) 
+
+  createdAt DateTime @default(now())
 }

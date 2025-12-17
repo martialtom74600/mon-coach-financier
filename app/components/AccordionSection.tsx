@@ -18,7 +18,7 @@ export interface FinancialItem {
   amount: number | string;
   dayOfMonth?: number;
   frequency?: string;
-  [key: string]: any; // Pour permettre d'autres propriétés si nécessaire
+  [key: string]: any; 
 }
 
 interface AccordionSectionProps {
@@ -32,11 +32,12 @@ interface AccordionSectionProps {
   colorClass?: string;
   defaultOpen?: boolean;
   mode?: 'beginner' | 'expert';
-  description?: React.ReactNode; // Peut être du texte ou un composant
+  description?: React.ReactNode; 
   unit?: string;
+  hideDate?: boolean; // ✅ Pour cacher la date (ex: Courses)
 }
 
-// --- SOUS-COMPOSANT INTERNE (Pour le style des info-bulles) ---
+// --- SOUS-COMPOSANT INTERNE (Info-bulle) ---
 const InfoBox = ({ children, className = "mb-6" }: { children: React.ReactNode, className?: string }) => (
   <div className={`bg-indigo-50/50 border border-indigo-100 rounded-xl p-3 flex gap-3 text-xs text-indigo-800 ${className}`}>
     <Info size={16} className="shrink-0 mt-0.5 text-indigo-500" />
@@ -56,15 +57,17 @@ const AccordionSection: React.FC<AccordionSectionProps> = ({
   colorClass = 'text-slate-800', 
   defaultOpen = false, 
   description = null,
-  unit = 'mois' 
+  unit = 'mois',
+  hideDate = false 
 }) => {
   const [isOpen, setIsOpen] = useState(defaultOpen);
   
-  // Utilisation de useMemo pour optimiser le calcul si la liste est longue
+  // Calcul du total optimisé
   const subTotal = useMemo(() => calculateListTotal(items), [items]);
 
   return (
     <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden transition-all duration-300 shadow-sm hover:shadow-md">
+      
       {/* HEADER DE L'ACCORDÉON */}
       <button 
         onClick={() => setIsOpen(!isOpen)} 
@@ -112,65 +115,71 @@ const AccordionSection: React.FC<AccordionSectionProps> = ({
             )}
             
             {items.map((item) => (
-            <div key={item.id} className="flex flex-col sm:flex-row gap-2 items-start sm:items-center bg-white p-2 rounded-xl border border-slate-100 shadow-sm">
-                {/* NOM */}
-                <div className="flex-1 w-full">
+              <div key={item.id} className="bg-white p-3 rounded-xl border border-slate-100 shadow-sm transition-all hover:border-indigo-100 group">
+                
+                {/* 📱 RESPONSIVE LAYOUT : 
+                    - Mobile: Flex Column (Nom au dessus, Reste en dessous)
+                    - Desktop: Flex Row (Tout aligné) 
+                */}
+                <div className="flex flex-col sm:flex-row gap-3 sm:items-center">
+                  
+                  {/* 1. NOM (Prend toute la largeur dispo) */}
+                  <div className="w-full sm:flex-1">
                     <input 
-                        type="text" 
-                        placeholder="Nom (ex: Loyer)" 
-                        value={item.name} 
-                        onChange={(e) => onItemChange(item.id, 'name', e.target.value)} 
-                        className="w-full p-2 bg-transparent font-medium text-sm text-slate-700 placeholder:text-slate-300 outline-none" 
+                      type="text" 
+                      placeholder="Nom (ex: Loyer)" 
+                      value={item.name} 
+                      onChange={(e) => onItemChange(item.id, 'name', e.target.value)} 
+                      className="w-full p-2 bg-transparent font-medium text-sm text-slate-700 placeholder:text-slate-300 outline-none border-b border-transparent focus:border-indigo-200 transition-colors" 
                     />
-                </div>
+                  </div>
 
-                <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+                  {/* 2. GROUPE DE DROITE (Montant + Date + Delete) */}
+                  <div className="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-end border-t border-slate-50 pt-2 sm:border-0 sm:pt-0">
                     
                     {/* MONTANT */}
-                    <div className="relative w-32">
-                        <input 
-                            type="number" 
-                            placeholder="0" 
-                            value={item.amount} 
-                            onChange={(e) => onItemChange(item.id, 'amount', e.target.value)} 
-                            className="w-full p-2 pl-3 pr-10 bg-slate-50 rounded-lg text-sm font-bold text-slate-800 text-right outline-none focus:ring-2 focus:ring-indigo-100 appearance-none" 
-                        />
-                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-[10px] font-medium pointer-events-none">
-                            €/{unit}
-                        </span>
+                    <div className="relative flex-1 sm:flex-none sm:w-32">
+                      <input 
+                        type="number" 
+                        placeholder="0" 
+                        value={item.amount} 
+                        onChange={(e) => onItemChange(item.id, 'amount', e.target.value)} 
+                        className="w-full p-2 pl-3 pr-8 bg-slate-50 rounded-lg text-sm font-bold text-slate-800 text-right outline-none focus:ring-2 focus:ring-indigo-100 appearance-none" 
+                      />
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-[10px] font-medium pointer-events-none">
+                        €/{unit === 'an' ? 'an' : 'm'}
+                      </span>
                     </div>
                     
-                    {/* DATE DE PRÉLÈVEMENT (Conditionnelle) */}
-                    {unit !== 'an' && (
-                        <div className="relative w-16" title="Jour du mois (ex: 5)">
-                            <input 
-                                type="number" 
-                                min="1" max="31" 
-                                placeholder="J" 
-                                value={item.dayOfMonth || ''} 
-                                onChange={(e) => {
-                                    const val = parseInt(e.target.value);
-                                    if (!isNaN(val)) {
-                                        onItemChange(item.id, 'dayOfMonth', Math.min(31, Math.max(1, val)));
-                                    } else {
-                                        onItemChange(item.id, 'dayOfMonth', '');
-                                    }
-                                }} 
-                                className="w-full p-2 pl-2 pr-1 bg-slate-50 rounded-lg text-sm text-center text-slate-500 outline-none focus:ring-2 focus:ring-indigo-100" 
-                            />
-                        </div>
+                    {/* DATE (Si affichée) */}
+                    {unit !== 'an' && !hideDate && (
+                      <div className="relative w-16 shrink-0" title="Jour du mois (ex: 5)">
+                        <input 
+                          type="number" 
+                          min="1" max="31" 
+                          placeholder="J" 
+                          value={item.dayOfMonth || ''} 
+                          onChange={(e) => {
+                             const val = parseInt(e.target.value);
+                             if (!isNaN(val)) onItemChange(item.id, 'dayOfMonth', Math.min(31, Math.max(1, val)));
+                             else onItemChange(item.id, 'dayOfMonth', '');
+                          }} 
+                          className="w-full p-2 bg-slate-50 rounded-lg text-sm text-center text-slate-500 outline-none focus:ring-2 focus:ring-indigo-100" 
+                        />
+                      </div>
                     )}
                     
                     {/* SUPPRESSION */}
                     <button 
-                        onClick={() => onItemRemove(item.id)} 
-                        className="p-2 text-slate-300 hover:text-rose-500 transition-colors"
-                        aria-label="Supprimer la ligne"
+                      onClick={() => onItemRemove(item.id)} 
+                      className="p-2 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-colors shrink-0"
+                      aria-label="Supprimer la ligne"
                     >
-                        <Trash2 size={16} />
+                      <Trash2 size={18} />
                     </button>
+                  </div>
                 </div>
-            </div>
+              </div>
             ))}
 
             {/* BOUTON AJOUTER */}
