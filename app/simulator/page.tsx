@@ -8,14 +8,13 @@ import {
   formatCurrency,
   PURCHASE_TYPES,
   PAYMENT_MODES,
-  generateId,
   calculateFinancials,
 } from '@/app/lib/logic';
 
 import {
   CheckCircle, AlertTriangle, XCircle, Info, Wallet, TrendingDown,
   ArrowLeft, Save, RefreshCcw, Settings, Briefcase, RefreshCw,
-  CalendarDays, Target, ShoppingBag
+  CalendarDays, ShoppingBag, Target
 } from 'lucide-react';
 
 import Card from '@/app/components/ui/Card';
@@ -158,20 +157,19 @@ const DiagnosticCard = ({ result }: { result: any }) => {
 
 export default function SimulatorPage() {
   const router = useRouter();
-  const { profile, history, saveDecision, isLoaded } = useFinancialData();
+  const { profile, history, isLoaded } = useFinancialData();
   
-  // Utilise l'engine v2 pour calculer les stats (incluant le fix des goals)
   const stats = useMemo(() => calculateFinancials(profile), [profile]);
-  
   const isProfileEmpty = stats.monthlyIncome === 0 && stats.matelas === 0;
+  
   const [step, setStep] = useState<'input' | 'result'>('input');
   const [isSaving, setIsSaving] = useState(false);
   const today = new Date().toISOString().split('T')[0];
 
-  // State Achat (Unique focus de cette page)
+  // State Achat
   const [purchase, setPurchase] = useState({
     name: '',
-    type: 'need',
+    type: 'need', // L'API convertira en 'NEED'
     amount: '',
     date: today,
     paymentMode: 'CASH_SAVINGS',
@@ -192,33 +190,46 @@ export default function SimulatorPage() {
     return null;
   }, [step, stats, purchase, profile, history]);
 
+  // ✅ SAUVEGARDE DIRECTE EN BDD (Plus de JSON !)
   const handleSavePurchase = async () => {
     if (!result) return;
     setIsSaving(true);
-    // Simulation d'attente pour l'UX
-    await new Promise(resolve => setTimeout(resolve, 600));
 
-    const decision = {
-      id: generateId(),
-      date: new Date().toISOString(),
-      purchase,
-      result,
-    };
-    
-    saveDecision(decision);
-    setStep('input');
-    setPurchase({
-      name: '',
-      type: 'need',
-      amount: '',
-      date: today,
-      paymentMode: 'CASH_SAVINGS',
-      duration: '',
-      rate: '',
-      isReimbursable: false,
-      isPro: false,
-    });
-    setIsSaving(false);
+    try {
+        // On envoie directement à l'API qui écrit dans la table PurchaseDecision
+        const response = await fetch('/api/decision', {
+            method: 'POST',
+            body: JSON.stringify(purchase),
+            headers: { 'Content-Type': 'application/json' },
+        });
+
+        if (!response.ok) {
+            throw new Error("Erreur lors de l'enregistrement");
+        }
+
+        // Succès : Reset UI
+        setStep('input');
+        setPurchase({
+            name: '',
+            type: 'need',
+            amount: '',
+            date: today,
+            paymentMode: 'CASH_SAVINGS',
+            duration: '',
+            rate: '',
+            isReimbursable: false,
+            isPro: false,
+        });
+        
+        // Optionnel : Recharger la page ou invalider le cache pour voir l'historique à jour
+        // router.refresh(); 
+
+    } catch (error) {
+        console.error("Erreur sauvegarde", error);
+        alert("Impossible de sauvegarder la décision.");
+    } finally {
+        setIsSaving(false);
+    }
   };
 
   if (!isLoaded) return <div className="min-h-[50vh] flex items-center justify-center"><div className="animate-pulse h-12 w-12 bg-slate-200 rounded-full"></div></div>;
@@ -332,11 +343,10 @@ export default function SimulatorPage() {
           <div className="space-y-4">
             <div className="flex justify-between items-center p-3 bg-slate-50 rounded-lg">
                 <span className="text-slate-500 text-sm font-medium">Revenus</span>
-                {/* DYNAMIQUE */}
                 <span className="font-bold text-slate-700">{formatCurrency(stats.monthlyIncome)}</span>
             </div>
             
-            {/* DYNAMIQUE : N'apparait que si totalGoalsEffort > 0 (ce qui dépend de tes goals et du buffer engine) */}
+            {/* Si totalGoalsEffort > 0 */}
             {stats.totalGoalsEffort > 0 && (
                 <div className="flex justify-between items-center p-3 bg-emerald-50 border border-emerald-100 rounded-lg">
                     <span className="text-emerald-700 text-sm font-bold flex items-center gap-2"><Target size={14}/> Épargne Projets</span>
@@ -346,7 +356,6 @@ export default function SimulatorPage() {
 
             <div className="flex justify-between items-center p-3 bg-indigo-50 border border-indigo-100 rounded-lg">
                 <span className="text-indigo-900 text-sm font-bold">Reste à vivre</span>
-                {/* DYNAMIQUE : Vient directement de engine.ts (contient le buffer invisible) */}
                 <span className="font-bold text-indigo-700 text-xl">{formatCurrency(stats.remainingToLive)}</span>
             </div>
           </div>
@@ -362,7 +371,6 @@ export default function SimulatorPage() {
                 <div>
                   <div className="text-xs text-slate-400 font-bold uppercase mb-1">Nouveau Matelas</div>
                   <div className="flex justify-between items-end">
-                    {/* DYNAMIQUE : Calculé par analyzePurchaseImpact */}
                     <div className="font-bold text-slate-800 text-2xl">{formatCurrency(result.newMatelas)}</div>
                     <Badge color={result.newSafetyMonths < 3 ? 'bg-orange-100 text-orange-700' : 'bg-emerald-100 text-emerald-700'}>
                         {result.newSafetyMonths.toFixed(1)} mois sécu

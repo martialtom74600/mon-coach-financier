@@ -4,15 +4,14 @@ import { useState, useMemo, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useFinancialData } from '@/app/hooks/useFinancialData';
 
-// 👇 IMPORTS LOGIQUE (Nettoyés : on ne garde que le nécessaire)
+// 👇 IMPORTS LOGIQUE
 import {
   calculateFinancials,
   formatCurrency,
   generateId,
   GOAL_CATEGORIES,
-  simulateGoalScenario // ✅ La fonction magique qui remplace ton contrôleur local
+  simulateGoalScenario
 } from '@/app/lib/logic';
-
 
 // 👇 IMPORTS ICONES
 import {
@@ -32,12 +31,94 @@ import Button from '@/app/components/ui/Button';
 import InputGroup from '@/app/components/ui/InputGroup';
 import Badge from '@/app/components/ui/Badge';
 
+// 🛑 TYPAGE STRICT BASÉ SUR PRISMA
+interface DBGoal {
+  id: string;
+  name: string;
+  category: string; 
+  targetAmount: number;
+  currentSaved: number;
+  monthlyContribution: number;
+  deadline: string;
+  projectedYield: number;
+  transferDay: number | null;
+}
+
 // ============================================================================
-// HELPERS UI (Purement visuel ou mapping état)
+// HELPERS DE RECONSTRUCTION DE PAYLOAD (LE CORRECTIF EST ICI 👇)
 // ============================================================================
 
-const applyStrategyToForm = (strategy: any, currentForm: Partial<Goal>) => {
-    let updates: Partial<Goal> = {};
+const prepareApiPayload = (currentProfile: any, newGoals: DBGoal[]) => {
+    // 1. Reconstituer la liste unique 'items' avec les catégories
+    const items = [
+        ...(currentProfile.incomes || []).map((i: any) => ({ ...i, category: 'INCOME' })),
+        ...(currentProfile.fixedCosts || []).map((i: any) => ({ ...i, category: 'FIXED_COST' })),
+        ...(currentProfile.variableCosts || []).map((i: any) => ({ ...i, category: 'VARIABLE_COST' })),
+        ...(currentProfile.credits || []).map((i: any) => ({ ...i, category: 'CREDIT' })),
+        ...(currentProfile.subscriptions || []).map((i: any) => ({ ...i, category: 'SUBSCRIPTION' })),
+        ...(currentProfile.annualExpenses || []).map((i: any) => ({ ...i, category: 'ANNUAL_EXPENSE' })),
+    ];
+
+    // 2. Reconstituer la liste unique 'assets' en fusionnant Investments (Stock) et Savings (Flux)
+    const assetsMap = new Map();
+    
+    // a. On ajoute les stocks
+    (currentProfile.investments || []).forEach((inv: any) => {
+        assetsMap.set(inv.id, {
+            name: inv.name,
+            type: inv.type, // Déjà en Enum (UPPERCASE) normalement
+            currentValue: inv.amount || inv.currentValue || 0,
+            monthlyFlow: 0,
+            transferDay: 1
+        });
+    });
+
+    // b. On ajoute les flux (versements programmés)
+    (currentProfile.savingsContributions || []).forEach((sav: any) => {
+        const existing = assetsMap.get(sav.id);
+        if(existing) {
+            existing.monthlyFlow = sav.amount;
+            existing.transferDay = sav.dayOfMonth;
+        } else {
+            // Cas rare : épargne vers un compte pas listé dans les investissements
+            assetsMap.set(sav.id, {
+                name: sav.name,
+                type: 'OTHER', 
+                currentValue: 0,
+                monthlyFlow: sav.amount,
+                transferDay: sav.dayOfMonth
+            });
+        }
+    });
+
+    const assets = Array.from(assetsMap.values());
+
+    // 3. Construire l'objet final imbriqué pour l'API
+    return {
+        firstName: currentProfile.firstName,
+        profile: {
+            age: currentProfile.age,
+            persona: currentProfile.persona,
+            housingStatus: currentProfile.housing?.status,
+            housingCost: currentProfile.housing?.monthlyCost,
+            housingPaymentDay: currentProfile.housing?.paymentDay,
+            adults: currentProfile.household?.adults,
+            children: currentProfile.household?.children,
+            funBudget: currentProfile.funBudget
+        },
+        items: items,
+        assets: assets,
+        goals: newGoals
+    };
+};
+
+
+// ============================================================================
+// HELPERS UI
+// ============================================================================
+
+const applyStrategyToForm = (strategy: any, currentForm: Partial<DBGoal>) => {
+    let updates: any = {};
     let triggerSavings = false;
 
     if (strategy.type === 'TIME' || strategy.type === 'HYBRID') {
@@ -46,7 +127,7 @@ const applyStrategyToForm = (strategy: any, currentForm: Partial<Goal>) => {
     } 
     else if (strategy.type === 'BUDGET' && strategy.actionLabel === "Simuler un virement") {
         const addedAmount = strategy.value;
-        const current = parseFloat(currentForm.currentSaved as string) || 0;
+        const current = parseFloat(String(currentForm.currentSaved)) || 0;
         updates = { currentSaved: (current + addedAmount).toString() };
         triggerSavings = true;
     }
@@ -81,24 +162,8 @@ const ProjectionChart = ({ data }: { data: any[] }) => {
             formatter={(value: number) => [formatCurrency(value), 'Capital']}
             labelFormatter={(label) => label ? new Date(label).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' }) : ''}
           />
-          <Area 
-            type="monotone" 
-            dataKey="balance" 
-            stroke="#10b981" 
-            strokeWidth={2}
-            fillOpacity={1} 
-            fill="url(#colorBalance)" 
-            animationDuration={1500}
-          />
-          <Area 
-            type="monotone" 
-            dataKey="contributed" 
-            stroke="#64748b" 
-            strokeDasharray="4 4"
-            fill="none" 
-            strokeWidth={1}
-            name="Versements seuls"
-          />
+          <Area type="monotone" dataKey="balance" stroke="#10b981" strokeWidth={2} fillOpacity={1} fill="url(#colorBalance)" animationDuration={1500} />
+          <Area type="monotone" dataKey="contributed" stroke="#64748b" strokeDasharray="4 4" fill="none" strokeWidth={1} name="Versements seuls" />
         </AreaChart>
       </ResponsiveContainer>
     </div>
@@ -174,22 +239,17 @@ const GoalItemCard = ({ goal, onDelete }: { goal: any, onDelete: (id: string) =>
 
 export default function GoalsPage() {
   const router = useRouter();
-  const { profile, saveProfile, isLoaded } = useFinancialData();
+  const { profile, isLoaded } = useFinancialData(); // On n'utilise pas saveProfile du hook directement ici
   
-  // 1. Récupération des stats via le Moteur (c'est lui qui fait les maths)
-  // stats contient maintenant : availableForProjects, securityBuffer, etc.
   const stats = useMemo(() => calculateFinancials(profile), [profile]);
-  
-  // Helpers d'affichage simples
   const isProfileEmpty = stats.monthlyIncome === 0 && stats.matelas === 0;
   const hasGoals = stats.goalsBreakdown && stats.goalsBreakdown.length > 0;
   
-  // État local de la page (UI uniquement)
   const [step, setStep] = useState<'input' | 'list'>(hasGoals ? 'list' : 'input');
   const [inputStep, setInputStep] = useState<'form' | 'check'>('form');
   const [isSaving, setIsSaving] = useState(false);
   
-  const [newGoal, setNewGoal] = useState<Partial<Goal>>({
+  const [newGoal, setNewGoal] = useState<any>({
     name: '', category: 'REAL_ESTATE', targetAmount: '', currentSaved: '', deadline: '', projectedYield: '', transferDay: ''
   });
   const [hasSavings, setHasSavings] = useState(false);
@@ -198,20 +258,15 @@ export default function GoalsPage() {
   useEffect(() => { window.scrollTo({ top: 0, behavior: 'smooth' }); }, [step, inputStep]);
   
   useEffect(() => {
-    if (!hasSavings) setNewGoal(prev => ({ ...prev, currentSaved: '' }));
-    if (!isInvested) setNewGoal(prev => ({ ...prev, projectedYield: '' }));
+    if (!hasSavings) setNewGoal((prev: any) => ({ ...prev, currentSaved: '' }));
+    if (!isInvested) setNewGoal((prev: any) => ({ ...prev, projectedYield: '' }));
   }, [hasSavings, isInvested]);
 
-  // 2. Appel du Moteur de Simulation pour le scénario en cours
-  // C'est ici que toute la complexité a été déplacée (engine.ts)
   const simulation = useMemo(() => {
       if (inputStep !== 'check') return null;
-      // On passe les stats complètes (qui contiennent le buffer déjà calculé)
       return simulateGoalScenario(newGoal, profile, stats);
   }, [inputStep, newGoal, profile, stats]);
 
-  // 3. Calcul des métriques d'affichage pour la Sidebar
-  // On utilise 'availableForProjects' qui est la VRAIE marge après buffer
   const displayedGoalsEffort = (inputStep === 'check' && simulation) 
       ? stats.totalGoalsEffort + simulation.monthlyEffort 
       : stats.totalGoalsEffort;
@@ -227,32 +282,66 @@ export default function GoalsPage() {
     if (triggerSavings) setHasSavings(true);
   };
 
+  // ✅ SAUVEGARDE CORRIGÉE : Utilisation de prepareApiPayload
   const handleSaveGoal = async () => {
     if (!simulation) return;
     setIsSaving(true);
-    await new Promise(resolve => setTimeout(resolve, 800));
-
-    const goalToAdd: Goal = {
-      ...simulation.tempGoal,
-      id: generateId(),
+    
+    // 1. Préparer le nouvel objectif
+    const goalPayload: DBGoal = {
+      id: generateId(), 
+      name: newGoal.name,
+      category: newGoal.category, 
+      targetAmount: parseFloat(newGoal.targetAmount),
+      currentSaved: parseFloat(newGoal.currentSaved || 0),
       monthlyContribution: simulation.monthlyEffort,
-      transferDay: newGoal.transferDay ? parseInt(newGoal.transferDay as string) : undefined
+      deadline: newGoal.deadline, 
+      projectedYield: parseFloat(newGoal.projectedYield || 0),
+      transferDay: newGoal.transferDay ? parseInt(newGoal.transferDay) : null
     };
 
-    const updatedProfile = { ...profile, goals: [...(profile.goals || []), goalToAdd] };
-    await saveProfile(updatedProfile);
-    
-    setIsSaving(false);
-    setNewGoal({ name: '', category: 'REAL_ESTATE', targetAmount: '', currentSaved: '', deadline: '', projectedYield: '', transferDay: '' });
-    setHasSavings(false); setIsInvested(false);
-    setInputStep('form'); setStep('list');
+    // 2. Préparer la liste complète des objectifs
+    const updatedGoalsList = [...(profile.goals || []), goalPayload];
+
+    // 3. RECONSTRUIRE LE PAYLOAD COMPLET POUR L'API (Fix Error 500)
+    const apiPayload = prepareApiPayload(profile, updatedGoalsList);
+
+    try {
+        // 4. Appel API manuel (on contourne saveProfile du hook pour être sûr du payload)
+        const response = await fetch('/api/user', {
+            method: 'POST',
+            body: JSON.stringify(apiPayload),
+            headers: { 'Content-Type': 'application/json' },
+        });
+
+        if (!response.ok) throw new Error("Erreur API");
+
+        // Force reload pour mettre à jour les données (optionnel si tu utilises un mutate global)
+        window.location.reload(); 
+        
+    } catch (error) {
+        console.error("Erreur sauvegarde objectif", error);
+        alert("Impossible de sauvegarder l'objectif.");
+        setIsSaving(false);
+    } 
   };
 
+  // ✅ SUPPRESSION CORRIGÉE
   const handleDeleteGoal = async (id: string) => {
-    const updatedGoals = (profile.goals || []).filter((g: Goal) => g.id !== id);
-    const updatedProfile = { ...profile, goals: updatedGoals };
-    await saveProfile(updatedProfile);
-    if (updatedGoals.length === 0) setStep('input');
+    const updatedGoalsList = (profile.goals || []).filter((g: any) => g.id !== id);
+    const apiPayload = prepareApiPayload(profile, updatedGoalsList);
+    
+    try {
+        await fetch('/api/user', {
+            method: 'POST',
+            body: JSON.stringify(apiPayload),
+            headers: { 'Content-Type': 'application/json' },
+        });
+        window.location.reload();
+    } catch (e) {
+        console.error(e);
+        alert("Erreur lors de la suppression");
+    }
   };
 
   if (!isLoaded) return <div className="min-h-[50vh] flex items-center justify-center"><div className="animate-pulse h-12 w-12 bg-slate-200 rounded-full"></div></div>;
@@ -488,7 +577,6 @@ export default function GoalsPage() {
                     <span className="font-bold text-emerald-700 text-xl">{formatCurrency(stats.capacityToSave)}</span>
                 </div>
                 
-                {/* 🔒 Visualisation de la sécurité (calculée par le moteur) */}
                 {stats.securityBuffer > 0 && (
                     <div className="flex items-center gap-2 text-xs text-emerald-600 pt-2 border-t border-emerald-100">
                         <ShieldCheck size={12} />
