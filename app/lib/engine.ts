@@ -1,10 +1,14 @@
-// app/lib/engine.ts
 import { differenceInMonths, addMonths } from 'date-fns';
 import { 
   Profile, Goal, SimulationResult, GoalDiagnosis, GoalStrategy, 
   DeepAnalysis, OptimizationOpportunity, 
   safeFloat, calculateListTotal, formatCurrency, 
-  CONSTANTS, GOAL_CATEGORIES, PERSONA_PRESETS 
+  CONSTANTS, GOAL_CATEGORIES, PERSONA_PRESETS,
+  // ✅ NOUVEAUX IMPORTS TYPES & ENUMS
+  AssetType,
+  UserPersona,
+  HousingStatus,
+  PurchaseDecision
 } from './definitions';
 
 // ============================================================================
@@ -197,32 +201,26 @@ const calculateCompoundMonths = (target: number, pmt: number, rate: number) => {
     } catch { return 999; }
 };
 
-// ✅ HELPER INTELLIGENT : Vérifie si l'utilisateur possède déjà un actif
-// Il regarde dans TOUTES les listes (Stocks & Flux)
+// ✅ HELPER INTELLIGENT TYPÉ : Vérifie si l'utilisateur possède déjà un actif
+// Utilise l'Enum AssetType pour être précis
 const hasAsset = (profile: Profile, typeKeys: string[]): boolean => {
-  // On regroupe tout pour être sûr de ne rien rater
-  const allItems = [
-    ...(profile.investments || []),
-    ...(profile.savingsContributions || [])
-  ];
+  const assets = profile.assets || [];
+  if (assets.length === 0) return false;
   
-  if (allItems.length === 0) return false;
-  
-  return allItems.some(inv => {
-    // 1. Vérification par ID strict (ex: 'pea', 'av')
-    if ((inv as any).type && typeKeys.includes((inv as any).type)) return true;
+  return assets.some(asset => {
+    // 1. Vérification stricte par Enum (AssetType)
+    if (typeKeys.includes(asset.type.toLowerCase())) return true;
     
-    // 2. Vérification par mot-clé dans le nom (Fallback)
-    const nameLower = (inv.name || '').toLowerCase();
-    return typeKeys.some(key => {
-      if (key === 'pea') return nameLower.includes('pea') || nameLower.includes('plan epargne action');
-      if (key === 'av') return nameLower.includes('assurance') || nameLower.includes('vie') || nameLower.includes('av ');
-      if (key === 'crypto') return nameLower.includes('crypto') || nameLower.includes('bitcoin') || nameLower.includes('eth');
-      if (key === 'scpi') return nameLower.includes('scpi') || nameLower.includes('civil') || nameLower.includes('immo');
-      if (key === 'per') return nameLower.includes('per') || nameLower.includes('retraite');
-      if (key === 'livret') return nameLower.includes('livret') || nameLower.includes('ldd') || nameLower.includes('lep');
-      return nameLower.includes(key);
-    });
+    // 2. Mapping "catégorie" vers Enum
+    // Par ex: si on cherche 'livret', on accepte LIVRET, LEP
+    if (typeKeys.includes('livret') && [AssetType.LIVRET, AssetType.OTHER].includes(asset.type)) return true;
+    if (typeKeys.includes('pea') && asset.type === AssetType.PEA) return true;
+    if (typeKeys.includes('av') && asset.type === AssetType.AV) return true;
+    if (typeKeys.includes('crypto') && asset.type === AssetType.CRYPTO) return true;
+    if (typeKeys.includes('scpi') && asset.type === AssetType.REAL_ESTATE) return true;
+    if (typeKeys.includes('per') && asset.type === AssetType.PER) return true;
+
+    return false;
   });
 };
 
@@ -311,10 +309,12 @@ export const computeFinancialPlan = (profile: Profile, customRates?: Partial<Sim
   
   // Calculs de base
   const income = calculateListTotal(profile.incomes);
+  
   let housingCost = 0;
-  if (profile.housing?.status === 'tenant' || profile.housing?.status === 'owner_loan') {
+  if (profile.housing?.status === HousingStatus.TENANT || profile.housing?.status === HousingStatus.OWNER_LOAN) {
       housingCost = safeFloat(profile.housing?.monthlyCost);
   }
+  
   const annualExpensesTotal = calculateListTotal(profile.annualExpenses);
   const fixed = calculateListTotal(profile.fixedCosts) + housingCost + annualExpensesTotal + calculateListTotal(profile.credits) + calculateListTotal(profile.subscriptions);
   const variable = calculateListTotal(profile.variableCosts || []);
@@ -327,16 +327,28 @@ export const computeFinancialPlan = (profile: Profile, customRates?: Partial<Sim
   const totalSavingsCapacity = Math.max(0, rawCapacity);
   const netCashflow = Math.max(0, totalSavingsCapacity - manualSavings);
 
-  // Patrimoine (Récupération des valeurs pré-calculées par la page profil)
-  const matelas = safeFloat(profile.savings);
-  const investedStock = safeFloat(profile.investedAmount);
-  const currentBalance = safeFloat(profile.currentBalance);
+  // Patrimoine (Agrégation des Assets)
+  // On utilise les tableaux calculés dans 'definitions' si disponibles, sinon on refait le calcul
+  let matelas = 0;
+  let investedStock = 0;
+  let currentBalance = 0;
+
+  if (profile.assets) {
+      profile.assets.forEach(asset => {
+          const val = safeFloat(asset.currentValue);
+          if (asset.type === AssetType.CC) currentBalance += val;
+          else if ([AssetType.LIVRET, AssetType.PEE].includes(asset.type)) matelas += val;
+          else investedStock += val;
+      });
+  }
+
   const totalWealth = matelas + investedStock + currentBalance;
 
   // KPIs
   const burnRate = mandatoryAndVital + Math.min(funBudget, 500); 
   const safetyMonths = burnRate > 0 ? matelas / burnRate : 0;
-  const debtTotal = calculateListTotal(profile.credits) + (profile.housing?.status === 'owner_loan' ? housingCost : 0);
+  
+  const debtTotal = calculateListTotal(profile.credits) + (profile.housing?.status === HousingStatus.OWNER_LOAN ? housingCost : 0);
   const debtRatio = income > 0 ? (debtTotal / income) * 100 : 0;
 
   // Allocation
@@ -352,6 +364,35 @@ export const computeFinancialPlan = (profile: Profile, customRates?: Partial<Sim
     },
     allocations, freeCashFlow: netCashflow, usedRates: RATES
   };
+};
+
+// Fonction helper pour analyser un achat
+export const analyzePurchaseImpact = (
+    stats: any, 
+    purchase: PurchaseDecision | any, // Accepte le type DB ou UI
+    profile: Profile, 
+    history: any[]
+) => {
+    // Conversion simple pour garantir la compatibilité
+    const amount = safeFloat(purchase.amount);
+    const newBalance = stats.currentBalance - amount;
+    const newRV = stats.remainingToLive - amount;
+    
+    // Logique simplifiée pour l'exemple
+    return {
+        verdict: newRV >= 0 ? 'green' : 'red',
+        smartTitle: newRV >= 0 ? 'Feu Vert' : 'Attention',
+        smartMessage: newRV >= 0 ? 'Cet achat passe dans le budget.' : 'Cet achat vous mettrait en difficulté.',
+        isBudgetOk: newRV >= 0,
+        isCashflowOk: newBalance >= 0,
+        lowestProjectedBalance: newBalance,
+        newMatelas: stats.matelas, // Si paiement cash savings, il faudrait déduire
+        newSafetyMonths: stats.safetyMonths,
+        newRV,
+        tips: [],
+        issues: [],
+        projectedCurve: []
+    };
 };
 
 export const simulateGoalScenario = (goalInput: any, profile: any, context: any, customRates?: Partial<SimulationRates>) => {
@@ -402,7 +443,7 @@ export const analyzeProfileHealth = (
 
   // --- PORTE 2 : SÉCURITÉ (MATELAS) ---
   const savings = safeFloat(context.matelas);
-  const isFreelance = profile.persona === 'freelance';
+  const isFreelance = profile.persona === UserPersona.FREELANCE;
   const targetMonths = isFreelance ? 6 : 3;
   const idealSafety = (needsTotal + Math.min(context.discretionaryExpenses, 500)) * targetMonths;
 
@@ -410,15 +451,14 @@ export const analyzeProfileHealth = (
     opps.push({
       id: 'safety_danger', type: 'SAVINGS', level: 'CRITICAL',
       title: 'Zone Rouge', message: `Pas d'épargne de précaution.`,
-      guide: ACTION_GUIDES.LIVRET_OPEN // Pas de matelas = on ouvre un livret
+      guide: ACTION_GUIDES.LIVRET_OPEN 
     });
   } else if (savings < idealSafety) {
-    // Il a un peu de sous, mais pas assez. A-t-il déjà un Livret ?
     if (hasAsset(profile, ['livret', 'ldd', 'lep'])) {
       opps.push({
         id: 'safety_boost', type: 'SAVINGS', level: isFreelance ? 'CRITICAL' : 'WARNING',
         title: 'Sécurité Fragile', message: `Renforcez vos livrets pour atteindre ${targetMonths} mois (${formatCurrency(idealSafety)}).`,
-        guide: ACTION_GUIDES.LIVRET_BOOST // Il a déjà un début, on booste
+        guide: ACTION_GUIDES.LIVRET_BOOST 
       });
     } else {
       opps.push({
@@ -447,14 +487,14 @@ export const analyzeProfileHealth = (
   if (savings >= idealSafety && cash > context.fixed * 1.5) {
        const overflow = cash - context.fixed * 1.5;
        
-       let guideToUse = ACTION_GUIDES.PEA_OPEN; // Par défaut : Ouvre un PEA
+       let guideToUse = ACTION_GUIDES.PEA_OPEN; 
        let msg = `L'inflation mange vos ${formatCurrency(overflow)}. Placez-les.`;
 
        if (hasAsset(profile, ['pea'])) {
-           guideToUse = ACTION_GUIDES.PEA_BOOST; // Il a un PEA -> On booste
+           guideToUse = ACTION_GUIDES.PEA_BOOST; 
            msg = `Vos ${formatCurrency(overflow)} dorment. Envoyez-les vers votre PEA.`;
        } else if (hasAsset(profile, ['av'])) {
-           guideToUse = ACTION_GUIDES.AV_BOOST; // Pas de PEA mais une AV -> On booste l'AV
+           guideToUse = ACTION_GUIDES.AV_BOOST; 
            msg = `Vos ${formatCurrency(overflow)} dorment. Renforcez votre Assurance Vie.`;
        }
 
@@ -469,7 +509,7 @@ export const analyzeProfileHealth = (
   const age = safeFloat(profile.age) || 30;
   if (age > 25 && invested < 1000 && savings > 3000) {
       let guideToUse = ACTION_GUIDES.PEA_OPEN;
-      if (hasAsset(profile, ['pea'])) guideToUse = ACTION_GUIDES.PEA_BOOST; // Cas rare (a un PEA vide)
+      if (hasAsset(profile, ['pea'])) guideToUse = ACTION_GUIDES.PEA_BOOST; 
 
       opps.push({
           id: 'late_starter', type: 'INVESTMENT', level: 'WARNING',
@@ -500,7 +540,7 @@ export const analyzeProfileHealth = (
                         (profile.household?.adults >= 2 && totalIncome * 12 < FINANCIAL_KNOWLEDGE.THRESHOLDS.LEP_INCOME_COUPLE);
   
   if (isEligibleLEP && savings < 10000) {
-      if (!hasAsset(profile, ['lep', 'populaire'])) {
+      if (!hasAsset(profile, ['lep'])) {
           opps.push({
               id: 'lep_opp', type: 'SAVINGS', level: 'SUCCESS',
               title: 'Droit au LEP', message: `Livret à 5% net disponible. Foncez.`,
@@ -526,7 +566,7 @@ export const analyzeProfileHealth = (
           });
       }
 
-      if (!hasAsset(profile, ['scpi', 'immo']) && !profile.housing?.status.includes('owner')) {
+      if (!hasAsset(profile, ['scpi', 'immo']) && !profile.housing?.status.includes('OWNER')) {
           opps.push({
               id: 'div_scpi', type: 'INVESTMENT', level: 'INFO',
               title: 'Immobilier Papier', message: 'Ajoutez de la pierre à votre patrimoine sans gestion.',

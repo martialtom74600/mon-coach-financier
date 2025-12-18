@@ -1,11 +1,23 @@
-// app/lib/scenarios.ts
 import { addDays, isLastDayOfMonth, addMonths, format, startOfMonth, differenceInDays, startOfDay, isBefore, isSameMonth } from 'date-fns';
 import { fr } from 'date-fns/locale';
-import { Profile, Purchase, AnalysisResult, safeFloat, generateId, formatCurrency, calculateFutureValue, CONSTANTS } from './definitions';
-import { computeFinancialPlan } from './engine';
+import { 
+  Profile, 
+  Purchase, 
+  AnalysisResult, 
+  safeFloat, 
+  generateId, 
+  formatCurrency, 
+  calculateFutureValue, 
+  CONSTANTS,
+  // ✅ ENUMS
+  PaymentMode,
+  ItemCategory,
+  PurchaseType,
+  FinancialItem
+} from './definitions';
 
 // ============================================================================
-// 1. TYPES SPÉCIFIQUES TIMELINE (Pour ton UI Calendrier)
+// 1. TYPES SPÉCIFIQUES TIMELINE
 // ============================================================================
 
 export interface TimelineEvent {
@@ -33,8 +45,8 @@ export interface MonthData {
     stats: { balanceEnd: number };
 }
 
-// Configuration du lissage des dépenses variables
-const SPENDING_WEIGHTS = [ 1.3, 0.6, 0.6, 0.6, 0.6, 1.0, 2.3 ]; // Dimanche -> Samedi
+// Configuration du lissage des dépenses variables (Dimanche -> Samedi)
+const SPENDING_WEIGHTS = [ 1.3, 0.6, 0.6, 0.6, 0.6, 1.0, 2.3 ]; 
 
 const toDateKey = (date: Date | string): string => format(typeof date === 'string' ? new Date(date) : date, 'yyyy-MM-dd');
 const round = (num: number): number => Math.round((num + Number.EPSILON) * 100) / 100;
@@ -48,24 +60,40 @@ export const getSimulatedEvents = (purchase: Purchase) => {
     const rawAmount = typeof purchase.amount === 'string' ? parseFloat(purchase.amount) : purchase.amount;
     const amount = Math.abs(rawAmount || 0);
     const date = new Date(purchase.date || new Date()); date.setHours(12, 0, 0, 0);
-    const mode = purchase.paymentMode;
+    
+    // On normalise le mode de paiement (string -> Enum si besoin)
+    const mode = purchase.paymentMode as PaymentMode;
 
-    if (mode === 'CASH_ACCOUNT') {
+    if (mode === PaymentMode.CASH_CURRENT) { // 'CASH_ACCOUNT' est devenu 'CASH_CURRENT'
         events.push({ id: generateId(), name: purchase.name, amount: -amount, type: 'purchase', date: date, isSimulation: true });
         if (purchase.isReimbursable) events.push({ id: generateId(), name: `Remboursement: ${purchase.name}`, amount: amount, type: 'income', date: addDays(date, 30), isSimulation: true });
-    } else if (mode === 'SUBSCRIPTION') {
-        for (let i = 0; i < 24; i++) events.push({ id: generateId(), name: purchase.name, amount: -amount, type: 'subscription', date: addMonths(date, i), isSimulation: true });
-    } else if (mode === 'CREDIT' || mode === 'SPLIT') {
+    } 
+    else if (mode === PaymentMode.SPLIT) { // On gère le split comme un paiement en plusieurs fois
         const rawDuration = purchase.duration;
         const duration = typeof rawDuration === 'string' ? parseInt(rawDuration) : rawDuration;
         const months = Math.max(1, duration || 3);
+        const monthlyPart = amount / months;
+        
+        for (let i = 0; i < months; i++) {
+             events.push({ id: generateId(), name: `${purchase.name} (${i + 1}/${months})`, amount: -monthlyPart, type: 'debt', date: addMonths(date, i), isSimulation: true });
+        }
+    } 
+    else if (mode === PaymentMode.CREDIT) {
+        const rawDuration = purchase.duration;
+        const duration = typeof rawDuration === 'string' ? parseInt(rawDuration) : rawDuration;
+        const months = Math.max(1, duration || 12);
         const rawRate = purchase.rate;
         const rateVal = typeof rawRate === 'string' ? parseFloat(rawRate) : rawRate;
-        const rate = mode === 'CREDIT' ? (rateVal || 0) : 0;
+        const rate = rateVal || 0;
+        
         const totalPaid = amount * (1 + (rate / 100) * (months / 12)); 
         const monthlyPart = totalPaid / months;
-        for (let i = 0; i < months; i++) events.push({ id: generateId(), name: `${purchase.name} (${i + 1}/${months})`, amount: -monthlyPart, type: 'debt', date: addMonths(date, i), isSimulation: true });
+        for (let i = 0; i < months; i++) {
+             events.push({ id: generateId(), name: `${purchase.name} (${i + 1}/${months})`, amount: -monthlyPart, type: 'debt', date: addMonths(date, i), isSimulation: true });
+        }
     }
+    // Note: PaymentMode.CASH_SAVINGS n'impacte pas la timeline du compte courant, donc pas d'event généré ici.
+
     return events;
 };
 
@@ -81,24 +109,27 @@ export const generateTimeline = (
 ): MonthData[] => {
   
   const realToday = new Date();
-  // On détermine le point de départ du solde
-  let anchorDateRaw = profile.balanceDate 
-    ? new Date(profile.balanceDate) 
-    : (profile.updatedAt ? new Date(profile.updatedAt) : realToday);
-
+  
+  // Point de départ (Anchor)
+  // Si on a une date de mise à jour récente, on l'utilise, sinon aujourd'hui
+  let anchorDateRaw = profile.updatedAt ? new Date(profile.updatedAt) : realToday;
   const anchorDate = new Date(anchorDateRaw); anchorDate.setHours(12, 0, 0, 0);
+  
   const startDateLoop = startOfMonth(anchorDate); startDateLoop.setHours(12, 0, 0, 0);
 
   let currentBalance = safeFloat(profile.currentBalance);
-  const monthlyVarCost = safeFloat(profile.variableCosts);
+  
+  // Calcul des dépenses variables lissées (tout sauf income/fixed/credit)
+  const monthlyVarCost = safeFloat(profile.variableCosts ? calculateListTotal(profile.variableCosts) : 0);
   const avgDaily = monthlyVarCost / 30;
   const costPerWeekDay = SPENDING_WEIGHTS.map(w => avgDaily * w);
 
   // A. Gestion des Récurrents
   const recurringByDay = new Map<number, any[]>();
-  const pushRecurring = (items: any[], type: string, defaultDay: number) => {
+  
+  const pushRecurring = (items: FinancialItem[], type: 'income' | 'expense', defaultDay: number) => {
       (items || []).forEach((item) => {
-          const day = typeof item.dayOfMonth === 'string' ? parseInt(item.dayOfMonth) : (item.dayOfMonth || defaultDay);
+          const day = item.dayOfMonth || defaultDay;
           const amount = safeFloat(item.amount);
           if (amount > 0) {
               if (!recurringByDay.has(day)) recurringByDay.set(day, []);
@@ -107,13 +138,16 @@ export const generateTimeline = (
       });
   };
   
-  pushRecurring(profile.incomes, 'income', 1);
-  pushRecurring(profile.fixedCosts, 'expense', 5);
-  pushRecurring(profile.subscriptions, 'expense', 10);
-  pushRecurring(profile.credits, 'expense', 15);
-  // Important : On inclut les virements d'épargne comme des sorties de cash du compte courant
+  // On utilise les tableaux pré-calculés du Profil ou on filtre manuellement si besoin
+  pushRecurring(profile.incomes || [], 'income', 1);
+  pushRecurring(profile.fixedCosts || [], 'expense', 5);
+  pushRecurring(profile.subscriptions || [], 'expense', 10);
+  pushRecurring(profile.credits || [], 'expense', 15);
+  pushRecurring(profile.annualExpenses || [], 'expense', 1); // Simplification: on les met le 1er (à affiner si mois dispo)
+
+  // Virements d'épargne programmés
   (profile.savingsContributions || []).forEach((i) => {
-      const day = typeof i.dayOfMonth === 'string' ? parseInt(i.dayOfMonth) : (i.dayOfMonth || 20);
+      const day = i.dayOfMonth || 5;
       const amount = safeFloat(i.amount);
       if(amount > 0) {
           if (!recurringByDay.has(day)) recurringByDay.set(day, []);
@@ -131,9 +165,23 @@ export const generateTimeline = (
 
   if (Array.isArray(history)) {
       history.forEach((decision: any) => {
-          if (!decision.purchase) return;
-          const evts = getSimulatedEvents(decision.purchase);
-          evts.forEach(e => addOneOffEvent(e.date, e));
+          // On ne prend que les achats payés via compte courant ou crédit (impact timeline)
+          if (decision.paymentMode === PaymentMode.CASH_CURRENT || decision.paymentMode === PaymentMode.SPLIT || decision.paymentMode === PaymentMode.CREDIT) {
+                // On recrée l'objet Purchase pour utiliser getSimulatedEvents
+                const purchaseStruct: Purchase = {
+                    name: decision.name,
+                    amount: decision.amount,
+                    date: decision.date,
+                    type: decision.type,
+                    paymentMode: decision.paymentMode,
+                    duration: decision.duration,
+                    rate: decision.rate,
+                    isReimbursable: decision.isReimbursable,
+                    isPro: decision.isPro
+                };
+                const evts = getSimulatedEvents(purchaseStruct);
+                evts.forEach(e => addOneOffEvent(e.date, e));
+          }
       });
   }
   if (simulatedEvents && simulatedEvents.length > 0) {
@@ -174,7 +222,7 @@ export const generateTimeline = (
 
     // Ajout des événements du jour
     if (recurringByDay.has(dayNum)) addEvents(recurringByDay.get(dayNum) || []);
-    // Si fin de mois, on ramasse ceux qui tombent le 31 si le mois finit le 30 ou 28
+    // Si fin de mois, on ramasse ceux qui tombent le 31
     if (isMonthEnd) { 
         for (let d = dayNum + 1; d <= 31; d++) { 
             if (recurringByDay.has(d)) addEvents(recurringByDay.get(d) || []); 
@@ -193,7 +241,7 @@ export const generateTimeline = (
     if (isAnchorDay) {
         // Reset au solde réel saisi par l'utilisateur
         runningBalance = safeFloat(profile.currentBalance);
-        // On applique les dépenses prévues ce jour-là par prudence, mais pas les revenus
+        // On applique les dépenses prévues ce jour-là par prudence
         runningBalance += dailyNegativeImpact; 
         runningBalance += simulationImpact;
     } else if (!isBeforeAnchor) {
@@ -215,7 +263,6 @@ export const generateTimeline = (
     currentMonthData.days.push({
         date: currentDate.toISOString(), 
         dayOfMonth: dayNum,
-        // Si c'est le passé (avant le dernier pointage), on ne montre pas de solde simulé
         balance: isBeforeAnchor ? null : Math.round(runningBalance),
         events: eventsOfTheDay, 
         status: !isBeforeAnchor && runningBalance < 0 ? 'danger' : 'safe'
@@ -239,9 +286,13 @@ export const analyzePurchaseImpact = (
     profile: Profile | null = null, 
     history: any[] = []
 ): AnalysisResult => {
+  
   const rawAmount = typeof purchase.amount === 'string' ? parseFloat(purchase.amount) : purchase.amount;
   const amount = Math.abs(rawAmount || 0);
-  const { isReimbursable = false, isPro = false, paymentMode } = purchase;
+  const { isReimbursable = false, isPro = false } = purchase;
+  // On caste en PaymentMode
+  const paymentMode = purchase.paymentMode as PaymentMode;
+  
   const rules = currentStats.rules;
   const purchaseDate = purchase.date ? new Date(purchase.date) : new Date();
   const today = new Date();
@@ -252,26 +303,27 @@ export const analyzePurchaseImpact = (
   let newRemainingToLive = currentStats.remainingToLive; 
   let monthlyCost = 0, creditCost = 0, opportunityCost = 0, timeToWork = 0, realCost = amount;
 
-  if (paymentMode === 'CASH_SAVINGS') {
+  if (paymentMode === PaymentMode.CASH_SAVINGS) {
     if (!isPast) newMatelas = Math.max(0, round(currentStats.matelas - amount));
     if(!isReimbursable) opportunityCost = calculateFutureValue(amount, CONSTANTS.INVESTMENT_RATE, 10) - amount;
-  } else if (paymentMode === 'CASH_ACCOUNT') {
+  } 
+  else if (paymentMode === PaymentMode.CASH_CURRENT) {
     if (isCurrentMonth) newRemainingToLive = round(currentStats.remainingToLive - amount);
     if(!isReimbursable) opportunityCost = calculateFutureValue(amount, CONSTANTS.INVESTMENT_RATE, 10) - amount;
-  } else if (paymentMode === 'SUBSCRIPTION') {
-    monthlyCost = amount;
-    if (isCurrentMonth) newRemainingToLive = round(currentStats.remainingToLive - monthlyCost);
-    const totalPaid5Years = amount * 12 * 5;
-    if(!isReimbursable) opportunityCost = calculateFutureValue(totalPaid5Years, CONSTANTS.INVESTMENT_RATE, 5) - totalPaid5Years;
-    realCost = amount * 12; 
-  } else { 
+  } 
+  // Note: On n'a plus de mode 'SUBSCRIPTION' dans l'Enum par défaut, on le traite comme un split ou cash recurrent
+  // Si tu veux garder Subscription, ajoute-le à l'Enum PaymentMode
+  else { 
+    // SPLIT ou CREDIT
     const rawDuration = typeof purchase.duration === 'string' ? parseInt(purchase.duration) : purchase.duration;
     const months = Math.max(1, rawDuration || 3);
     const rawRate = typeof purchase.rate === 'string' ? parseFloat(purchase.rate) : purchase.rate;
-    const rate = paymentMode === 'CREDIT' ? Math.abs(rawRate || 0) : 0;
+    const rate = paymentMode === PaymentMode.CREDIT ? Math.abs(rawRate || 0) : 0;
+    
     const totalPaid = amount * (1 + (rate / 100) * (months / 12)); 
     monthlyCost = round(totalPaid / months);
-    if (paymentMode === 'CREDIT') { creditCost = round(totalPaid - amount); realCost = totalPaid; }
+    
+    if (paymentMode === PaymentMode.CREDIT) { creditCost = round(totalPaid - amount); realCost = totalPaid; }
     if (isCurrentMonth) newRemainingToLive = round(currentStats.remainingToLive - monthlyCost);
     if(!isReimbursable) opportunityCost = calculateFutureValue(amount, CONSTANTS.INVESTMENT_RATE, 10) - amount;
   }
@@ -303,19 +355,20 @@ export const analyzePurchaseImpact = (
 
   // Verdict
   let isBudgetOk = true;
-  if (paymentMode === 'CASH_SAVINGS') isBudgetOk = newMatelas >= 0;
+  if (paymentMode === PaymentMode.CASH_SAVINGS) isBudgetOk = newMatelas >= 0;
   else isBudgetOk = newRemainingToLive >= rules.minLiving; 
+  
   const isCashflowOk = lowestProjectedBalance >= 0;
 
   let verdict: AnalysisResult['verdict'] = 'green';
   let smartTitle = "Feu vert";
   let smartMessage = "Tout est ok.";
   let score = 100;
-  const issues: any[] = []; const tips: any[] = [];
+  // const issues: any[] = []; const tips: any[] = []; // Inutilisés dans cette version simplifiée
 
   if (isPast) { 
       verdict = 'green'; smartTitle = "Mise à jour"; smartMessage = "Historique mis à jour."; 
-  } else if (paymentMode === 'CASH_SAVINGS' && !isBudgetOk) {
+  } else if (paymentMode === PaymentMode.CASH_SAVINGS && !isBudgetOk) {
       verdict = 'red'; smartTitle = "Fonds insuffisants"; smartMessage = `Manque ${formatCurrency(amount - currentStats.matelas)} d'épargne.`; score = 0;
   } else if (isBudgetOk && isCashflowOk) {
       verdict = 'green'; smartTitle = "Fonce !"; smartMessage = "Validé : Budget et Trésorerie OK.";
@@ -327,5 +380,5 @@ export const analyzePurchaseImpact = (
       verdict = 'red'; smartTitle = "Impossible"; smartMessage = "Ni budget, ni trésorerie."; score = 10;
   }
 
-  return { verdict, score: Math.max(0, score), isBudgetOk, isCashflowOk, smartTitle, smartMessage, issues, tips, newMatelas, newRV: newRemainingToLive, newSafetyMonths: 0, newEngagementRate: 0, realCost: round(realCost), creditCost: round(creditCost), opportunityCost: round(opportunityCost), timeToWork, lowestProjectedBalance: round(lowestProjectedBalance), projectedCurve };
+  return { verdict, score: Math.max(0, score), isBudgetOk, isCashflowOk, smartTitle, smartMessage, issues: [], tips: [], newMatelas, newRV: newRemainingToLive, newSafetyMonths: 0, newEngagementRate: 0, realCost: round(realCost), creditCost: round(creditCost), opportunityCost: round(opportunityCost), timeToWork, lowestProjectedBalance: round(lowestProjectedBalance), projectedCurve };
 };

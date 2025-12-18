@@ -1,5 +1,5 @@
 // =========================================================
-// 1. CONFIGURATION (Standard Vercel / Postgres)
+// 1. CONFIGURATION
 // =========================================================
 
 generator client {
@@ -9,205 +9,222 @@ generator client {
 datasource db {
   provider  = "postgresql"
   url       = env("POSTGRES_PRISMA_URL") // Connection pooling
-  directUrl = env("POSTGRES_URL")        // Direct connection (Migrations)
+  directUrl = env("POSTGRES_URL") // Direct connection (Migrations)
 }
 
 // =========================================================
-// 2. ENUMS (Listes de choix fixes)
+// 2. ENUMS
 // =========================================================
 
 enum UserPersona {
-  SALARIED   // Salarié
-  FREELANCE  // Indépendant
-  STUDENT    // Étudiant
-  RETIRED    // Retraité
+  SALARIED
+  FREELANCE
+  STUDENT
+  RETIRED
 }
 
 enum HousingStatus {
-  TENANT      // Locataire
-  OWNER_LOAN  // Propriétaire (Crédit en cours)
-  OWNER_PAID  // Propriétaire (Payé)
-  FREE        // Hébergé à titre gratuit
+  TENANT
+  OWNER_LOAN
+  OWNER_PAID
+  FREE
+}
+
+// ✅ OPTIMISATION : Enum pour la fréquence (évite les fautes de frappe "mensuel" vs "monthly")
+enum Frequency {
+  DAILY
+  WEEKLY
+  MONTHLY
+  QUARTERLY // Trimestriel
+  YEARLY // Annuel
+  ONCE // Ponctuel
 }
 
 enum ItemCategory {
-  INCOME           // Revenus (Salaires, Primes...)
-  FIXED_COST       // Charges Fixes (Électricité, Assurance...)
-  SUBSCRIPTION     // Abonnements (Netflix, Sport...)
-  CREDIT           // Crédits Conso
-  ANNUAL_EXPENSE   // Dépenses Annuelles (Taxe foncière...)
-  VARIABLE_COST    // Vie Quotidienne (Courses, Resto...) -> Souvent lissées
+  INCOME
+  FIXED_COST
+  SUBSCRIPTION
+  CREDIT
+  ANNUAL_EXPENSE
+  VARIABLE_COST
 }
 
 enum AssetType {
-  CC             // Compte Courant
-  LIVRET         // Livret A, LDDS, LEP...
-  PEA            // Plan Épargne Actions
-  CTO            // Compte Titres
-  AV             // Assurance Vie
-  PER            // Épargne Retraite
-  PEE            // Épargne Entreprise
-  CRYPTO         // Bitcoin, Eth...
-  REAL_ESTATE    // Immobilier Physique ou Papier (SCPI)
-  GOLD           // Or / Matières premières
-  CROWD          // Crowdfunding / Lending
-  OTHER          // Montres, Art, Vin...
+  CC
+  LIVRET
+  PEA
+  CTO
+  AV
+  PER
+  PEE
+  CRYPTO
+  REAL_ESTATE
+  GOLD
+  CROWD
+  OTHER
 }
 
 enum GoalCategory {
-  REAL_ESTATE   // Immobilier
-  VEHICLE       // Voiture / Moto
-  TRAVEL        // Voyage
-  WEDDING       // Mariage / Event
-  EMERGENCY     // Précaution
-  RETIREMENT    // Retraite spécifique
-  PROJECT       // Projet Perso
-  OTHER         // Autre
+  REAL_ESTATE
+  VEHICLE
+  TRAVEL
+  WEDDING
+  EMERGENCY
+  RETIREMENT
+  PROJECT
+  OTHER
 }
 
-// ✅ NOUVEAUX ENUMS POUR LES ACHATS
 enum PurchaseType {
-  NEED          // Besoin
-  PLEASURE      // Plaisir
-  OPPORTUNITY   // Opportunité
-  PROBLEM       // Galère / Imprévu
+  NEED
+  PLEASURE
+  OPPORTUNITY
+  PROBLEM
 }
 
 enum PaymentMode {
-  CASH_SAVINGS  // Épargne
-  CASH_CURRENT  // Compte courant
-  CREDIT        // Crédit Conso
-  SPLIT         // Paiement en X fois
+  CASH_SAVINGS
+  CASH_CURRENT
+  CREDIT
+  SPLIT
 }
 
 // =========================================================
 // 3. TABLES (MODÈLES)
 // =========================================================
 
-// L'utilisateur (Authentification via Clerk)
 model User {
-  id        String   @id // ID Clerk (ex: user_2bX...)
+  id        String   @id // ID Clerk
   email     String   @unique
   firstName String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  // Un User possède un seul Profil Financier
-  profile   FinancialProfile?
+  profile FinancialProfile?
 }
 
-// La fiche d'identité financière
 model FinancialProfile {
-  id       String @id @default(cuid())
-  userId   String @unique
-  user     User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id     String @id @default(cuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  // --- STEP 1 & 2 : IDENTITÉ & SITUATION ---
-  age             Int?
-  persona         UserPersona?
-  housingStatus   HousingStatus?
-  housingCost     Float         @default(0) // Loyer ou Mensualité Crédit
-  
-  // Jour du prélèvement Loyer/Crédit
-  housingPaymentDay Int?      @default(5) 
+  // --- IDENTITÉ & SITUATION ---
+  age           Int?
+  persona       UserPersona?
+  housingStatus HousingStatus?
 
-  adults          Int           @default(1)
-  children        Int           @default(0)
+  // NOTE : Si housingCost est rempli ici, attention à ne pas le doublonner dans FinancialItem
+  housingCost Float @default(0)
 
-  // --- STEP 6 : STRATÉGIE ---
-  funBudget       Float         @default(0) // "Reste à vivre" plaisir choisi
+  housingPaymentDay Int? @default(5)
+
+  adults   Int @default(1)
+  children Int @default(0)
+
+  // --- STRATÉGIE ---
+  funBudget Float @default(0)
 
   // --- RELATIONS ---
-  items     FinancialItem[]    // Flux (Revenus / Dépenses)
-  assets    Asset[]            // Patrimoine (Comptes / Investissements)
-  goals     FinancialGoal[]    // Objectifs
-  
-  // ✅ RELATION AJOUTÉE : Historique des décisions
-  decisions PurchaseDecision[] 
+  items     FinancialItem[]
+  assets    Asset[]
+  goals     FinancialGoal[]
+  decisions PurchaseDecision[]
 
   updatedAt DateTime @updatedAt
 }
 
-// Gestion des Flux (Revenus et Dépenses)
 model FinancialItem {
-  id        String       @id @default(cuid())
+  id        String           @id @default(cuid())
   profileId String
   profile   FinancialProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
 
-  name      String
-  amount    Float        @default(0)
-  category  ItemCategory // Définit le type (Revenu, Charge Fixe, Variable...)
-  frequency String       @default("mensuel")
+  name     String
+  amount   Float        @default(0)
+  category ItemCategory
 
-  // GESTION DU TEMPS :
-  dayOfMonth Int?        @default(1) 
+  // ✅ OPTIMISATION : Utilisation de l'Enum Frequency
+  frequency Frequency @default(MONTHLY)
+
+  // Jour du prélèvement (ex: 1 pour le 1er du mois). 
+  // Astuce : Mettre 32 pour "Fin de mois" dans ton code métier
+  dayOfMonth Int? @default(1)
 
   createdAt DateTime @default(now())
 }
 
-// Gestion du Patrimoine (Hybride Stock/Flux)
 model Asset {
-  id        String    @id @default(cuid())
+  id        String           @id @default(cuid())
   profileId String
   profile   FinancialProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
 
-  name      String
-  type      AssetType
-  
-  // Stock : Combien j'ai aujourd'hui
-  currentValue    Float @default(0) 
-  
-  // Flux : Combien j'épargne tous les mois
-  monthlyFlow     Float @default(0) 
-  
-  // Date : Quand le virement part-il ?
-  transferDay     Int   @default(1) 
+  name String
+  type AssetType
+
+  currentValue Float @default(0)
+  monthlyFlow  Float @default(0)
+  transferDay  Int   @default(1)
+
+  // ✅ OPTIMISATION : Relation vers l'historique pour tracer les courbes
+  history AssetHistory[]
 
   createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt // Utile pour savoir quand le montant a été rafraîchi
 }
 
-// Objectifs Financiers
+// ✅ NOUVEAU : Historique de valeur pour les graphiques
+model AssetHistory {
+  id      String @id @default(cuid())
+  assetId String
+  asset   Asset  @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  value Float // La valeur à l'instant T
+  date  DateTime @default(now()) // Date de l'enregistrement (snapshot)
+
+  @@index([assetId, date]) // Index pour rendre les requêtes graphiques rapides
+}
+
 model FinancialGoal {
-  id        String   @id @default(cuid())
+  id        String           @id @default(cuid())
   profileId String
   profile   FinancialProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
 
-  name                String
-  category            GoalCategory @default(OTHER)
-  
-  targetAmount        Float        // Montant à atteindre
-  currentSaved        Float        @default(0) // Apport initial déjà de côté
-  monthlyContribution Float        @default(0) // Effort mensuel calculé
-  
-  deadline            DateTime     // Date butoir
-  
-  // Options avancées
-  projectedYield      Float        @default(0) // Rendement annuel (%) si investi
-  transferDay         Int?         // Jour du virement automatique (optionnel)
+  name     String
+  category GoalCategory @default(OTHER)
+
+  targetAmount        Float
+  currentSaved        Float @default(0)
+  monthlyContribution Float @default(0)
+
+  deadline DateTime
+
+  projectedYield Float @default(0)
+  transferDay    Int?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
 
-// ✅ NOUVEAU MODÈLE : Historique des Décisions d'Achat
 model PurchaseDecision {
-  id        String   @id @default(cuid())
+  id        String           @id @default(cuid())
   profileId String
   profile   FinancialProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
 
-  name         String
-  amount       Float
-  date         DateTime
-  type         PurchaseType
-  paymentMode  PaymentMode
+  name        String
+  amount      Float
+  date        DateTime
+  type        PurchaseType
+  paymentMode PaymentMode
 
-  // Options contextuelles
-  isReimbursable Boolean @default(false)
-  isPro          Boolean @default(false)
-  
-  // Pour Crédit / Paiement fractionné
-  duration     Int?    // Nombre de mois
-  rate         Float?  // Taux d'intérêt
+  // --- CONTEXTE ---
+  isPro Boolean @default(false)
 
-  createdAt    DateTime @default(now())
+  // ✅ OPTIMISATION : Gestion plus fine du remboursement
+  isReimbursable Boolean   @default(false)
+  reimbursedAt   DateTime? // Si null -> Pas encore remboursé. Si date -> Remboursé le...
+
+  // --- CRÉDIT / SPLIT ---
+  duration Int? // Mois
+  rate     Float? // Taux
+
+  createdAt DateTime @default(now())
 }

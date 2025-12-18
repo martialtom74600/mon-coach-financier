@@ -2,143 +2,221 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useUser } from '@clerk/nextjs';
-// Assure-toi que ce chemin pointe bien vers ton fichier definitions.ts
-import { INITIAL_PROFILE, Profile } from '@/app/lib/definitions'; 
+import { INITIAL_PROFILE, Profile, FinancialItem, Asset, Goal, PurchaseDecision } from '@/app/lib/definitions'; 
 
 export function useFinancialData() {
   const { user, isLoaded: isClerkLoaded } = useUser();
   
-  // 1. TYPAGE STRICT
   const [profile, setProfile] = useState<Profile>(INITIAL_PROFILE);
-  const [history, setHistory] = useState<any[]>([]); 
   const [isLoadingData, setIsLoadingData] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  // 2. RÉCUPÉRATION DES DONNÉES (BLINDÉE)
+  // ==========================================================================
+  // 1. CHARGEMENT INITIAL (GET global)
+  // ==========================================================================
   const fetchData = useCallback(async () => {
     if (!user) return;
+    setIsLoadingData(true);
+    setError(null);
+
     try {
-      // Le timestamp ?t=... force le rafraichissement (anti-cache)
+      // On récupère tout le dashboard d'un coup
       const res = await fetch(`/api/user?t=${Date.now()}`);
       
       if (res.ok) {
         const data = await res.json();
-        
         if (data) {
-          const { history: savedHistory, ...savedProfile } = data;
+            // Nettoyage et fusion avec les valeurs par défaut
+            const cleanProfile: Profile = {
+                ...INITIAL_PROFILE,
+                ...data, // Les données de l'API écrasent les defaults
+                
+                // Sécurisation des objets imbriqués
+                household: { ...INITIAL_PROFILE.household, ...(data.household || {}) },
+                housing: { ...INITIAL_PROFILE.housing, ...(data.housing || {}) },
+                
+                // Sécurisation des tableaux (API renvoie [] si vide, mais on assure le coup)
+                items: data.items || [], // Items bruts
+                assets: data.assets || [],
+                goals: data.goals || [],
+                decisions: data.decisions || [],
 
-          // --- NETTOYAGE ANTI-CRASH (Vital) ---
-          // On force la structure pour qu'elle respecte l'interface Profile
-          const cleanProfile: Profile = {
-              ...INITIAL_PROFILE, // On part des valeurs par défaut saines
-              ...savedProfile,    // On écrase avec les données BDD
-              
-              // 🛡️ SÉCURITÉ SUPPLÉMENTAIRE POUR OBJETS IMBRIQUÉS
-              // Empêche le crash si la BDD renvoie housing: null
-              housing: { 
-                ...INITIAL_PROFILE.housing, 
-                ...(savedProfile.housing || {}) 
-              },
-              household: { 
-                ...INITIAL_PROFILE.household, 
-                ...(savedProfile.household || {}) 
-              },
-
-              // --- SÉCURISATION DES TABLEAUX (Si la BDD renvoie null, on met []) ---
-              
-              // 1. Revenus
-              incomes: Array.isArray(savedProfile.incomes) ? savedProfile.incomes : [],
-              
-              // 2. Charges Fixes (Datées / Mensualisées)
-              fixedCosts: Array.isArray(savedProfile.fixedCosts) ? savedProfile.fixedCosts : [],
-              
-              // 3. ✅ NOUVEAU : Charges Variables (Lissées / Courses / Essence)
-              variableCosts: Array.isArray(savedProfile.variableCosts) ? savedProfile.variableCosts : [],
-
-              // 4. Dettes & Crédits
-              credits: Array.isArray(savedProfile.credits) ? savedProfile.credits : [],
-              
-              // 5. Autres listes
-              subscriptions: Array.isArray(savedProfile.subscriptions) ? savedProfile.subscriptions : [],
-              annualExpenses: Array.isArray(savedProfile.annualExpenses) ? savedProfile.annualExpenses : [],
-              savingsContributions: Array.isArray(savedProfile.savingsContributions) ? savedProfile.savingsContributions : [],
-              goals: Array.isArray(savedProfile.goals) ? savedProfile.goals : [],
-              
-              // --- MIGRATION INTELLIGENTE ---
-              // Gère la transition : Ancien format (nombre) -> Nouveau format (tableau)
-              investments: Array.isArray(savedProfile.investments) ? savedProfile.investments : [],
-              
-              // Si 'investments' était un nombre dans la vieille version, on le déplace vers 'investedAmount'
-              investedAmount: typeof savedProfile.investments === 'number' 
-                ? savedProfile.investments 
-                : (savedProfile.investedAmount || 0),
-          };
-
-          setProfile(cleanProfile);
-          setHistory(Array.isArray(savedHistory) ? savedHistory : []);
+                // Listes filtrées (déjà préparées par l'API normalement, sinon fallback)
+                incomes: data.incomes || [],
+                fixedCosts: data.fixedCosts || [],
+                variableCosts: data.variableCosts || [],
+                credits: data.credits || [],
+                subscriptions: data.subscriptions || [],
+                annualExpenses: data.annualExpenses || [],
+            };
+            setProfile(cleanProfile);
         } else {
-           // Nouvel utilisateur : On initialise avec son prénom Clerk
-           setProfile({ ...INITIAL_PROFILE, firstName: user.firstName || '' });
+            // Nouvel utilisateur
+            setProfile({ ...INITIAL_PROFILE, firstName: user.firstName || '' });
         }
+      } else {
+          console.error("Erreur HTTP", res.status);
+          setError("Impossible de charger les données.");
       }
-    } catch (error) {
-      console.error("Erreur sync:", error);
+    } catch (err) {
+      console.error("Erreur fetch:", err);
+      setError("Erreur de connexion.");
     } finally {
       setIsLoadingData(false);
     }
   }, [user]);
 
-  // Chargement au démarrage
   useEffect(() => {
-    if (!isClerkLoaded) return;
-    if (!user) { setIsLoadingData(false); return; }
-    fetchData();
+    if (isClerkLoaded && user) fetchData();
+    else if (isClerkLoaded && !user) setIsLoadingData(false);
   }, [isClerkLoaded, user, fetchData]);
 
-  // Fonction interne pour parler à la BDD
-  const pushToDB = async (dataToSave: any) => {
-    if (!user) return;
+
+  // ==========================================================================
+  // 2. ACTIONS UNITAIRES (CRUD) - LE COEUR DU SYSTÈME
+  // ==========================================================================
+
+  // 🔹 Mettre à jour le Profil (Age, Statut, Budget Fun...)
+  const updateProfileInfo = async (updates: Partial<Profile>) => {
+    // 1. Optimistic UI : On met à jour l'écran tout de suite
+    setProfile(prev => ({ ...prev, ...updates }));
+
     try {
-      const response = await fetch('/api/user', {
+      await fetch('/api/profile', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updates),
+      });
+    } catch (err) {
+      console.error("Erreur save profile:", err);
+      // En cas d'erreur, on pourrait rollback ici (fetchData())
+      fetchData(); 
+    }
+  };
+
+  // 🔹 Ajouter un Item (Revenu/Dépense)
+  const addItem = async (item: Partial<FinancialItem>) => {
+    // Optimistic (Optionnel, ici on attend le retour pour avoir l'ID)
+    try {
+      const res = await fetch('/api/items', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(dataToSave),
+        body: JSON.stringify(item),
       });
-      if (!response.ok) throw new Error('Erreur sauvegarde');
-      return await response.json();
-    } catch (error) { console.error("Erreur save:", error); throw error; }
+      if (res.ok) {
+          const newItem = await res.json();
+          // On recharge tout pour être sûr que les calculs et tris sont bons
+          // (Ou on ajoute manuellement à la bonne liste si on veut être ultra-performant)
+          fetchData(); 
+          return newItem;
+      }
+    } catch (err) { console.error(err); }
   };
 
-  // 3. LA FONCTION DE SAUVEGARDE (TYPÉE)
-  const saveProfile = async (newProfileData: Partial<Profile>) => {
-    // 1. Fusion Optimiste : On met à jour l'état local immédiatement
-    const updatedProfile = { ...profile, ...newProfileData };
-    setProfile(updatedProfile as Profile); 
-    
-    // 2. Envoi BDD : On sauvegarde tout l'objet pour être sûr
-    return await pushToDB({ ...updatedProfile, history });
+  // 🔹 Supprimer un Item
+  const deleteItem = async (itemId: string) => {
+    // Optimistic UI : On le retire visuellement tout de suite
+    setProfile(prev => ({
+        ...prev,
+        // On filtre toutes les listes potentielles (bourrin mais efficace visuellement)
+        incomes: prev.incomes.filter(i => i.id !== itemId),
+        fixedCosts: prev.fixedCosts.filter(i => i.id !== itemId),
+        variableCosts: prev.variableCosts.filter(i => i.id !== itemId),
+        credits: prev.credits.filter(i => i.id !== itemId),
+        subscriptions: prev.subscriptions.filter(i => i.id !== itemId),
+        annualExpenses: prev.annualExpenses.filter(i => i.id !== itemId),
+    }));
+
+    try {
+        await fetch(`/api/items/${itemId}`, { method: 'DELETE' });
+    } catch (err) { console.error(err); fetchData(); }
   };
 
-  // Fonctions pour l'historique des décisions
-  const saveDecision = async (decision: any) => {
-    const newHistory = [...history, decision];
-    setHistory(newHistory);
-    return await pushToDB({ ...profile, history: newHistory });
+  // 🔹 Ajouter/Modifier un Asset (Patrimoine)
+  const saveAsset = async (asset: Partial<Asset>) => {
+      const method = asset.id ? 'PATCH' : 'POST';
+      const url = asset.id ? `/api/assets/${asset.id}` : '/api/assets';
+
+      try {
+          await fetch(url, {
+              method,
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(asset),
+          });
+          fetchData(); // On recharge pour mettre à jour les graphiques
+      } catch (err) { console.error(err); }
   };
 
-  const deleteDecision = async (idToDelete: string) => {
-    const newHistory = history.filter((item: any) => item.id !== idToDelete);
-    setHistory(newHistory);
-    return await pushToDB({ ...profile, history: newHistory });
+  const deleteAsset = async (assetId: string) => {
+      try {
+          await fetch(`/api/assets/${assetId}`, { method: 'DELETE' });
+          fetchData();
+      } catch (err) { console.error(err); }
+  };
+
+  // 🔹 Gérer les Objectifs (Goals)
+  const saveGoal = async (goal: Partial<Goal>) => {
+      const method = goal.id ? 'PATCH' : 'POST';
+      const url = goal.id ? `/api/goals/${goal.id}` : '/api/goals';
+
+      try {
+          await fetch(url, {
+              method,
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(goal),
+          });
+          fetchData();
+      } catch (err) { console.error(err); }
+  };
+
+  const deleteGoal = async (goalId: string) => {
+    try {
+        await fetch(`/api/goals/${goalId}`, { method: 'DELETE' });
+        fetchData();
+    } catch (err) { console.error(err); }
+  };
+
+  // 🔹 Gérer les Décisions d'achat
+  const addDecision = async (decision: any) => {
+      try {
+          await fetch('/api/decisions', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(decision),
+          });
+          fetchData();
+      } catch (err) { console.error(err); }
+  };
+
+  const deleteDecision = async (id: string) => {
+    try {
+        await fetch(`/api/decisions/${id}`, { method: 'DELETE' });
+        fetchData();
+    } catch (err) { console.error(err); }
   };
 
   return { 
+      // Données
       profile, 
-      history, 
-      saveProfile, 
-      saveDecision, 
-      deleteDecision, 
-      isLoaded: isClerkLoaded && !isLoadingData, 
+      isLoaded: isClerkLoaded && !isLoadingData,
+      isLoading: isLoadingData,
+      error,
       user,
-      refreshData: fetchData 
+
+      // Actions "Atomiques"
+      refreshData: fetchData,
+      updateProfileInfo,
+      
+      addItem,
+      deleteItem,
+      
+      saveAsset,
+      deleteAsset,
+      
+      saveGoal,
+      deleteGoal,
+      
+      addDecision,
+      deleteDecision
   };
 }

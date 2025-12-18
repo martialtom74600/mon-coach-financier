@@ -3,15 +3,23 @@
 import React, { useMemo, useState, useEffect, ReactNode } from 'react';
 import { useFinancialData } from '@/app/hooks/useFinancialData';
 
-// ✅ IMPORTS MOTEUR & DEFINITIONS
+// ✅ IMPORTS MOTEUR
 import { computeFinancialPlan as runSimulation } from '@/app/lib/engine';
+
+// ✅ IMPORTS DEFINITIONS & ENUMS (Source de vérité)
 import { 
   ASSET_TYPES, 
   formatCurrency, 
   generateId, 
   calculateListTotal,
   Profile,
-  FinancialItem 
+  FinancialItem,
+  // Enums Prisma indispensables
+  UserPersona,
+  HousingStatus,
+  ItemCategory,
+  AssetType,
+  Frequency
 } from '@/app/lib/definitions';
 
 // --- COMPOSANTS UI ---
@@ -32,14 +40,10 @@ import {
 } from 'lucide-react';
 
 // ============================================================================
-// 1. TYPES UI SPÉCIFIQUES & DEFINITIONS
+// 1. TYPES UI SPÉCIFIQUES
 // ============================================================================
 
-type UserPersona = 'SALARIED' | 'FREELANCE' | 'STUDENT' | 'RETIRED';
-type HousingStatus = 'TENANT' | 'OWNER_LOAN' | 'OWNER_PAID' | 'FREE';
-type ItemCategory = 'INCOME' | 'FIXED_COST' | 'SUBSCRIPTION' | 'CREDIT' | 'ANNUAL_EXPENSE' | 'VARIABLE_COST';
-type AssetType = 'CC' | 'LIVRET' | 'PEA' | 'CTO' | 'AV' | 'PER' | 'PEE' | 'CRYPTO' | 'REAL_ESTATE' | 'GOLD' | 'CROWD' | 'OTHER';
-
+// On définit une ligne d'asset pour l'UI (qui combine Asset + MonthlyFlow)
 interface AssetUiRow {
   id: string;
   type: string;
@@ -49,13 +53,20 @@ interface AssetUiRow {
   transferDay: number; 
 }
 
-interface FormProfile extends Omit<Profile, 'investments' | 'savingsContributions'> {
-  assetsUi: AssetUiRow[];
+// Le formulaire étend le Profil mais avec des structures simplifiées pour l'édition
+interface FormProfile extends Omit<Profile, 'investments' | 'savingsContributions' | 'persona' | 'housing'> {
+  // On surcharge avec des types permissifs pour le formulaire, qu'on nettoiera au save
+  persona: UserPersona | string;
+  
   housing: {
-      status: string;
+      status: HousingStatus | string;
       monthlyCost: number;
       paymentDay?: number;
   };
+
+  assetsUi: AssetUiRow[];
+  
+  // Listes typées FinancialItem
   incomes: FinancialItem[];
   fixedCosts: FinancialItem[];
   variableCosts: FinancialItem[];
@@ -65,41 +76,39 @@ interface FormProfile extends Omit<Profile, 'investments' | 'savingsContribution
 }
 
 // ============================================================================
-// 2. MAPPERS (LOGIQUE DE TRADUCTION UI <-> DB)
+// 2. MAPPERS (UI <-> DB)
 // ============================================================================
 
 const mapProfileToForm = (profile: Profile): FormProfile => {
   const assetsUi: AssetUiRow[] = [];
-  (profile.investments || []).forEach(inv => {
-    const matchingFlow = (profile.savingsContributions || []).find(f => f.id === inv.id);
-    const stockValue = (inv as any).currentValue ?? inv.amount;
+  
+  // Fusion des Assets (Stock) et SavingsContributions (Flux) pour l'UI
+  (profile.assets || []).forEach(asset => {
     assetsUi.push({
-      id: inv.id,
-      type: inv.type || 'unknown',
-      name: inv.name,
-      stock: parseFloat(String(stockValue)) || 0,
-      monthlyFlow: matchingFlow ? (parseFloat(String(matchingFlow.amount)) || 0) : 0,
-      transferDay: matchingFlow ? (Number(matchingFlow.dayOfMonth) || 1) : 1
+      id: asset.id,
+      type: asset.type, // DB Enum
+      name: asset.name,
+      stock: asset.currentValue || 0,
+      monthlyFlow: asset.monthlyFlow || 0,
+      transferDay: asset.transferDay || 1
     });
   });
 
+  // Fallback si vide
   if (assetsUi.length === 0) {
-    assetsUi.push({ id: generateId(), type: 'cc', name: 'Compte Courant', stock: 0, monthlyFlow: 0, transferDay: 1 });
+    assetsUi.push({ id: generateId(), type: 'CC', name: 'Compte Courant', stock: 0, monthlyFlow: 0, transferDay: 1 });
   }
 
   return {
     ...profile,
-    // ✅ CORRECTION 1 : On force le minuscule pour le Persona (SALARIED -> salaried)
-    persona: (profile.persona as string)?.toLowerCase() as any,
-
+    persona: profile.persona || UserPersona.SALARIED,
     assetsUi,
     housing: {
-        // ✅ CORRECTION 2 : On force le minuscule pour le Statut Logement (TENANT -> tenant)
-        status: (profile.housing?.status as string)?.toLowerCase() || 'free',
-        
+        status: profile.housing?.status || HousingStatus.TENANT,
         monthlyCost: profile.housing?.monthlyCost || 0,
-        paymentDay: (profile.housing as any)?.paymentDay || 5
+        paymentDay: profile.housing?.paymentDay || 5
     },
+    // On s'assure que les tableaux existent
     incomes: profile.incomes || [],
     fixedCosts: profile.fixedCosts || [],
     variableCosts: profile.variableCosts || [],
@@ -109,33 +118,35 @@ const mapProfileToForm = (profile: Profile): FormProfile => {
   } as FormProfile;
 };
 
+// C'est ici qu'on prépare le JSON strict pour l'API
 const mapFormToPayload = (formData: FormProfile, lifestyle: number) => {
   
-  // 1. Préparation de la LISTE UNIQUE "ITEMS" (Flux)
+  // 1. Fusion des listes en "items"
   const items = [
-    ...formData.incomes.map(i => ({ ...i, category: 'INCOME' })),
-    ...formData.fixedCosts.map(i => ({ ...i, category: 'FIXED_COST' })),
-    ...formData.subscriptions.map(i => ({ ...i, category: 'SUBSCRIPTION' })),
-    ...formData.credits.map(i => ({ ...i, category: 'CREDIT' })),
-    ...formData.annualExpenses.map(i => ({ ...i, category: 'ANNUAL_EXPENSE' })),
-    ...formData.variableCosts.map(i => ({ ...i, category: 'VARIABLE_COST' })),
+    ...formData.incomes.map(i => ({ ...i, category: ItemCategory.INCOME })),
+    ...formData.fixedCosts.map(i => ({ ...i, category: ItemCategory.FIXED_COST })),
+    ...formData.subscriptions.map(i => ({ ...i, category: ItemCategory.SUBSCRIPTION })),
+    ...formData.credits.map(i => ({ ...i, category: ItemCategory.CREDIT })),
+    ...formData.annualExpenses.map(i => ({ ...i, category: ItemCategory.ANNUAL_EXPENSE })),
+    ...formData.variableCosts.map(i => ({ ...i, category: ItemCategory.VARIABLE_COST })),
   ].map(item => ({
     name: item.name,
     amount: typeof item.amount === 'string' ? parseFloat(item.amount) : item.amount,
-    category: item.category as ItemCategory,
-    frequency: 'mensuel',
-    dayOfMonth: (item as any).category === 'VARIABLE_COST' ? null : ((item as any).dayOfMonth || 1)
+    category: item.category,
+    // ✅ UTILISATION DE L'ENUM FREQUENCY
+    frequency: Frequency.MONTHLY, 
+    dayOfMonth: item.category === ItemCategory.VARIABLE_COST ? null : ((item as any).dayOfMonth || 1)
   }));
 
-  // 2. Préparation de la LISTE UNIQUE "ASSETS" (Patrimoine)
+  // 2. Conversion Assets UI -> DB Assets
   const assets = formData.assetsUi.map(asset => {
-    let typeKey = asset.type.toUpperCase();
-    if (typeKey === 'IMMO_PHYS' || typeKey === 'IMMO_PAPER') typeKey = 'REAL_ESTATE';
-    if (typeKey === 'CC') typeKey = 'CC';
+    // Mapping UI type -> DB Enum AssetType si besoin (normalement c'est aligné)
+    // Ici on fait confiance à l'UI qui utilise les IDs de ASSET_TYPES qui doivent matcher
+    let typeKey = asset.type; 
     
-    const validTypes = ['CC','LIVRET','PEA','CTO','AV','PER','PEE','CRYPTO','REAL_ESTATE','GOLD','CROWD','OTHER'];
-    if (!validTypes.includes(typeKey)) typeKey = 'OTHER';
-
+    // Petite sécurité pour les vieux profils
+    if (typeKey === 'cc') typeKey = 'CC';
+    
     return {
       name: asset.name,
       type: typeKey as AssetType, 
@@ -145,20 +156,15 @@ const mapFormToPayload = (formData: FormProfile, lifestyle: number) => {
     };
   });
 
-  // 3. Préparation du PROFIL (Champs simples)
+  // 3. Payload Final
   return {
     firstName: formData.firstName,
     profile: {
       age: parseInt(String(formData.age)),
-      persona: formData.persona?.toUpperCase() as UserPersona,
-      housingStatus: formData.housing?.status?.toUpperCase() === 'OWNER_LOAN' ? 'OWNER_LOAN' 
-                    : formData.housing?.status?.toUpperCase() === 'OWNER_PAID' ? 'OWNER_PAID'
-                    : formData.housing?.status?.toUpperCase() as HousingStatus,
-      housingCost: formData.housing?.monthlyCost || 0,
-      
-      // ✅ C'EST ICI QUE C'EST CORRIGÉ (housingPaymentDay au lieu de paymentDay)
-      housingPaymentDay: formData.housing?.paymentDay || 1, 
-      
+      persona: formData.persona as UserPersona,
+      housingStatus: formData.housing.status as HousingStatus,
+      housingCost: formData.housing.monthlyCost || 0,
+      housingPaymentDay: formData.housing.paymentDay || 1,
       adults: formData.household?.adults || 1,
       children: formData.household?.children || 0,
       funBudget: lifestyle,
@@ -168,30 +174,47 @@ const mapFormToPayload = (formData: FormProfile, lifestyle: number) => {
   };
 };
 
+// Mapper pour le moteur de calcul (Simulation Live)
 const mapFormToEngineProfile = (formData: FormProfile): Profile => {
     let totalCash = 0, totalInvested = 0, totalSavings = 0;
+    
+    // On recalcule les totaux à la volée
     formData.assetsUi.forEach(a => {
-        if (a.type === 'cc') totalCash += a.stock;
-        else if (['livret', 'lep', 'ldds'].includes(a.type)) totalSavings += a.stock;
+        const t = a.type.toUpperCase();
+        if (t === 'CC') totalCash += a.stock;
+        else if (['LIVRET', 'LEP', 'PEL'].includes(t)) totalSavings += a.stock;
         else totalInvested += a.stock;
     });
 
+    // On crée des "investments" virtuels pour le moteur
     const investments = formData.assetsUi.map(a => ({
-        id: a.id, name: a.name, type: a.type, amount: a.stock, currentValue: a.stock, frequency: 'mensuel'
+        id: a.id, 
+        name: a.name, 
+        type: a.type as AssetType, 
+        currentValue: a.stock, 
+        amount: a.stock, // legacy field support
+        frequency: Frequency.MONTHLY
     }));
     
+    // On crée des "contributions" virtuelles
     const savingsContributions = formData.assetsUi
-        .filter(a => a.type !== 'cc' && a.monthlyFlow > 0)
-        .map(a => ({ id: a.id, name: a.name, amount: a.monthlyFlow, dayOfMonth: a.transferDay, frequency: 'mensuel' }));
+        .filter(a => a.type.toUpperCase() !== 'CC' && a.monthlyFlow > 0)
+        .map(a => ({ 
+            id: a.id, 
+            name: a.name, 
+            amount: a.monthlyFlow, 
+            dayOfMonth: a.transferDay, 
+            frequency: Frequency.MONTHLY 
+        }));
 
     return {
         ...formData,
         investedAmount: totalInvested,
         savings: totalSavings,
         currentBalance: totalCash,
-        investments,
+        investments: investments as any,
         savingsContributions,
-        housing: { ...formData.housing },
+        housing: { ...formData.housing } as any,
         updatedAt: new Date().toISOString()
     } as Profile;
 };
@@ -223,7 +246,6 @@ const WizardLayout = ({ title, subtitle, icon: Icon, children, footer, error }: 
       <Card className="p-6 md:p-10 shadow-xl shadow-slate-200/40 border-slate-100">
           {children}
           
-          {/* ✅ AFFICHAGE DES ERREURS */}
           {error && (
             <div className="mt-6 p-4 bg-rose-50 border border-rose-200 rounded-xl flex items-start gap-3 text-rose-700 animate-in slide-in-from-top-2">
                 <AlertTriangle className="shrink-0 mt-0.5" size={20} />
@@ -275,7 +297,11 @@ const LiveSummary = ({ formData, stats, currentStep }: LiveSummaryProps) => {
           <div className="text-2xl font-black text-slate-800 truncate">{formData.firstName || "Invité"}</div>
           <div className="flex flex-wrap gap-2 mt-3">
               {formData.age && <Badge variant="secondary" className="bg-slate-100 text-slate-600">{formData.age} ans</Badge>}
-              {formData.persona && <Badge className="bg-indigo-100 text-indigo-700 border-indigo-200 capitalize">{formData.persona === 'salaried' ? 'Salarié' : formData.persona}</Badge>}
+              {formData.persona && <Badge className="bg-indigo-100 text-indigo-700 border-indigo-200 capitalize">
+                {formData.persona === UserPersona.SALARIED ? 'Salarié' : 
+                 formData.persona === UserPersona.FREELANCE ? 'Indépendant' :
+                 formData.persona === UserPersona.STUDENT ? 'Étudiant' : 'Retraité'}
+              </Badge>}
           </div>
         </div>
       </Card>
@@ -337,7 +363,7 @@ interface StepProps {
     onConfirm?: (lifestyle: number, savings: number) => void;
     isSaving?: boolean;
     stats?: any;
-    error?: string | null; // ✅ On passe l'erreur aux steps
+    error?: string | null;
 }
 
 const StepIdentite = ({ formData, updateForm, onNext, error }: StepProps) => (
@@ -358,18 +384,18 @@ const StepSituation = ({ formData, updateForm, onNext, onPrev, error }: StepProp
       <div className="space-y-8">
           <div><label className="block text-xs font-bold text-slate-500 uppercase mb-3">Statut Pro</label>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <SelectionTile icon={Briefcase} title="Salarié" desc="CDI / CDD" selected={formData.persona === 'salaried'} onClick={() => updateForm({ ...formData, persona: 'salaried' })} />
-                  <SelectionTile icon={Target} title="Indépendant" desc="Freelance" selected={formData.persona === 'freelance'} onClick={() => updateForm({ ...formData, persona: 'freelance' })} />
-                  <SelectionTile icon={GraduationCap} title="Étudiant" desc="Études" selected={formData.persona === 'student'} onClick={() => updateForm({ ...formData, persona: 'student' })} />
-                  <SelectionTile icon={Armchair} title="Retraité" desc="Pension" selected={formData.persona === 'retired'} onClick={() => updateForm({ ...formData, persona: 'retired' })} />
+                  <SelectionTile icon={Briefcase} title="Salarié" desc="CDI / CDD" selected={formData.persona === UserPersona.SALARIED} onClick={() => updateForm({ ...formData, persona: UserPersona.SALARIED })} />
+                  <SelectionTile icon={Target} title="Indépendant" desc="Freelance" selected={formData.persona === UserPersona.FREELANCE} onClick={() => updateForm({ ...formData, persona: UserPersona.FREELANCE })} />
+                  <SelectionTile icon={GraduationCap} title="Étudiant" desc="Études" selected={formData.persona === UserPersona.STUDENT} onClick={() => updateForm({ ...formData, persona: UserPersona.STUDENT })} />
+                  <SelectionTile icon={Armchair} title="Retraité" desc="Pension" selected={formData.persona === UserPersona.RETIRED} onClick={() => updateForm({ ...formData, persona: UserPersona.RETIRED })} />
               </div>
           </div>
           <div><label className="block text-xs font-bold text-slate-500 uppercase mb-3">Logement</label>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <SelectionTile icon={Building} title="Locataire" desc="Loyer" selected={formData.housing?.status === 'tenant'} onClick={() => updateForm({ ...formData, housing: { ...formData.housing, status: 'tenant' } })} />
-                  <SelectionTile icon={Home} title="Propriétaire" desc="Crédit" selected={formData.housing?.status === 'owner_loan'} onClick={() => updateForm({ ...formData, housing: { ...formData.housing, status: 'owner_loan' } })} />
-                  <SelectionTile icon={CheckCircle} title="Propriétaire" desc="Payé" selected={formData.housing?.status === 'owner_paid'} onClick={() => updateForm({ ...formData, housing: { ...formData.housing, status: 'owner_paid', monthlyCost: 0 } })} />
-                  <SelectionTile icon={HeartHandshake} title="Gratuit" desc="Hébergé" selected={formData.housing?.status === 'free'} onClick={() => updateForm({ ...formData, housing: { ...formData.housing, status: 'free', monthlyCost: 0 } })} />
+                  <SelectionTile icon={Building} title="Locataire" desc="Loyer" selected={formData.housing?.status === HousingStatus.TENANT} onClick={() => updateForm({ ...formData, housing: { ...formData.housing, status: HousingStatus.TENANT } })} />
+                  <SelectionTile icon={Home} title="Propriétaire" desc="Crédit" selected={formData.housing?.status === HousingStatus.OWNER_LOAN} onClick={() => updateForm({ ...formData, housing: { ...formData.housing, status: HousingStatus.OWNER_LOAN } })} />
+                  <SelectionTile icon={CheckCircle} title="Propriétaire" desc="Payé" selected={formData.housing?.status === HousingStatus.OWNER_PAID} onClick={() => updateForm({ ...formData, housing: { ...formData.housing, status: HousingStatus.OWNER_PAID, monthlyCost: 0 } })} />
+                  <SelectionTile icon={HeartHandshake} title="Gratuit" desc="Hébergé" selected={formData.housing?.status === HousingStatus.FREE} onClick={() => updateForm({ ...formData, housing: { ...formData.housing, status: HousingStatus.FREE, monthlyCost: 0 } })} />
               </div>
           </div>
           <div><label className="block text-xs font-bold text-slate-500 uppercase mb-3">Foyer</label>
@@ -388,19 +414,19 @@ const StepFixedFinances = ({ formData, updateForm, addItem, removeItem, updateIt
         <div className="space-y-6">
             <AccordionSection mode="expert" defaultOpen={true} title="Revenus (Net)" icon={Banknote} colorClass="text-emerald-600" items={formData.incomes} onItemChange={(id: string, f: string, v: any) => updateItem!('incomes', id, f, v)} onItemAdd={() => addItem!('incomes')} onItemRemove={(id: string) => removeItem!('incomes', id)} />
             
-            {formData.housing?.status !== 'free' && formData.housing?.status !== 'owner_paid' && (
+            {formData.housing?.status !== HousingStatus.FREE && formData.housing?.status !== HousingStatus.OWNER_PAID && (
                 <div className="p-4 bg-slate-50 rounded-xl border border-slate-100 mb-6">
                     <h3 className="text-sm font-bold text-slate-700 mb-3 flex items-center gap-2">
                         <Home size={16} className="text-indigo-500"/> 
-                        {formData.housing?.status === 'tenant' ? "Votre Loyer" : "Votre Crédit Immo"}
+                        {formData.housing?.status === HousingStatus.TENANT ? "Votre Loyer" : "Votre Crédit Immo"}
                     </h3>
                     <div className="flex gap-4">
-                         <div className="flex-1">
-                            <InputGroup label="Montant Mensuel" type="number" placeholder="800" value={formData.housing?.monthlyCost || ''} onChange={(e: any) => updateForm({ ...formData, housing: { ...formData.housing, monthlyCost: parseNumber(getInputValue(e)) } })} endAdornment={<span className="text-slate-400 font-bold px-3">€</span>} />
-                         </div>
-                         <div className="w-24">
+                          <div className="flex-1">
+                             <InputGroup label="Montant Mensuel" type="number" placeholder="800" value={formData.housing?.monthlyCost || ''} onChange={(e: any) => updateForm({ ...formData, housing: { ...formData.housing, monthlyCost: parseNumber(getInputValue(e)) } })} endAdornment={<span className="text-slate-400 font-bold px-3">€</span>} />
+                          </div>
+                          <div className="w-24">
                              <InputGroup label="Jour" type="number" placeholder="5" max={31} min={1} value={formData.housing?.paymentDay || ''} onChange={(e: any) => updateForm({ ...formData, housing: { ...formData.housing, paymentDay: parseNumber(getInputValue(e)) } })} />
-                         </div>
+                          </div>
                     </div>
                 </div>
             )}
@@ -439,16 +465,16 @@ const StepDailyLife = ({ formData, updateForm, addItem, removeItem, updateItem, 
             />
             
             <div className="grid grid-cols-2 gap-3 mt-4">
-                <Button variant="outline" size="sm" className="w-full text-xs" onClick={() => updateForm({ ...formData, variableCosts: [...formData.variableCosts, { id: generateIdHelper(), name: 'Essence / Péage', amount: 0, frequency: 'mensuel' }] })}>
+                <Button variant="outline" size="sm" className="w-full text-xs" onClick={() => updateForm({ ...formData, variableCosts: [...formData.variableCosts, { id: generateIdHelper(), name: 'Essence / Péage', amount: 0, frequency: Frequency.MONTHLY }] })}>
                     <Car className="mr-2" size={14} /> + Transport
                 </Button>
-                <Button variant="outline" size="sm" className="w-full text-xs" onClick={() => updateForm({ ...formData, variableCosts: [...formData.variableCosts, { id: generateIdHelper(), name: 'Santé (Reste à charge)', amount: 0, frequency: 'mensuel' }] })}>
+                <Button variant="outline" size="sm" className="w-full text-xs" onClick={() => updateForm({ ...formData, variableCosts: [...formData.variableCosts, { id: generateIdHelper(), name: 'Santé (Reste à charge)', amount: 0, frequency: Frequency.MONTHLY }] })}>
                     <HeartHandshake className="mr-2" size={14} /> + Santé
                 </Button>
-                <Button variant="outline" size="sm" className="w-full text-xs" onClick={() => updateForm({ ...formData, variableCosts: [...formData.variableCosts, { id: generateIdHelper(), name: 'Animaux', amount: 0, frequency: 'mensuel' }] })}>
+                <Button variant="outline" size="sm" className="w-full text-xs" onClick={() => updateForm({ ...formData, variableCosts: [...formData.variableCosts, { id: generateIdHelper(), name: 'Animaux', amount: 0, frequency: Frequency.MONTHLY }] })}>
                     <User className="mr-2" size={14} /> + Animaux
                 </Button>
-                <Button variant="outline" size="sm" className="w-full text-xs" onClick={() => updateForm({ ...formData, variableCosts: [...formData.variableCosts, { id: generateIdHelper(), name: 'Pause Dej / Cantine', amount: 0, frequency: 'mensuel' }] })}>
+                <Button variant="outline" size="sm" className="w-full text-xs" onClick={() => updateForm({ ...formData, variableCosts: [...formData.variableCosts, { id: generateIdHelper(), name: 'Pause Dej / Cantine', amount: 0, frequency: Frequency.MONTHLY }] })}>
                     <Coffee className="mr-2" size={14} /> + Repas Midi
                 </Button>
             </div>
@@ -459,9 +485,9 @@ const StepDailyLife = ({ formData, updateForm, addItem, removeItem, updateItem, 
 const StepAssets = ({ formData, updateForm, addItem, removeItem, updateItem, onNext, onPrev, error }: StepProps) => {
   
     const ICON_MAPPING: Record<string, LucideIcon> = {
-        cc: Wallet, pea: TrendingUp, av: ShieldCheck, cto: TrendingUp, per: PiggyBank,
-        livret: Landmark, lep: Landmark, pel: Key, pee: Briefcase, immo_paper: Building2,
-        immo_phys: Building, crypto: Coins, gold: Gem
+        [AssetType.CC]: Wallet, [AssetType.PEA]: TrendingUp, [AssetType.AV]: ShieldCheck, [AssetType.CTO]: TrendingUp, [AssetType.PER]: PiggyBank,
+        [AssetType.LIVRET]: Landmark, 'lep': Landmark, 'pel': Key, [AssetType.PEE]: Briefcase, 'immo_paper': Building2,
+        'immo_phys': Building, [AssetType.CRYPTO]: Coins, [AssetType.GOLD]: Gem
     };
   
     const hasAsset = (labelSubString: string) => {
@@ -498,7 +524,8 @@ const StepAssets = ({ formData, updateForm, addItem, removeItem, updateItem, onN
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                   {ASSET_TYPES.map((type) => {
                       const isSelected = hasAsset(type.label);
-                      const Icon = ICON_MAPPING[type.id] || TrendingUp;
+                      // Mapping pour retrouver l'icone, si l'ID diffère un peu
+                      const Icon = ICON_MAPPING[type.id] || ICON_MAPPING[type.id.toUpperCase()] || TrendingUp;
                       return (
                           <button key={type.id} onClick={() => toggleAsset(type)} className={`relative p-3 rounded-xl border-2 text-left transition-all duration-200 group ${isSelected ? `${type.bg} ${type.border} ring-1 ring-offset-1 ring-indigo-100` : 'bg-white border-slate-100 hover:border-slate-300 hover:shadow-md'}`}>
                               <div className="flex items-start justify-between mb-2">
@@ -521,7 +548,7 @@ const StepAssets = ({ formData, updateForm, addItem, removeItem, updateItem, onN
                     
                     <div className="grid grid-cols-1 gap-4">
                         {formData.assetsUi.map((item) => {
-                            const isCC = item.type === 'cc' || item.name.toLowerCase().includes('courant');
+                            const isCC = item.type === 'CC' || item.type === 'cc' || item.name.toLowerCase().includes('courant');
                             return (
                                 <div key={item.id} className="p-4 bg-white border border-slate-200 rounded-xl shadow-sm hover:border-indigo-200 transition-colors">
                                     <div className="flex items-center justify-between mb-3">
@@ -631,7 +658,7 @@ const StepStrategy = ({ formData, onConfirm, isSaving, onPrev, stats }: StepProp
 // ============================================================================
 
 export default function ProfilePage() {
-  const { profile, saveProfile, isLoaded } = useFinancialData();
+  const { profile, isLoaded } = useFinancialData();
   const [currentStep, setCurrentStep] = useState(1);
   const [formData, setFormData] = useState<FormProfile | null>(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -640,7 +667,7 @@ export default function ProfilePage() {
   // 1. Initialisation
   useEffect(() => {
     if (isLoaded && profile) {
-        if (!formData || profile.updatedAt !== formData.updatedAt) {
+        if (!formData) {
              const cleanForm = mapProfileToForm(profile);
              setFormData(cleanForm);
         }
@@ -660,7 +687,7 @@ export default function ProfilePage() {
 
     const { budget } = simulation;
     const monthlyInvestments = formData.assetsUi
-        .filter(a => a.type !== 'cc')
+        .filter(a => a.type !== 'CC' && a.type !== 'cc')
         .reduce((sum, item) => sum + (item.monthlyFlow || 0), 0);
 
     const monthlyVariable = calculateListTotal(formData.variableCosts || []);
@@ -681,7 +708,7 @@ export default function ProfilePage() {
 
   const updateForm = (newData: FormProfile) => {
       setFormData(newData);
-      if (error) setError(null); // On efface l'erreur si l'utilisateur modifie quelque chose
+      if (error) setError(null);
   };
 
   // ✅ LOGIQUE DE VALIDATION ROBUSTE
@@ -694,16 +721,10 @@ export default function ProfilePage() {
         if (!formData.age || parseInt(String(formData.age)) <= 0) { setError("Veuillez renseigner un âge valide."); return false; }
     }
 
-    // STEP 2 : Situation (Defaults are safe usually, but good to check housing consistency)
-    if (step === 2) {
-        // Rien de critique ici car tout a des valeurs par défaut
-    }
-
     // STEP 3 : Fixes (Logement + Listes)
     if (step === 3) {
-        // Logement : Si pas gratuit, on veut un montant et une date
         const s = formData.housing?.status;
-        if (s === 'tenant' || s === 'owner_loan') {
+        if (s === HousingStatus.TENANT || s === HousingStatus.OWNER_LOAN) {
             if (!formData.housing.monthlyCost || formData.housing.monthlyCost <= 0) {
                 setError("Veuillez indiquer le montant de votre loyer/crédit."); return false;
             }
@@ -712,12 +733,11 @@ export default function ProfilePage() {
             }
         }
 
-        // Vérification générique des listes fixes (Nom + Montant + Date)
         const checkList = (list: FinancialItem[], name: string) => {
             for (const item of list) {
                 if (!item.name || item.name.trim() === '') return `Une ligne dans "${name}" n'a pas de nom.`;
                 if (!item.amount || isNaN(Number(item.amount))) return `Une ligne dans "${name}" n'a pas de montant.`;
-                if (item.category !== 'ANNUAL_EXPENSE' && (!item.dayOfMonth || item.dayOfMonth < 1 || item.dayOfMonth > 31)) 
+                if (item.category !== ItemCategory.ANNUAL_EXPENSE && (!item.dayOfMonth || item.dayOfMonth < 1 || item.dayOfMonth > 31)) 
                     return `Une ligne dans "${name}" n'a pas de date de prélèvement valide.`;
             }
             return null;
@@ -729,14 +749,12 @@ export default function ProfilePage() {
         if (err) { setError(err); return false; }
         err = checkList(formData.credits, "Crédits");
         if (err) { setError(err); return false; }
-        // Pour les dépenses annuelles, la date (jour) est moins critique, on vérifie juste montant/nom via checkList (qui ignore date si annual - à adapter si besoin, ici j'ai exclu dans la condition)
     }
 
-    // STEP 4 : Variable (Nom + Montant, Pas de Date)
+    // STEP 4 : Variable
     if (step === 4) {
         for (const item of formData.variableCosts) {
             if (!item.name || item.name.trim() === '') { setError("Une dépense courante n'a pas de nom."); return false; }
-            if (!item.amount && item.amount !== 0) { setError("Une dépense courante n'a pas de montant valide."); return false; } // Amount 0 is technically allowed but weird, assuming inputs force number
         }
     }
 
@@ -746,8 +764,7 @@ export default function ProfilePage() {
             if (!asset.name || asset.name.trim() === '') { setError("Un de vos comptes n'a pas de nom."); return false; }
             if (asset.stock === undefined || isNaN(asset.stock)) { setError(`Le solde du compte "${asset.name}" est invalide.`); return false; }
             
-            // Si c'est pas un compte courant et qu'il y a un versement, il faut une date
-            if (asset.type !== 'cc' && asset.monthlyFlow > 0) {
+            if (asset.type !== 'CC' && asset.type !== 'cc' && asset.monthlyFlow > 0) {
                  if (!asset.transferDay || asset.transferDay < 1 || asset.transferDay > 31) {
                      setError(`Veuillez indiquer le jour du virement pour "${asset.name}".`); return false;
                  }
@@ -775,9 +792,9 @@ export default function ProfilePage() {
   const addItem = (list: keyof FormProfile) => {
     if (!formData) return;
     const currentList = formData[list] as FinancialItem[];
-    // Initialisation intelligente : si c'est income/fixed/credit, on met le jour 1 par défaut pour éviter l'erreur de validation immédiate
     const defaultDay = list === 'variableCosts' ? undefined : 1; 
-    updateForm({ ...formData, [list]: [...currentList, { id: generateIdHelper(), name: '', amount: '', frequency: 'mensuel', dayOfMonth: defaultDay }] });
+    // ✅ Utilisation de Frequency.MONTHLY
+    updateForm({ ...formData, [list]: [...currentList, { id: generateIdHelper(), name: '', amount: '', frequency: Frequency.MONTHLY, dayOfMonth: defaultDay }] });
   };
   const removeItem = (list: keyof FormProfile, id: string) => {
     if (!formData) return;
@@ -790,6 +807,7 @@ export default function ProfilePage() {
     setIsSaving(true);
     try {
         const finalPayload = mapFormToPayload(formData, lifestyle);
+        // ✅ On appelle directement la route Transactionnelle (Batch Update)
         const response = await fetch('/api/user', {
             method: 'POST',
             body: JSON.stringify(finalPayload),
@@ -817,7 +835,6 @@ export default function ProfilePage() {
 
             <div className="lg:grid lg:grid-cols-12 lg:gap-12 items-start">
                 <div className="lg:col-span-7 xl:col-span-8">
-                    {/* ✅ On passe la prop 'error' à tous les steps */}
                     {currentStep === 1 && <StepIdentite formData={formData} updateForm={updateForm} onNext={goNext} error={error} />}
                     {currentStep === 2 && <StepSituation formData={formData} updateForm={updateForm} onNext={goNext} onPrev={goPrev} error={error} />}
                     {currentStep === 3 && <StepFixedFinances formData={formData} updateForm={updateForm} addItem={addItem} removeItem={removeItem} updateItem={updateItem} onNext={goNext} onPrev={goPrev} error={error} />}

@@ -11,7 +11,8 @@ import {
   AssetType,
   GoalCategory,
   PurchaseType,
-  PaymentMode
+  PaymentMode,
+  Frequency // ✅ Ajouté pour les calculs
 } from '@prisma/client';
 
 // ============================================================================
@@ -29,12 +30,10 @@ export const CONSTANTS = {
   BUFFER_RATIO: 0.10, 
 };
 
-// ✅ CONFIGURATION VISUELLE DES CATÉGORIES
-// On utilise les clés de l'Enum Prisma 'GoalCategory' pour garantir la cohérence
+// ✅ CONFIGURATION VISUELLE DES CATÉGORIES (Basé sur Enum Prisma)
 export const GOAL_CATEGORIES: Record<GoalCategory, { id: GoalCategory, priority: number, label: string, icon: string, description: string }> = {
   EMERGENCY:   { id: 'EMERGENCY',   priority: 1, label: 'Matelas de Sécurité', icon: '🛡️', description: 'Épargne de précaution' },
   REAL_ESTATE: { id: 'REAL_ESTATE', priority: 2, label: 'Immobilier',          icon: '🏠', description: 'Achat résidence' },
-  // Note : Si 'DEBT' n'est pas dans l'Enum Prisma, on le mappe sur 'OTHER' ou on ajoute l'Enum en BDD. Ici je le mappe sur OTHER pour l'instant.
   OTHER:       { id: 'OTHER',       priority: 3, label: 'Autre / Dette',       icon: '💳', description: 'Divers / Remboursement' },
   VEHICLE:     { id: 'VEHICLE',     priority: 3, label: 'Véhicule',            icon: '🚗', description: 'Voiture, Moto' },
   TRAVEL:      { id: 'TRAVEL',      priority: 3, label: 'Voyage',              icon: '✈️', description: 'Vacances' },
@@ -44,7 +43,8 @@ export const GOAL_CATEGORIES: Record<GoalCategory, { id: GoalCategory, priority:
 };
 
 // ✅ CONFIGURATION VISUELLE DES ACTIFS
-// Les IDs correspondent (en minuscule pour l'UI, conversion nécessaire vers Enum Majuscule pour l'API)
+// L'ID doit matcher l'Enum Prisma (en minuscule ou via un mapping si tu veux garder la casse actuelle)
+// Pour simplifier, ici je garde tes IDs minuscules, mais idéalement il faudrait matcher l'Enum AssetType
 export const ASSET_TYPES = [
   { id: 'cc',         label: 'Compte Courant',      category: 'LIQUIDITY', color: 'text-slate-600',   bg: 'bg-slate-50',   border: 'border-slate-300' },
   { id: 'pea',        label: 'PEA / PEA-PME',       category: 'BOURSE',    color: 'text-blue-600',    bg: 'bg-blue-50',    border: 'border-blue-200' },
@@ -63,14 +63,13 @@ export const ASSET_TYPES = [
 ] as const;
 
 export const PURCHASE_TYPES = {
-  NEED:   { id: 'NEED',   label: 'Besoin Vital',    description: 'Nourriture, Santé', color: 'bg-blue-100 text-blue-700 border-blue-200' },
-  USEFUL: { id: 'OPPORTUNITY', label: 'Confort / Utile', description: 'Gain de temps',     color: 'bg-emerald-100 text-emerald-700 border-emerald-200' },
-  DESIRE: { id: 'PLEASURE', label: 'Envie / Plaisir', description: 'Loisirs, Mode',     color: 'bg-purple-100 text-purple-700 border-purple-200' },
-  // Mapping pour le cas PROBLEM si besoin dans l'UI
-  PROBLEM: { id: 'PROBLEM', label: 'Imprévu / Galère', description: 'Réparations, Amende', color: 'bg-red-100 text-red-700 border-red-200' }
+  NEED:    { id: 'NEED',        label: 'Besoin Vital',     description: 'Nourriture, Santé', color: 'bg-blue-100 text-blue-700 border-blue-200' },
+  PLEASURE:{ id: 'PLEASURE',    label: 'Envie / Plaisir',  description: 'Loisirs, Mode',     color: 'bg-purple-100 text-purple-700 border-purple-200' },
+  OPPORTUNITY:{ id: 'OPPORTUNITY', label: 'Confort / Utile', description: 'Gain de temps',    color: 'bg-emerald-100 text-emerald-700 border-emerald-200' },
+  PROBLEM: { id: 'PROBLEM',     label: 'Imprévu / Galère', description: 'Réparations',       color: 'bg-red-100 text-red-700 border-red-200' }
 };
 
-export const PAYMENT_MODES = {
+export const PAYMENT_MODES: Record<PaymentMode, string> = {
   CASH_SAVINGS: 'Épargne (Je tape dans le stock)',
   CASH_CURRENT: 'Compte Courant (Je paie avec le salaire)',
   SPLIT:        'Paiement 3x/4x (Dette court terme)',
@@ -81,25 +80,18 @@ export const PAYMENT_MODES = {
 // 2. MAPPING BDD -> TYPES APP (SOURCE DE VÉRITÉ)
 // ============================================================================
 
-// On réexporte les types Prisma pour les utiliser partout dans l'app
 export type { UserPersona, HousingStatus, ItemCategory, AssetType, GoalCategory, PurchaseType, PaymentMode };
 
 // 🔹 Financial Item (Flux)
-// On utilise directement le type Prisma
 export type FinancialItem = PrismaItem;
 
 // 🔹 Asset (Patrimoine)
-export type Asset = PrismaAsset;
-// L'interface "Investment" étend Asset pour ajouter des champs UI calculés (ex: performance)
 export interface Investment extends PrismaAsset {
-  performance?: number;
+  performance?: number; // Champ UI calculé
 }
-
-// 🔹 Decision (Historique)
-export type PurchaseDecision = PurchaseDecision; // Type Prisma direct
+export type Asset = PrismaAsset;
 
 // 🔹 Goal (Objectifs)
-// On étend le type Prisma car le moteur de calcul (Logic.ts) ajoute des champs temporaires
 export interface GoalStrategy {
   type: 'TIME' | 'BUDGET' | 'HYBRID' | 'INCOME';
   title: string;
@@ -120,11 +112,14 @@ export interface GoalDiagnosis {
 }
 
 export type Goal = FinancialGoal & {
-  // Ces champs sont calculés par le moteur, ils ne sont pas persistés en base
+  // Champs calculés UI
   isInvested?: boolean; 
   monthlyNeed?: number;
   diagnosis?: GoalDiagnosis;
 };
+
+// 🔹 Decision
+export type { PurchaseDecision };
 
 // ============================================================================
 // 3. PROFIL UTILISATEUR (AGRÉGATION)
@@ -134,21 +129,22 @@ export interface Household { adults: number; children: number; }
 export interface Housing { status: HousingStatus; monthlyCost: number; paymentDay?: number; }
 export interface PersonaRules { safetyMonths: number; maxDebt: number; minLiving: number; }
 
-// Le Profil "Application" est l'objet hydraté qui contient tout l'arbre
-export interface Profile extends Omit<FinancialProfile, 'createdAt' | 'updatedAt'> {
-  // Champs DB aplatis ou transformés pour l'UI (ex: household object vs 2 champs int)
+export interface Profile extends Omit<FinancialProfile, 'createdAt' | 'updatedAt' | 'items' | 'assets' | 'goals' | 'decisions'> {
+  // Champs Frontend spécifiques (optionnels ou transformés)
   email?: string;
   firstName?: string;
+  mode?: string; // UI mode (beginner/expert) - Pas en DB
+
   household: Household; 
   housing: Housing;     
   
-  // ✅ LES LISTES COMPLÈTES (Relations Prisma)
+  // Relations complètes
   items: FinancialItem[]; 
   assets: Asset[];        
   goals: Goal[];          
   decisions: PurchaseDecision[];
 
-  // --- Champs Calculés / Helpers pour l'UI (peuplés par les mappers du GET) ---
+  // --- Helpers UI (tableaux filtrés) ---
   incomes: FinancialItem[];
   fixedCosts: FinancialItem[];
   variableCosts: FinancialItem[];
@@ -159,7 +155,7 @@ export interface Profile extends Omit<FinancialProfile, 'createdAt' | 'updatedAt
   savingsContributions: { id: string; name: string; amount: number; dayOfMonth: number }[]; 
   investments: Investment[]; 
 
-  // Champs calculés par le moteur (non présents en base)
+  // --- Totaux Calculés ---
   savings?: number; 
   investedAmount?: number;
   currentBalance?: number;
@@ -169,21 +165,8 @@ export interface Profile extends Omit<FinancialProfile, 'createdAt' | 'updatedAt
   updatedAt?: Date | string;
 }
 
-// Type utilisé pour le formulaire de simulation (avant sauvegarde)
-export interface Purchase {
-  name: string;
-  type: string; 
-  amount: number | string;
-  date: string;
-  paymentMode: keyof typeof PAYMENT_MODES | string;
-  duration?: number | string;
-  rate?: number | string;
-  isReimbursable?: boolean;
-  isPro?: boolean;
-}
-
 // ============================================================================
-// 4. TYPES D'ANALYSE (Docteur Financier & Simulation)
+// 4. TYPES D'ANALYSE
 // ============================================================================
 
 export type OpportunityLevel = 'CRITICAL' | 'WARNING' | 'INFO' | 'SUCCESS';
@@ -229,52 +212,51 @@ export interface SimulationResult {
 }
 
 // ============================================================================
-// 5. OBJETS INITIAUX (PRESETS & DEFAULT)
+// 5. OBJETS INITIAUX
 // ============================================================================
 
-export const PERSONA_PRESETS: Record<string, { id: string, label: string, description: string, rules: PersonaRules }> = {
-  STUDENT:    { id: 'student',    label: 'Étudiant(e)',         description: 'Budget serré, flexible.',     rules: { safetyMonths: 1, maxDebt: 40, minLiving: 100 } },
-  SALARIED:   { id: 'salaried',   label: 'Salarié / Stable',      description: 'Revenus réguliers.',          rules: { safetyMonths: 3, maxDebt: 35, minLiving: 300 } },
-  FREELANCE:  { id: 'freelance',  label: 'Indépendant',          description: 'Revenus variables, risque.',    rules: { safetyMonths: 6, maxDebt: 30, minLiving: 500 } },
-  RETIIRED:   { id: 'retired',    label: 'Retraité(e)',          description: 'Revenus fixes, préservation.',  rules: { safetyMonths: 6, maxDebt: 25, minLiving: 400 } },
-  UNEMPLOYED: { id: 'unemployed', label: 'En recherche',          description: 'Revenus précaires, prudence.',  rules: { safetyMonths: 6, maxDebt: 0, minLiving: 200 } }
+// ✅ Correction des clés pour matcher l'Enum Prisma 'UserPersona'
+export const PERSONA_PRESETS: Record<UserPersona, { id: UserPersona, label: string, description: string, rules: PersonaRules }> = {
+  STUDENT:    { id: 'STUDENT',    label: 'Étudiant(e)',         description: 'Budget serré, flexible.',     rules: { safetyMonths: 1, maxDebt: 40, minLiving: 100 } },
+  SALARIED:   { id: 'SALARIED',   label: 'Salarié / Stable',    description: 'Revenus réguliers.',          rules: { safetyMonths: 3, maxDebt: 35, minLiving: 300 } },
+  FREELANCE:  { id: 'FREELANCE',  label: 'Indépendant',         description: 'Revenus variables, risque.',  rules: { safetyMonths: 6, maxDebt: 30, minLiving: 500 } },
+  RETIRED:    { id: 'RETIRED',    label: 'Retraité(e)',         description: 'Revenus fixes, préservation.',rules: { safetyMonths: 6, maxDebt: 25, minLiving: 400 } },
+  // Note: Si 'UNEMPLOYED' n'est pas dans ton Enum Prisma, mappe le sur 'STUDENT' ou ajoute le à l'Enum.
+  // Pour l'instant je ne l'inclus pas pour éviter l'erreur de type si il n'est pas dans l'Enum.
 };
 
 export const INITIAL_PROFILE: Profile = {
-  // Champs simples
+  id: 'temp',
+  userId: 'temp',
   firstName: '', 
   age: 0, 
-  persona: 'SALARIED', // Utilisation de la string par défaut, le mapper gérera l'Enum
+  persona: 'SALARIED', 
   mode: 'beginner',
   household: { adults: 1, children: 0 },
-  housing: { status: 'TENANT', monthlyCost: 0 }, 
+  housing: { status: 'TENANT', monthlyCost: 0, paymentDay: 5 }, 
+  housingCost: 0,
+  housingPaymentDay: 5,
+  adults: 1,
+  children: 0,
+  housingStatus: 'TENANT',
+  funBudget: 0,
   
-  // Valeurs calculées par défaut
   savings: 0, 
   investedAmount: 0, 
   investmentYield: 5, 
   currentBalance: 0, 
   monthlyIncome: 0,
   
-  // Tableaux (Relations)
   items: [],
   assets: [],
   goals: [],
   decisions: [],
 
-  // Tableaux Helper
-  variableCosts: [], 
-  incomes: [], 
-  fixedCosts: [], 
-  subscriptions: [], 
-  credits: [], 
-  savingsContributions: [], 
-  annualExpenses: [], 
-  investments: [],
+  variableCosts: [], incomes: [], fixedCosts: [], subscriptions: [], credits: [], savingsContributions: [], annualExpenses: [], investments: [],
 };
 
 // ============================================================================
-// 6. UTILITAIRES
+// 6. UTILITAIRES DE CALCUL
 // ============================================================================
 
 export const generateId = (): string => Math.random().toString(36).substr(2, 9);
@@ -296,12 +278,18 @@ export const calculateFutureValue = (principal: number, rate: number, years: num
   return principal * Math.pow((1 + rate), years);
 };
 
+// ✅ Correction majeure : Utilisation de l'Enum Frequency
 export const calculateListTotal = (items: FinancialItem[]): number => {
   if (!Array.isArray(items)) return 0; 
   
   return items.reduce((acc, item) => {
     let amount = Math.abs(safeFloat(item.amount));
-    if (item.frequency === 'annuel') amount = amount / 12; 
+    
+    // Si c'est Annuel ou Trimestriel, on mensualise
+    if (item.frequency === Frequency.YEARLY) amount = amount / 12;
+    if (item.frequency === Frequency.QUARTERLY) amount = amount / 3;
+    if (item.frequency === Frequency.WEEKLY) amount = amount * 4.33; // Moyenne semaines/mois
+
     return acc + amount;
   }, 0);
 };
