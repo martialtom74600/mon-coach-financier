@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo, useState, Suspense } from 'react';
+import React, { useMemo, useState, Suspense, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth, SignIn, SignUp, useUser } from '@clerk/nextjs';
 import { clerkAppearanceHybrid } from '@/app/config/clerk-theme';
@@ -14,10 +14,10 @@ import {
   computeFinancialPlan, 
   analyzeProfileHealth, 
   DeepAnalysis,
-  OptimizationOpportunity
+  OptimizationOpportunity,
+  formatCurrency
 } from '@/app/lib/logic';
 import { generateTimeline } from '@/app/lib/scenarios';
-import { formatCurrency } from '@/app/lib/logic';
 
 // --- ICONS ---
 import {
@@ -211,22 +211,21 @@ const EducationalModal = ({ guide, onClose }: { guide: any, onClose: () => void 
 };
 
 // ============================================================================
-// 2. DASHBOARD VIEW (MAIN)
+// 2. DASHBOARD VIEW (MAIN) - CORRIGÉE
 // ============================================================================
 
 function DashboardView() {
   const router = useRouter();
   const { user } = useUser();
-  // IMPORTANT : On récupère 'history' ici pour le passer au moteur de calcul
   const { profile, history, isLoaded: isProfileLoaded } = useFinancialData();
   const [selectedGuide, setSelectedGuide] = useState<any | null>(null);
 
   const analysis: DeepAnalysis | null = useMemo(() => {
-      if (!profile || !profile.incomes) return null;
+      if (!profile) return null; 
       try {
           const budgetContext = computeFinancialPlan(profile);
           return analyzeProfileHealth(profile, budgetContext.budget);
-      } catch (e) { return null; }
+      } catch (e) { console.error("Erreur analyse", e); return null; }
   }, [profile]);
 
   const handleActionClick = (opp: OptimizationOpportunity) => {
@@ -237,35 +236,43 @@ function DashboardView() {
       } else router.push('/profile');
   };
 
-  // ✅ 1. CALCUL DU SAFE-TO-SPEND (LA LOGIQUE COMPLEXE)
+  // ✅ 1. CALCUL DU SAFE-TO-SPEND (CORRIGÉ & ROBUSTE)
   const treasuryStatus = useMemo(() => {
-      if (!profile || !profile.incomes) return null;
+      if (!profile) return null;
 
-      // a. On génère la timeline pour le mois en cours en incluant l'HISTORIQUE
-      // C'est ça qui corrige le décalage avec la page History !
+      // a. On génère la timeline
       const timeline = generateTimeline(profile, history || [], [], 45);
-      const currentMonthKey = new Date().toISOString().slice(0, 7); // "2023-10"
+      const currentMonthKey = new Date().toISOString().slice(0, 7); // Ex: "2025-02"
       const monthData = timeline.find(m => m.id === currentMonthKey);
       
-      if (!monthData) return null;
+      // Fallback si pas de données pour ce mois (ne devrait pas arriver si engine.ts est bon)
+      if (!monthData) return {
+          currentBalance: profile.currentBalance || 0,
+          upcomingFixed: 0,
+          upcomingSavings: 0,
+          safeToSpend: profile.currentBalance || 0,
+          endOfMonthProjection: profile.currentBalance || 0
+      };
 
       // b. Solde Actuel (Aujourd'hui)
       const todayDate = new Date().toISOString().slice(0, 10);
       const todayData = monthData.days.find(d => d.date.startsWith(todayDate));
-      const currentBalance = todayData?.balance || 0; // Solde théorique au jour J
+      
+      // IMPORTANT : Si currentBalance est 0 dans le profil, on prend 0.
+      const currentBalance = todayData?.balance ?? (profile.currentBalance || 0);
 
       // c. Calcul des charges RESTANTES ce mois-ci
-      // On regarde tous les événements négatifs (charges) entre Demain et la Fin du mois
       const todayIndex = monthData.days.findIndex(d => d.date.startsWith(todayDate));
-      const remainingDays = monthData.days.slice(todayIndex + 1); // Jours futurs
+      
+      // Si on ne trouve pas aujourd'hui, on prend tous les jours restants
+      const remainingDays = todayIndex >= 0 ? monthData.days.slice(todayIndex + 1) : monthData.days;
       
       let upcomingFixed = 0;
       let upcomingSavings = 0;
 
       remainingDays.forEach(day => {
           day.events.forEach(evt => {
-              if (evt.amount < 0) { // C'est une dépense
-                  // On essaie de deviner si c'est de l'épargne ou du fixe
+              if (evt.amount < 0) { // Dépense
                   if (evt.name.toLowerCase().includes('épargne') || evt.name.toLowerCase().includes('virement')) {
                       upcomingSavings += Math.abs(evt.amount);
                   } else {
@@ -276,7 +283,6 @@ function DashboardView() {
       });
 
       // d. Le Safe-to-Spend
-      // Argent dispo maintenant - Tout ce qui DOIT sortir avant la fin du mois
       const safeToSpend = currentBalance - upcomingFixed - upcomingSavings;
       const endOfMonthProjection = monthData.stats.balanceEnd;
 
@@ -287,11 +293,11 @@ function DashboardView() {
           safeToSpend,
           endOfMonthProjection
       };
-  }, [profile, history]); // Dépendance à 'history' ajoutée
+  }, [profile, history]);
 
   // ✅ 2. CALCUL DU GRAPHIQUE PATRIMOINE
   const chartData = useMemo(() => {
-      if (!profile || !profile.incomes) return [];
+      if (!profile) return [];
       const simulation = computeFinancialPlan(profile);
       const netWorth = simulation.budget.totalWealth;
       const monthlySavings = simulation.budget.capacityToSave;
@@ -299,14 +305,22 @@ function DashboardView() {
       let wealth = netWorth;
       for (let year = 0; year <= 10; year++) {
           d.push({ year: `+${year}a`, amount: Math.round(wealth) });
-          wealth = (wealth + (monthlySavings * 12)) * 1.05;
+          wealth = (wealth + (monthlySavings * 12)) * 1.05; // 5% hypothèse
       }
       return d;
   }, [profile]);
 
   if (!isProfileLoaded) return <div className="h-[60vh] flex flex-col items-center justify-center gap-4"><div className="animate-spin h-10 w-10 border-4 border-slate-200 border-t-indigo-600 rounded-full"></div><p className="text-slate-400 text-sm font-medium animate-pulse">Analyse de vos finances...</p></div>;
 
-  if (!analysis || (analysis.ratios.needs === 0 && analysis.opportunities.length === 0)) {
+  // Si pas de profil ou profil vide -> On force la redirection
+  // On vérifie s'il y a des assets OU des revenus OU un solde non nul
+  const isProfileEmpty = !profile || (
+      (!profile.incomes || profile.incomes.length === 0) && 
+      (!profile.assets || profile.assets.length === 0) && 
+      (profile.currentBalance === 0 || profile.currentBalance === undefined)
+  );
+
+  if (isProfileEmpty) {
     return (
       <div className="flex flex-col items-center justify-center bg-white p-8 text-center rounded-[2rem] border border-slate-100 shadow-xl shadow-slate-200/50 min-h-[60vh] max-w-2xl mx-auto mt-10">
         <div className="w-24 h-24 bg-indigo-50 rounded-full flex items-center justify-center mb-6 animate-bounce">
@@ -321,10 +335,13 @@ function DashboardView() {
     );
   }
 
+  // On recalcule pour l'affichage final
   const simulation = computeFinancialPlan(profile);
   const netWorth = simulation.budget.totalWealth;
-  const heroAction = analysis.opportunities[0];
-  const otherActions = analysis.opportunities.slice(1, 4);
+  
+  // Sécurité si analysis est null
+  const heroAction = analysis?.opportunities?.[0];
+  const otherActions = analysis?.opportunities?.slice(1, 4) || [];
 
   return (
     <>
@@ -362,8 +379,8 @@ function DashboardView() {
                              <div className={`absolute left-0 top-0 bottom-0 w-1 ${heroAction.level === 'CRITICAL' ? 'bg-rose-500' : 'bg-amber-500'}`}></div>
                              <div className={`p-4 rounded-2xl shrink-0 ${heroAction.level === 'CRITICAL' ? 'bg-rose-50 text-rose-600' : 'bg-amber-50 text-amber-600'}`}>
                                 <Zap size={28} />
-                            </div>
-                            <div className="flex-1 relative z-10 w-full">
+                             </div>
+                             <div className="flex-1 relative z-10 w-full">
                                 <div className="flex items-center justify-between mb-2">
                                     <div className="flex items-center gap-2">
                                         <h3 className="font-bold text-slate-900 text-lg">Conseil Prioritaire</h3>
@@ -435,14 +452,14 @@ function DashboardView() {
                          <div className="h-20 w-20 shrink-0 relative flex items-center justify-center">
                             <svg className="transform -rotate-90 w-full h-full drop-shadow-lg">
                                 <circle cx="40" cy="40" r="34" stroke="#f1f5f9" strokeWidth="8" fill="transparent" />
-                                <circle cx="40" cy="40" r="34" stroke={analysis.globalScore > 60 ? "#10b981" : (analysis.globalScore > 30 ? "#f59e0b" : "#f43f5e")} strokeWidth="8" fill="transparent" strokeDasharray={2 * Math.PI * 34} strokeDashoffset={(2 * Math.PI * 34) * (1 - analysis.globalScore/100)} strokeLinecap="round" className="transition-all duration-1000 ease-out" />
+                                <circle cx="40" cy="40" r="34" stroke={analysis ? (analysis.globalScore > 60 ? "#10b981" : (analysis.globalScore > 30 ? "#f59e0b" : "#f43f5e")) : "#f1f5f9"} strokeWidth="8" fill="transparent" strokeDasharray={2 * Math.PI * 34} strokeDashoffset={(2 * Math.PI * 34) * (1 - (analysis?.globalScore || 0)/100)} strokeLinecap="round" className="transition-all duration-1000 ease-out" />
                             </svg>
-                            <span className="absolute text-lg font-black text-slate-800">{analysis.globalScore}</span>
+                            <span className="absolute text-lg font-black text-slate-800">{analysis?.globalScore || 0}</span>
                          </div>
                          <div>
                              <div className="text-xs font-bold text-slate-400 uppercase tracking-widest">Score Santé</div>
                              <div className="text-base font-bold text-slate-700 leading-tight mt-1">
-                                {analysis.globalScore > 80 ? "Excellente forme" : (analysis.globalScore > 50 ? "Bon état général" : "Attention requise")}
+                                {analysis ? (analysis.globalScore > 80 ? "Excellente forme" : (analysis.globalScore > 50 ? "Bon état général" : "Attention requise")) : "À calculer"}
                              </div>
                          </div>
                     </GlassCard>

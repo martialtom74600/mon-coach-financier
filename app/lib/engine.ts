@@ -4,11 +4,10 @@ import {
   DeepAnalysis, OptimizationOpportunity, 
   safeFloat, calculateListTotal, formatCurrency, 
   CONSTANTS, GOAL_CATEGORIES, PERSONA_PRESETS,
-  // ✅ NOUVEAUX IMPORTS TYPES & ENUMS
+  // ✅ IMPORTS TYPES & ENUMS
   AssetType,
   UserPersona,
-  HousingStatus,
-  PurchaseDecision
+  HousingStatus
 } from './definitions';
 
 // ============================================================================
@@ -161,22 +160,6 @@ const ACTION_GUIDES: Record<string, ActionGuide> = {
 // 2. MODULES DE CALCUL
 // ============================================================================
 
-const calculateFIRE = (annualExpenses: number, currentWealth: number, monthlySavings: number, rates: SimulationRates) => {
-    if (monthlySavings <= 0) return { years: 99, date: null };
-    const target = annualExpenses / rates.SAFE_WITHDRAWAL;
-    if (currentWealth >= target) return { years: 0, date: new Date() };
-    const realRateAnnual = rates.MARKET_AVG - rates.INFLATION;
-    const realRateMonthly = realRateAnnual / 12;
-    let months = 0;
-    try {
-        const numerator = Math.log((target * realRateMonthly + monthlySavings) / (currentWealth * realRateMonthly + monthlySavings));
-        const denominator = Math.log(1 + realRateMonthly);
-        months = numerator / denominator;
-    } catch (e) { months = 999; }
-    if (!isFinite(months) || months > 1200) return { years: 99, date: null };
-    return { years: Math.round(months / 12), date: addMonths(new Date(), Math.round(months)), target };
-};
-
 const simulateFutureWealth = (start: number, monthly: number, years: number, rate: number) => {
     if (years <= 0) return start;
     const r = rate / 12;
@@ -202,7 +185,6 @@ const calculateCompoundMonths = (target: number, pmt: number, rate: number) => {
 };
 
 // ✅ HELPER INTELLIGENT TYPÉ : Vérifie si l'utilisateur possède déjà un actif
-// Utilise l'Enum AssetType pour être précis
 const hasAsset = (profile: Profile, typeKeys: string[]): boolean => {
   const assets = profile.assets || [];
   if (assets.length === 0) return false;
@@ -212,7 +194,6 @@ const hasAsset = (profile: Profile, typeKeys: string[]): boolean => {
     if (typeKeys.includes(asset.type.toLowerCase())) return true;
     
     // 2. Mapping "catégorie" vers Enum
-    // Par ex: si on cherche 'livret', on accepte LIVRET, LEP
     if (typeKeys.includes('livret') && [AssetType.LIVRET, AssetType.OTHER].includes(asset.type)) return true;
     if (typeKeys.includes('pea') && asset.type === AssetType.PEA) return true;
     if (typeKeys.includes('av') && asset.type === AssetType.AV) return true;
@@ -242,25 +223,6 @@ export const calculateMonthlyEffort = (goal: Goal): number => {
     return Math.max(0, denominator === 0 ? 0 : numerator / denominator);
   }
   return Math.max(0, target - current) / months;
-};
-
-export const simulateGoalProjection = (goal: Goal, monthlyContribution: number) => {
-    const projection = [];
-    const today = new Date();
-    const months = differenceInMonths(new Date(goal.deadline), today);
-    const r = (goal.isInvested ? (safeFloat(goal.projectedYield) || 5) : 0) / 100 / 12;
-    let balance = safeFloat(goal.currentSaved);
-    let contributed = balance;
-    let interests = 0;
-    projection.push({ month: 0, date: today, balance, contributed, interests: 0 });
-    for (let i = 1; i <= months; i++) {
-        const gain = balance * r;
-        balance += monthlyContribution + gain;
-        contributed += monthlyContribution;
-        interests += gain;
-        projection.push({ month: i, date: addMonths(today, i), balance: Math.round(balance), contributed: Math.round(contributed), interests: Math.round(interests) });
-    }
-    return { projection, summary: { totalPocket: Math.round(contributed), totalInterests: Math.round(interests), finalAmount: Math.round(balance) }};
 };
 
 export const analyzeGoalStrategies = (goal: Goal, effort: number, capacity: number, income: number, globalSavings: number, rates: SimulationRates): GoalDiagnosis => {
@@ -311,6 +273,7 @@ export const computeFinancialPlan = (profile: Profile, customRates?: Partial<Sim
   const income = calculateListTotal(profile.incomes);
   
   let housingCost = 0;
+  // ✅ Correction Enum HousingStatus
   if (profile.housing?.status === HousingStatus.TENANT || profile.housing?.status === HousingStatus.OWNER_LOAN) {
       housingCost = safeFloat(profile.housing?.monthlyCost);
   }
@@ -328,7 +291,6 @@ export const computeFinancialPlan = (profile: Profile, customRates?: Partial<Sim
   const netCashflow = Math.max(0, totalSavingsCapacity - manualSavings);
 
   // Patrimoine (Agrégation des Assets)
-  // On utilise les tableaux calculés dans 'definitions' si disponibles, sinon on refait le calcul
   let matelas = 0;
   let investedStock = 0;
   let currentBalance = 0;
@@ -336,6 +298,7 @@ export const computeFinancialPlan = (profile: Profile, customRates?: Partial<Sim
   if (profile.assets) {
       profile.assets.forEach(asset => {
           const val = safeFloat(asset.currentValue);
+          // ✅ Correction Enum AssetType
           if (asset.type === AssetType.CC) currentBalance += val;
           else if ([AssetType.LIVRET, AssetType.PEE].includes(asset.type)) matelas += val;
           else investedStock += val;
@@ -354,45 +317,19 @@ export const computeFinancialPlan = (profile: Profile, customRates?: Partial<Sim
   // Allocation
   const { allocations, totalAllocated } = distributeGoals(profile.goals || [], netCashflow);
 
+  // ✅ Correction PERSONA_PRESETS (Accès sécurisé par Enum)
+  const defaultRules = PERSONA_PRESETS[UserPersona.SALARIED]?.rules || { safetyMonths: 3, maxDebt: 35, minLiving: 300 };
+
   return {
     budget: { 
       income, fixed, variable, variableExpenses: variable, monthlyIncome: income, mandatoryExpenses: fixed, discretionaryExpenses: funBudget,
       capacityToSave: totalSavingsCapacity, rawCapacity, endOfMonthBalance, profitableExpenses: manualSavings + totalAllocated, 
       totalRecurring: fixed + variable + manualSavings, remainingToLive: Math.max(0, income - mandatoryAndVital - manualSavings), 
       realCashflow: netCashflow, matelas, investments: investedStock, totalWealth, safetyMonths, engagementRate: debtRatio,
-      rules: PERSONA_PRESETS.SALARIED.rules, securityBuffer: 0, availableForProjects: 0, currentBalance, capacity: totalSavingsCapacity, totalGoalsEffort: totalAllocated
+      rules: defaultRules, securityBuffer: 0, availableForProjects: 0, currentBalance, capacity: totalSavingsCapacity, totalGoalsEffort: totalAllocated
     },
     allocations, freeCashFlow: netCashflow, usedRates: RATES
   };
-};
-
-// Fonction helper pour analyser un achat
-export const analyzePurchaseImpact = (
-    stats: any, 
-    purchase: PurchaseDecision | any, // Accepte le type DB ou UI
-    profile: Profile, 
-    history: any[]
-) => {
-    // Conversion simple pour garantir la compatibilité
-    const amount = safeFloat(purchase.amount);
-    const newBalance = stats.currentBalance - amount;
-    const newRV = stats.remainingToLive - amount;
-    
-    // Logique simplifiée pour l'exemple
-    return {
-        verdict: newRV >= 0 ? 'green' : 'red',
-        smartTitle: newRV >= 0 ? 'Feu Vert' : 'Attention',
-        smartMessage: newRV >= 0 ? 'Cet achat passe dans le budget.' : 'Cet achat vous mettrait en difficulté.',
-        isBudgetOk: newRV >= 0,
-        isCashflowOk: newBalance >= 0,
-        lowestProjectedBalance: newBalance,
-        newMatelas: stats.matelas, // Si paiement cash savings, il faudrait déduire
-        newSafetyMonths: stats.safetyMonths,
-        newRV,
-        tips: [],
-        issues: [],
-        projectedCurve: []
-    };
 };
 
 export const simulateGoalScenario = (goalInput: any, profile: any, context: any, customRates?: Partial<SimulationRates>) => {
@@ -443,6 +380,7 @@ export const analyzeProfileHealth = (
 
   // --- PORTE 2 : SÉCURITÉ (MATELAS) ---
   const savings = safeFloat(context.matelas);
+  // ✅ Correction Enum UserPersona
   const isFreelance = profile.persona === UserPersona.FREELANCE;
   const targetMonths = isFreelance ? 6 : 3;
   const idealSafety = (needsTotal + Math.min(context.discretionaryExpenses, 500)) * targetMonths;

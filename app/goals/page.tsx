@@ -4,12 +4,10 @@ import { useState, useMemo, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useFinancialData } from '@/app/hooks/useFinancialData';
 
-// 👇 IMPORTS LOGIQUE
+// 👇 IMPORTS LOGIQUE (Mis à jour vers le nouveau moteur)
 import {
-  calculateFinancials,
+  computeFinancialPlan, // ✅ REMPLACEMENT MAJEUR
   formatCurrency,
-  generateId,
-  GOAL_CATEGORIES,
   simulateGoalScenario
 } from '@/app/lib/logic';
 
@@ -33,6 +31,7 @@ import Card from '@/app/components/ui/Card';
 import Button from '@/app/components/ui/Button';
 import InputGroup from '@/app/components/ui/InputGroup';
 import Badge from '@/app/components/ui/Badge';
+import { GOAL_CATEGORIES } from '@/app/lib/definitions'; // Import direct depuis definitions
 
 // ============================================================================
 // HELPERS UI
@@ -164,7 +163,17 @@ export default function GoalsPage() {
   // ✅ ON UTILISE LES FONCTIONS CRUD DU HOOK
   const { profile, isLoaded, saveGoal, deleteGoal } = useFinancialData(); 
   
-  const stats = useMemo(() => calculateFinancials(profile), [profile]);
+  // ✅ ADAPTATION AU NOUVEAU MOTEUR (computeFinancialPlan)
+  const stats = useMemo(() => {
+      if (!profile) return { monthlyIncome: 0, matelas: 0, goalsBreakdown: [], totalGoalsEffort: 0, availableForProjects: 0, capacityToSave: 0, securityBuffer: 0 };
+      
+      const plan = computeFinancialPlan(profile);
+      return {
+          ...plan.budget,
+          goalsBreakdown: plan.allocations // On mappe 'allocations' vers 'goalsBreakdown' pour garder ton UI
+      };
+  }, [profile]);
+
   const isProfileEmpty = stats.monthlyIncome === 0 && stats.matelas === 0;
   const hasGoals = stats.goalsBreakdown && stats.goalsBreakdown.length > 0;
   
@@ -188,6 +197,7 @@ export default function GoalsPage() {
 
   const simulation = useMemo(() => {
       if (inputStep !== 'check') return null;
+      // On passe les stats calculées au simulateur
       return simulateGoalScenario(newGoal, profile, stats);
   }, [inputStep, newGoal, profile, stats]);
 
@@ -214,18 +224,17 @@ export default function GoalsPage() {
     try {
         // Préparation du payload propre (typage strict)
         const payload: Partial<Goal> = {
-            // Pas d'ID, la DB le génère (sauf si edit)
             name: newGoal.name,
             category: newGoal.category as GoalCategory,
             targetAmount: parseFloat(newGoal.targetAmount),
             currentSaved: parseFloat(newGoal.currentSaved || 0),
             monthlyContribution: simulation.monthlyEffort,
-            deadline: new Date(newGoal.deadline), // Date object for Prisma
+            deadline: new Date(newGoal.deadline), 
             projectedYield: parseFloat(newGoal.projectedYield || 0),
             transferDay: newGoal.transferDay ? parseInt(newGoal.transferDay) : null
         };
 
-        // Appel via le hook (qui gère fetch /api/goals et le refresh state)
+        // Appel via le hook
         await saveGoal(payload);
 
         // Reset UI
@@ -451,17 +460,17 @@ export default function GoalsPage() {
 
         {step === 'list' && (
           <div className="space-y-4 animate-fade-in">
-             {(!hasGoals) ? (
-                 <div className="text-center py-12 bg-white rounded-xl border border-dashed border-slate-300">
-                    <LayoutGrid className="mx-auto text-slate-300 mb-3" size={48} />
-                    <p className="text-slate-500 font-medium">Aucun objectif pour le moment.</p>
-                    <Button variant="outline" className="mt-4" onClick={() => { setStep('input'); setInputStep('form'); }}>Créer mon premier objectif</Button>
-                 </div>
-             ) : (
+              {(!hasGoals) ? (
+                  <div className="text-center py-12 bg-white rounded-xl border border-dashed border-slate-300">
+                     <LayoutGrid className="mx-auto text-slate-300 mb-3" size={48} />
+                     <p className="text-slate-500 font-medium">Aucun objectif pour le moment.</p>
+                     <Button variant="outline" className="mt-4" onClick={() => { setStep('input'); setInputStep('form'); }}>Créer mon premier objectif</Button>
+                  </div>
+              ) : (
                 stats.goalsBreakdown.map((goal: any) => (
                     <GoalItemCard key={goal.id} goal={goal} onDelete={handleDeleteGoal} />
                 ))
-             )}
+              )}
           </div>
         )}
       </div>

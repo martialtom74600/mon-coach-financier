@@ -9,6 +9,7 @@ import {
   formatCurrency, 
   calculateFutureValue, 
   CONSTANTS,
+  calculateListTotal,
   // ✅ ENUMS
   PaymentMode,
   ItemCategory,

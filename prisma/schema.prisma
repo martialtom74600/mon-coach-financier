@@ -9,11 +9,11 @@ generator client {
 datasource db {
   provider  = "postgresql"
   url       = env("POSTGRES_PRISMA_URL") // Connection pooling
-  directUrl = env("POSTGRES_URL") // Direct connection (Migrations)
+  directUrl = env("POSTGRES_URL")        // Direct connection (Migrations)
 }
 
 // =========================================================
-// 2. ENUMS
+// 2. ENUMS (Listes de choix fixes)
 // =========================================================
 
 enum UserPersona {
@@ -21,6 +21,7 @@ enum UserPersona {
   FREELANCE
   STUDENT
   RETIRED
+  UNEMPLOYED // Ajouté au cas où
 }
 
 enum HousingStatus {
@@ -30,14 +31,13 @@ enum HousingStatus {
   FREE
 }
 
-// ✅ OPTIMISATION : Enum pour la fréquence (évite les fautes de frappe "mensuel" vs "monthly")
 enum Frequency {
   DAILY
   WEEKLY
   MONTHLY
-  QUARTERLY // Trimestriel
-  YEARLY // Annuel
-  ONCE // Ponctuel
+  QUARTERLY
+  YEARLY
+  ONCE
 }
 
 enum ItemCategory {
@@ -49,19 +49,25 @@ enum ItemCategory {
   VARIABLE_COST
 }
 
+// ✅ AMÉLIORATION : Liste exhaustive pour éviter les erreurs de mapping
 enum AssetType {
-  CC
-  LIVRET
-  PEA
-  CTO
-  AV
-  PER
-  PEE
-  CRYPTO
-  REAL_ESTATE
-  GOLD
-  CROWD
-  OTHER
+  CC          // Compte Courant
+  LIVRET      // Livret A, standard
+  LDDS        // Livret Développement Durable
+  LEP         // Livret Épargne Populaire (Celui qui posait problème)
+  PEL         // Plan Épargne Logement
+  CEL         // Compte Épargne Logement
+  PEA         // Plan Épargne Actions
+  CTO         // Compte Titres Ordinaire
+  AV          // Assurance Vie
+  PER         // Plan Épargne Retraite
+  PEE         // Plan Épargne Entreprise
+  CRYPTO      // Actifs numériques
+  REAL_ESTATE // Immobilier Physique
+  SCPI        // Immobilier Papier (Pierre-papier)
+  GOLD        // Matières premières
+  CROWD       // Crowdfunding / Lending
+  OTHER       // Montres, Art, Vin...
 }
 
 enum GoalCategory {
@@ -94,35 +100,37 @@ enum PaymentMode {
 // =========================================================
 
 model User {
-  id        String   @id // ID Clerk
+  id        String   @id // ID Clerk (ex: user_2bX...)
   email     String   @unique
   firstName String?
+  
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  profile FinancialProfile?
+  profile   FinancialProfile?
+
+  @@map("users") // Nom de la table en BDD : 'users'
 }
 
 model FinancialProfile {
-  id     String @id @default(cuid())
-  userId String @unique
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   // --- IDENTITÉ & SITUATION ---
-  age           Int?
-  persona       UserPersona?
-  housingStatus HousingStatus?
+  age               Int?
+  persona           UserPersona?
+  housingStatus     HousingStatus?
+  
+  // Coût du logement (Sert de cache/référence rapide)
+  housingCost       Float         @default(0) 
+  housingPaymentDay Int?          @default(5) 
 
-  // NOTE : Si housingCost est rempli ici, attention à ne pas le doublonner dans FinancialItem
-  housingCost Float @default(0)
-
-  housingPaymentDay Int? @default(5)
-
-  adults   Int @default(1)
-  children Int @default(0)
+  adults            Int           @default(1)
+  children          Int           @default(0)
 
   // --- STRATÉGIE ---
-  funBudget Float @default(0)
+  funBudget         Float         @default(0)
 
   // --- RELATIONS ---
   items     FinancialItem[]
@@ -131,81 +139,90 @@ model FinancialProfile {
   decisions PurchaseDecision[]
 
   updatedAt DateTime @updatedAt
+
+  @@map("financial_profiles")
 }
 
 model FinancialItem {
-  id        String           @id @default(cuid())
+  id        String   @id @default(cuid())
   profileId String
   profile   FinancialProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
 
-  name     String
-  amount   Float        @default(0)
-  category ItemCategory
-
-  // ✅ OPTIMISATION : Utilisation de l'Enum Frequency
-  frequency Frequency @default(MONTHLY)
-
-  // Jour du prélèvement (ex: 1 pour le 1er du mois). 
-  // Astuce : Mettre 32 pour "Fin de mois" dans ton code métier
-  dayOfMonth Int? @default(1)
+  name      String
+  amount    Float        @default(0)
+  category  ItemCategory
+  frequency Frequency    @default(MONTHLY)
+  
+  // Jour du prélèvement (ex: 1). Null si variable.
+  dayOfMonth Int?        @default(1) 
 
   createdAt DateTime @default(now())
+
+  // ✅ OPTIMISATION : Index pour récupérer vite les items d'un profil
+  @@index([profileId])
+  @@map("financial_items")
 }
 
 model Asset {
-  id        String           @id @default(cuid())
+  id        String   @id @default(cuid())
   profileId String
   profile   FinancialProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
 
-  name String
-  type AssetType
+  name         String
+  type         AssetType // Utilise la liste étendue (LEP, PEL, etc.)
+  
+  currentValue Float @default(0) 
+  monthlyFlow  Float @default(0) 
+  transferDay  Int   @default(1) 
 
-  currentValue Float @default(0)
-  monthlyFlow  Float @default(0)
-  transferDay  Int   @default(1)
-
-  // ✅ OPTIMISATION : Relation vers l'historique pour tracer les courbes
-  history AssetHistory[]
+  history      AssetHistory[]
 
   createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt // Utile pour savoir quand le montant a été rafraîchi
+  updatedAt DateTime @updatedAt 
+
+  @@index([profileId])
+  @@map("assets")
 }
 
-// ✅ NOUVEAU : Historique de valeur pour les graphiques
 model AssetHistory {
-  id      String @id @default(cuid())
-  assetId String
-  asset   Asset  @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  id        String   @id @default(cuid())
+  assetId   String
+  asset     Asset    @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  
+  value     Float    // Valeur enregistrée
+  date      DateTime @default(now()) 
 
-  value Float // La valeur à l'instant T
-  date  DateTime @default(now()) // Date de l'enregistrement (snapshot)
-
-  @@index([assetId, date]) // Index pour rendre les requêtes graphiques rapides
+  // ✅ OPTIMISATION : Index composite pour tracer les courbes rapidement
+  @@index([assetId, date])
+  @@map("asset_history")
 }
 
 model FinancialGoal {
-  id        String           @id @default(cuid())
+  id        String   @id @default(cuid())
   profileId String
   profile   FinancialProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
 
-  name     String
-  category GoalCategory @default(OTHER)
-
+  name      String
+  category  GoalCategory @default(OTHER)
+  
   targetAmount        Float
-  currentSaved        Float @default(0)
-  monthlyContribution Float @default(0)
-
-  deadline DateTime
-
-  projectedYield Float @default(0)
-  transferDay    Int?
+  currentSaved        Float    @default(0)
+  monthlyContribution Float    @default(0)
+  
+  deadline            DateTime
+  
+  projectedYield      Float    @default(0)
+  transferDay         Int?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([profileId])
+  @@map("financial_goals")
 }
 
 model PurchaseDecision {
-  id        String           @id @default(cuid())
+  id        String   @id @default(cuid())
   profileId String
   profile   FinancialProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
 
@@ -216,15 +233,16 @@ model PurchaseDecision {
   paymentMode PaymentMode
 
   // --- CONTEXTE ---
-  isPro Boolean @default(false)
-
-  // ✅ OPTIMISATION : Gestion plus fine du remboursement
-  isReimbursable Boolean   @default(false)
-  reimbursedAt   DateTime? // Si null -> Pas encore remboursé. Si date -> Remboursé le...
+  isPro          Boolean @default(false)
+  isReimbursable Boolean @default(false)
+  reimbursedAt   DateTime? 
 
   // --- CRÉDIT / SPLIT ---
-  duration Int? // Mois
-  rate     Float? // Taux
+  duration       Int?    // Mois
+  rate           Float?  // Taux
 
-  createdAt DateTime @default(now())
+  createdAt      DateTime @default(now())
+
+  @@index([profileId])
+  @@map("purchase_decisions")
 }

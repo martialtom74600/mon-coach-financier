@@ -1,22 +1,10 @@
 // app/lib/logic.ts
 
+// On exporte tout depuis definitions (Types, Enums, Constantes)
 export * from './definitions';
+
+// On exporte le moteur de calcul (SAUF s'il y a des conflits, mais là on a nettoyé engine.ts)
 export * from './engine';
+
+// On exporte les scénarios (Timeline, Analyse d'achat)
 export * from './scenarios';
-
-import { computeFinancialPlan, analyzeProfileHealth } from './engine';
-
-export const calculateFinancials = (profile: any) => {
-  const plan = computeFinancialPlan(profile);
-  
-  // ✅ CORRECTION : On lance l'analyse "Docteur" ici
-  const diagnosis = analyzeProfileHealth(profile, plan.budget);
-
-  return {
-    ...plan.budget,
-    totalGoalsEffort: plan.budget.capacity - plan.freeCashFlow, 
-    goalsBreakdown: plan.allocations, 
-    realCashflow: plan.freeCashFlow,
-    diagnosis // <--- Sans ça, le bloc "Coach" ne s'affiche pas !
-  };
-};

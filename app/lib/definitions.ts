@@ -12,7 +12,7 @@ import {
   GoalCategory,
   PurchaseType,
   PaymentMode,
-  Frequency // ✅ Ajouté pour les calculs
+  Frequency
 } from '@prisma/client';
 
 // ============================================================================
@@ -42,24 +42,31 @@ export const GOAL_CATEGORIES: Record<GoalCategory, { id: GoalCategory, priority:
   RETIREMENT:  { id: 'RETIREMENT',  priority: 4, label: 'Retraite',            icon: '🌴', description: 'Long terme' },
 };
 
-// ✅ CONFIGURATION VISUELLE DES ACTIFS
-// L'ID doit matcher l'Enum Prisma (en minuscule ou via un mapping si tu veux garder la casse actuelle)
-// Pour simplifier, ici je garde tes IDs minuscules, mais idéalement il faudrait matcher l'Enum AssetType
+// ✅ CONFIGURATION VISUELLE DES ACTIFS (STRICTE & COMPLÈTE)
+// On utilise DIRECTEMENT l'Enum AssetType. Plus de strings en dur.
 export const ASSET_TYPES = [
-  { id: 'cc',         label: 'Compte Courant',      category: 'LIQUIDITY', color: 'text-slate-600',   bg: 'bg-slate-50',   border: 'border-slate-300' },
-  { id: 'pea',        label: 'PEA / PEA-PME',       category: 'BOURSE',    color: 'text-blue-600',    bg: 'bg-blue-50',    border: 'border-blue-200' },
-  { id: 'av',         label: 'Assurance Vie',       category: 'BOURSE',    color: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-emerald-200' },
-  { id: 'cto',        label: 'Compte Titres (CTO)', category: 'BOURSE',    color: 'text-cyan-600',    bg: 'bg-cyan-50',    border: 'border-cyan-200' },
-  { id: 'per',        label: 'PER (Retraite)',      category: 'BOURSE',    color: 'text-orange-600',  bg: 'bg-orange-50',  border: 'border-orange-200' },
-  { id: 'livret',     label: 'Livrets (A/LDDS)',    category: 'CASH',      color: 'text-rose-600',    bg: 'bg-rose-50',    border: 'border-rose-200' },
-  { id: 'lep',        label: 'LEP (Épargne Pop.)',  category: 'CASH',      color: 'text-pink-600',    bg: 'bg-pink-50',    border: 'border-pink-200' },
-  { id: 'pel',        label: 'PEL / CEL',           category: 'CASH',      color: 'text-slate-600',   bg: 'bg-slate-100',  border: 'border-slate-300' },
-  { id: 'pee',        label: 'Épargne Salariale',   category: 'CASH',      color: 'text-indigo-600',  bg: 'bg-indigo-50',  border: 'border-indigo-200' },
-  { id: 'immo_paper', label: 'SCPI / SIIC',         category: 'IMMO',      color: 'text-amber-600',   bg: 'bg-amber-50',   border: 'border-amber-200' },
-  { id: 'crowd',      label: 'Crowdfunding',        category: 'IMMO',      color: 'text-lime-600',    bg: 'bg-lime-50',    border: 'border-lime-200' },
-  { id: 'immo_phys',  label: 'Immo. Locatif',       category: 'IMMO',      color: 'text-amber-700',   bg: 'bg-amber-100',  border: 'border-amber-300' },
-  { id: 'crypto',     label: 'Crypto / Web3',       category: 'EXOTIC',    color: 'text-purple-600',  bg: 'bg-purple-50',  border: 'border-purple-200' },
-  { id: 'gold',       label: 'Or / Montres / Art',  category: 'EXOTIC',    color: 'text-yellow-600',  bg: 'bg-yellow-50',  border: 'border-yellow-200' },
+  { id: AssetType.CC,          label: 'Compte Courant',      category: 'LIQUIDITY', color: 'text-slate-600',   bg: 'bg-slate-50',   border: 'border-slate-300' },
+  
+  // Épargne sécurisée
+  { id: AssetType.LIVRET,      label: 'Livret A / LDDS',     category: 'CASH',      color: 'text-rose-600',    bg: 'bg-rose-50',    border: 'border-rose-200' },
+  { id: AssetType.LEP,         label: 'LEP (Épargne Pop.)',  category: 'CASH',      color: 'text-pink-600',    bg: 'bg-pink-50',    border: 'border-pink-200' },
+  { id: AssetType.PEL,         label: 'PEL / CEL',           category: 'CASH',      color: 'text-slate-600',   bg: 'bg-slate-100',  border: 'border-slate-300' },
+  { id: AssetType.PEE,         label: 'Épargne Salariale',   category: 'CASH',      color: 'text-indigo-600',  bg: 'bg-indigo-50',  border: 'border-indigo-200' },
+  
+  // Bourse
+  { id: AssetType.PEA,         label: 'PEA / PEA-PME',       category: 'BOURSE',    color: 'text-blue-600',    bg: 'bg-blue-50',    border: 'border-blue-200' },
+  { id: AssetType.CTO,         label: 'Compte Titres (CTO)', category: 'BOURSE',    color: 'text-cyan-600',    bg: 'bg-cyan-50',    border: 'border-cyan-200' },
+  { id: AssetType.AV,          label: 'Assurance Vie',       category: 'BOURSE',    color: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-emerald-200' },
+  { id: AssetType.PER,         label: 'PER (Retraite)',      category: 'BOURSE',    color: 'text-orange-600',  bg: 'bg-orange-50',  border: 'border-orange-200' },
+  
+  // Immo & Exotique
+  { id: AssetType.SCPI,        label: 'SCPI (Pierre-Papier)',category: 'IMMO',      color: 'text-amber-600',   bg: 'bg-amber-50',   border: 'border-amber-200' },
+  { id: AssetType.REAL_ESTATE, label: 'Immo. Locatif',       category: 'IMMO',      color: 'text-amber-700',   bg: 'bg-amber-100',  border: 'border-amber-300' },
+  { id: AssetType.CROWD,       label: 'Crowdfunding',        category: 'IMMO',      color: 'text-lime-600',    bg: 'bg-lime-50',    border: 'border-lime-200' },
+  
+  { id: AssetType.CRYPTO,      label: 'Crypto / Web3',       category: 'EXOTIC',    color: 'text-purple-600',  bg: 'bg-purple-50',  border: 'border-purple-200' },
+  { id: AssetType.GOLD,        label: 'Or / Montres / Art',  category: 'EXOTIC',    color: 'text-yellow-600',  bg: 'bg-yellow-50',  border: 'border-yellow-200' },
+  { id: AssetType.OTHER,       label: 'Autre',               category: 'EXOTIC',    color: 'text-gray-600',    bg: 'bg-gray-50',    border: 'border-gray-200' },
 ] as const;
 
 export const PURCHASE_TYPES = {
@@ -80,7 +87,17 @@ export const PAYMENT_MODES: Record<PaymentMode, string> = {
 // 2. MAPPING BDD -> TYPES APP (SOURCE DE VÉRITÉ)
 // ============================================================================
 
-export type { UserPersona, HousingStatus, ItemCategory, AssetType, GoalCategory, PurchaseType, PaymentMode };
+// ✅ IMPORT CRITIQUE : Export des Enums en tant que Valeurs
+export { 
+  UserPersona, 
+  HousingStatus, 
+  ItemCategory, 
+  AssetType, 
+  GoalCategory, 
+  PurchaseType, 
+  PaymentMode, 
+  Frequency 
+};
 
 // 🔹 Financial Item (Flux)
 export type FinancialItem = PrismaItem;
@@ -130,10 +147,10 @@ export interface Housing { status: HousingStatus; monthlyCost: number; paymentDa
 export interface PersonaRules { safetyMonths: number; maxDebt: number; minLiving: number; }
 
 export interface Profile extends Omit<FinancialProfile, 'createdAt' | 'updatedAt' | 'items' | 'assets' | 'goals' | 'decisions'> {
-  // Champs Frontend spécifiques (optionnels ou transformés)
+  // Champs Frontend spécifiques
   email?: string;
   firstName?: string;
-  mode?: string; // UI mode (beginner/expert) - Pas en DB
+  mode?: string; 
 
   household: Household; 
   housing: Housing;     
@@ -215,14 +232,13 @@ export interface SimulationResult {
 // 5. OBJETS INITIAUX
 // ============================================================================
 
-// ✅ Correction des clés pour matcher l'Enum Prisma 'UserPersona'
+// ✅ Utilisation des Enums en clé
 export const PERSONA_PRESETS: Record<UserPersona, { id: UserPersona, label: string, description: string, rules: PersonaRules }> = {
-  STUDENT:    { id: 'STUDENT',    label: 'Étudiant(e)',         description: 'Budget serré, flexible.',     rules: { safetyMonths: 1, maxDebt: 40, minLiving: 100 } },
-  SALARIED:   { id: 'SALARIED',   label: 'Salarié / Stable',    description: 'Revenus réguliers.',          rules: { safetyMonths: 3, maxDebt: 35, minLiving: 300 } },
-  FREELANCE:  { id: 'FREELANCE',  label: 'Indépendant',         description: 'Revenus variables, risque.',  rules: { safetyMonths: 6, maxDebt: 30, minLiving: 500 } },
-  RETIRED:    { id: 'RETIRED',    label: 'Retraité(e)',         description: 'Revenus fixes, préservation.',rules: { safetyMonths: 6, maxDebt: 25, minLiving: 400 } },
-  // Note: Si 'UNEMPLOYED' n'est pas dans ton Enum Prisma, mappe le sur 'STUDENT' ou ajoute le à l'Enum.
-  // Pour l'instant je ne l'inclus pas pour éviter l'erreur de type si il n'est pas dans l'Enum.
+  [UserPersona.STUDENT]:    { id: 'STUDENT',    label: 'Étudiant(e)',         description: 'Budget serré, flexible.',     rules: { safetyMonths: 1, maxDebt: 40, minLiving: 100 } },
+  [UserPersona.SALARIED]:   { id: 'SALARIED',   label: 'Salarié / Stable',    description: 'Revenus réguliers.',          rules: { safetyMonths: 3, maxDebt: 35, minLiving: 300 } },
+  [UserPersona.FREELANCE]:  { id: 'FREELANCE',  label: 'Indépendant',         description: 'Revenus variables, risque.',  rules: { safetyMonths: 6, maxDebt: 30, minLiving: 500 } },
+  [UserPersona.RETIRED]:    { id: 'RETIRED',    label: 'Retraité(e)',         description: 'Revenus fixes, préservation.',rules: { safetyMonths: 6, maxDebt: 25, minLiving: 400 } },
+  [UserPersona.UNEMPLOYED]: { id: 'UNEMPLOYED', label: 'En recherche',        description: 'Budget de transition.',       rules: { safetyMonths: 6, maxDebt: 10, minLiving: 100 } },
 };
 
 export const INITIAL_PROFILE: Profile = {
@@ -230,15 +246,15 @@ export const INITIAL_PROFILE: Profile = {
   userId: 'temp',
   firstName: '', 
   age: 0, 
-  persona: 'SALARIED', 
+  persona: UserPersona.SALARIED, 
   mode: 'beginner',
   household: { adults: 1, children: 0 },
-  housing: { status: 'TENANT', monthlyCost: 0, paymentDay: 5 }, 
+  housing: { status: HousingStatus.TENANT, monthlyCost: 0, paymentDay: 5 }, 
   housingCost: 0,
   housingPaymentDay: 5,
   adults: 1,
   children: 0,
-  housingStatus: 'TENANT',
+  housingStatus: HousingStatus.TENANT,
   funBudget: 0,
   
   savings: 0, 
@@ -278,7 +294,7 @@ export const calculateFutureValue = (principal: number, rate: number, years: num
   return principal * Math.pow((1 + rate), years);
 };
 
-// ✅ Correction majeure : Utilisation de l'Enum Frequency
+// ✅ UTILITAIRE MAJEUR : Utilisation de l'Enum Frequency
 export const calculateListTotal = (items: FinancialItem[]): number => {
   if (!Array.isArray(items)) return 0; 
   
@@ -288,7 +304,9 @@ export const calculateListTotal = (items: FinancialItem[]): number => {
     // Si c'est Annuel ou Trimestriel, on mensualise
     if (item.frequency === Frequency.YEARLY) amount = amount / 12;
     if (item.frequency === Frequency.QUARTERLY) amount = amount / 3;
-    if (item.frequency === Frequency.WEEKLY) amount = amount * 4.33; // Moyenne semaines/mois
+    if (item.frequency === Frequency.WEEKLY) amount = amount * 4.33;
+    if (item.frequency === Frequency.DAILY) amount = amount * 30;
+    if (item.frequency === Frequency.ONCE) amount = 0; // On ne compte pas le ponctuel dans le budget mensuel
 
     return acc + amount;
   }, 0);

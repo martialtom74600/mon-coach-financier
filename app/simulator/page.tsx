@@ -3,11 +3,15 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useFinancialData } from '@/app/hooks/useFinancialData';
+
+// ✅ MISE À JOUR DES IMPORTS LOGIQUE
 import {
-  analyzePurchaseImpact,
   formatCurrency,
-  calculateFinancials,
+  computeFinancialPlan, // Nouveau moteur
 } from '@/app/lib/logic';
+
+// ✅ IMPORT DU SCÉNARIO D'ACHAT (Déplacé ici)
+import { analyzePurchaseImpact } from '@/app/lib/scenarios';
 
 // ✅ IMPORT DES ENUMS (Source de vérité)
 import { 
@@ -164,17 +168,21 @@ const DiagnosticCard = ({ result }: { result: any }) => {
 export default function SimulatorPage() {
   const router = useRouter();
   
-  // ✅ ON RÉCUPÈRE addDecision DEPUIS LE HOOK
   const { profile, history, isLoaded, addDecision } = useFinancialData();
   
-  const stats = useMemo(() => calculateFinancials(profile), [profile]);
+  // ✅ ADAPTATION NOUVEAU MOTEUR (computeFinancialPlan)
+  const stats = useMemo(() => {
+      if (!profile) return { monthlyIncome: 0, matelas: 0, remainingToLive: 0, totalGoalsEffort: 0 };
+      const plan = computeFinancialPlan(profile);
+      return plan.budget; 
+  }, [profile]);
+
   const isProfileEmpty = stats.monthlyIncome === 0 && stats.matelas === 0;
   
   const [step, setStep] = useState<'input' | 'result'>('input');
   const [isSaving, setIsSaving] = useState(false);
   const today = new Date().toISOString().split('T')[0];
 
-  // ✅ STATE INITIALISÉ AVEC LES ENUMS
   const [purchase, setPurchase] = useState({
     name: '',
     type: PurchaseType.NEED, 
@@ -191,6 +199,7 @@ export default function SimulatorPage() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, [step]);
 
+  // ✅ APPEL DE L'ANALYSE (scenarios.ts)
   const result = useMemo(() => {
     if (step === 'result') {
       return analyzePurchaseImpact(stats, purchase, profile, history);
@@ -198,13 +207,12 @@ export default function SimulatorPage() {
     return null;
   }, [step, stats, purchase, profile, history]);
 
-  // ✅ SAUVEGARDE VIA LE HOOK (Beaucoup plus propre)
+  // ✅ SAUVEGARDE VIA LE HOOK
   const handleSavePurchase = async () => {
     if (!result) return;
     setIsSaving(true);
 
     try {
-        // Conversion des types pour Prisma (String -> Number)
         const payload = {
             ...purchase,
             amount: parseFloat(purchase.amount),
@@ -212,10 +220,8 @@ export default function SimulatorPage() {
             rate: purchase.rate ? parseFloat(purchase.rate) : null,
         };
 
-        // Appel de la fonction du hook qui gère le fetch et le refresh
         await addDecision(payload);
 
-        // Succès : Reset UI
         setStep('input');
         setPurchase({
             name: '',
