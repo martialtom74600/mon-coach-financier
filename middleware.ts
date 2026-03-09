@@ -43,5 +43,8 @@ export const config = {
     // Configuration standard pour ignorer les fichiers statiques (images, css...)
     '/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)',
     '/(api|trpc)(.*)',
+    // PWA : sw.js et worker-*.js doivent passer par le middleware pour que Clerk soit initialisé
+    '/sw.js',
+    '/worker-:hash.js',
   ],
 };
