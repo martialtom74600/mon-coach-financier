@@ -92,7 +92,7 @@ export async function sendPushForInsight(
       if (status === 410 || status === 404) {
         invalidEndpoints.push(sub.endpoint);
       }
-      logger.warn('PUSH_SEND_FAILED', { profileId, endpoint: sub.endpoint, status }, err);
+      logger.warn('PUSH_SEND_FAILED', { profileId, endpoint: sub.endpoint, status, error: String(err) });
     }
   }
 

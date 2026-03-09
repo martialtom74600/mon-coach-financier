@@ -26,7 +26,7 @@ import { StepStrategy } from './steps/StepStrategy';
 export default function ProfileWizard() {
   const router = useRouter();
   const { profile, isLoaded } = useFinancialData();
-  const showToast = useToast();
+  const { showToast } = useToast();
   const [currentStep, setCurrentStep] = useState(1);
   const [formData, setFormData] = useState<FormProfile | null>(null);
   const [isSaving, setIsSaving] = useState(false);

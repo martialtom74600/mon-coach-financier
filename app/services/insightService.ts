@@ -89,13 +89,11 @@ export async function listInsights(
   const cutoff = new Date();
   cutoff.setDate(cutoff.getDate() - RETENTION_DAYS);
 
-  const where: Parameters<typeof prisma.insight.findMany>[0]['where'] = {
-    profileId,
-    createdAt: { gte: cutoff },
-  };
-
   let insights = await prisma.insight.findMany({
-    where,
+    where: {
+      profileId,
+      createdAt: { gte: cutoff },
+    },
     orderBy: { createdAt: 'desc' },
     take: limit * 2,
   });

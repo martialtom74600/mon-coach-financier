@@ -3,17 +3,26 @@
  * Injecté dans le service worker par next-pwa (customWorkerSrc).
  * Gère l'événement 'push' pour afficher les notifications proactives.
  */
+/// <reference lib="webworker" />
 
-declare const self: ServiceWorkerGlobalScope;
+interface SWScope {
+  addEventListener: (type: string, listener: (e: Event) => void) => void;
+  registration: ServiceWorkerRegistration;
+  clients: Clients;
+  location: { origin: string };
+}
 
-self.addEventListener('push', (event: PushEvent) => {
-  if (!event.data) return;
+const sw = self as unknown as SWScope;
+
+sw.addEventListener('push', (event: Event) => {
+  const e = event as ExtendableMessageEvent & { data?: { json(): unknown; text(): string } };
+  if (!e.data) return;
 
   let payload: { title?: string; body?: string; url?: string; insightId?: string } = {};
   try {
-    payload = event.data.json();
+    payload = e.data.json();
   } catch {
-    payload = { title: 'Mon Coach Financier', body: event.data.text() || 'Nouvelle alerte' };
+    payload = { title: 'Mon Coach Financier', body: e.data.text() || 'Nouvelle alerte' };
   }
 
   const title = payload.title ?? 'Mon Coach Financier';
@@ -25,29 +34,29 @@ self.addEventListener('push', (event: PushEvent) => {
     icon: '/icon-192.png',
     badge: '/icon-192.png',
     tag: payload.insightId ?? 'insight',
-    renotify: true,
     data: { url },
   };
 
-  event.waitUntil(
-    self.registration.showNotification(title, options)
+  (event as ExtendableEvent).waitUntil(
+    sw.registration.showNotification(title, options)
   );
 });
 
-self.addEventListener('notificationclick', (event: NotificationEvent) => {
-  event.notification.close();
+sw.addEventListener('notificationclick', (event: Event) => {
+  const ne = event as NotificationEvent;
+  ne.notification.close();
 
-  const url = (event.notification.data?.url as string) ?? '/';
-  event.waitUntil(
-    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
+  const url = (ne.notification.data?.url as string) ?? '/';
+  (event as ExtendableEvent).waitUntil(
+    sw.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
       for (const client of clientList) {
-        if (client.url.includes(self.location.origin) && 'focus' in client) {
+        if (client.url.includes(sw.location.origin) && 'focus' in client) {
           client.navigate(url);
           return client.focus();
         }
       }
-      if (self.clients.openWindow) {
-        return self.clients.openWindow(url);
+      if (sw.clients.openWindow) {
+        return sw.clients.openWindow(url);
       }
     })
   );

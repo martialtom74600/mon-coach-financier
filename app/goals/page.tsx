@@ -20,7 +20,7 @@ import { applyStrategyToForm } from '@/app/components/goals/applyStrategyToForm'
 
 export default function GoalsPage() {
   const { profile, isLoaded, saveGoal, deleteGoal } = useFinancialData();
-  const showToast = useToast();
+  const { showToast } = useToast();
   const { state: confirmDelete, openConfirm, closeConfirm, wrapConfirm } = useConfirmDelete();
 
   const stats = useMemo(() => {

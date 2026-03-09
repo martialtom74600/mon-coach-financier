@@ -25,7 +25,7 @@ import { DiagnosticCard } from '@/app/components/simulator/DiagnosticCard';
 export default function SimulatorPage() {
   const router = useRouter();
   const { profile, isLoaded, addDecision } = useFinancialData();
-  const showToast = useToast();
+  const { showToast } = useToast();
 
   const stats = useMemo(() => {
     if (!profile) return EMPTY_BUDGET_RESULT;

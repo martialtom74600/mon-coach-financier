@@ -297,7 +297,7 @@ export function useFinancialData() {
         setProfile((prev) => ({
           ...prev,
           decisions: (prev.decisions || []).map((d) =>
-            d.id === id && previous ? { ...d, outcome: (previous as { outcome?: string }).outcome } : d
+            d.id === id && previous ? { ...d, outcome: previous.outcome ?? null } : d
           ),
         }));
       }
@@ -306,7 +306,7 @@ export function useFinancialData() {
       setProfile((prev) => ({
         ...prev,
         decisions: (prev.decisions || []).map((d) =>
-          d.id === id && previous ? { ...d, outcome: (previous as { outcome?: string }).outcome } : d
+          d.id === id && previous ? { ...d, outcome: previous.outcome ?? null } : d
         ),
       }));
     }

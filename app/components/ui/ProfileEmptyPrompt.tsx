@@ -18,7 +18,7 @@ export default function ProfileEmptyPrompt({
   message,
   buttonLabel = '',
   onAction = () => {},
-  icon: Icon = () => null,
+  icon: Icon = ArrowRight,
   variant = 'full',
 }: ProfileEmptyPromptProps) {
   if (variant === 'minimal') {
