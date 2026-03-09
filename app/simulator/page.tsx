@@ -18,7 +18,11 @@ import {
   PURCHASE_TYPES, 
   PAYMENT_MODES, 
   PurchaseType, 
-  PaymentMode 
+  PaymentMode,
+  Purchase,
+  AnalysisResult,
+  AnalysisTip,
+  AnalysisIssue,
 } from '@/app/lib/definitions';
 
 import {
@@ -34,7 +38,15 @@ import Badge from '@/app/components/ui/Badge';
 
 // --- COMPOSANTS UI LOCAUX ---
 
-const ContextToggle = ({ label, subLabel, icon: Icon, checked, onChange }: any) => (
+interface ContextToggleProps {
+  label: string;
+  subLabel: string;
+  icon: React.ComponentType<{ size?: number | string }>;
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+}
+
+const ContextToggle = ({ label, subLabel, icon: Icon, checked, onChange }: ContextToggleProps) => (
   <label className={`flex items-center gap-4 p-4 border rounded-xl cursor-pointer transition-all duration-200 ${checked ? 'bg-indigo-50 border-indigo-200 ring-1 ring-indigo-200' : 'bg-white border-slate-200 hover:bg-slate-50'}`}>
     <div className={`p-2 rounded-lg ${checked ? 'bg-indigo-100 text-indigo-600' : 'bg-slate-100 text-slate-400'}`}>
       <Icon size={20} />
@@ -50,11 +62,13 @@ const ContextToggle = ({ label, subLabel, icon: Icon, checked, onChange }: any) 
   </label>
 );
 
-const PurchaseRecap = ({ purchase }: { purchase: any }) => {
-  // @ts-ignore
-  const typeInfo = PURCHASE_TYPES[purchase.type] || { label: purchase.type, color: 'bg-gray-100 text-gray-600' };
-  // @ts-ignore
-  const paymentLabel = PAYMENT_MODES[purchase.paymentMode] || purchase.paymentMode;
+const PurchaseRecap = ({ purchase }: { purchase: Purchase }) => {
+  const typeInfo = purchase.type && purchase.type in PURCHASE_TYPES
+    ? PURCHASE_TYPES[purchase.type]
+    : { label: purchase.type ?? 'Inconnu', color: 'bg-gray-100 text-gray-600' };
+  const paymentLabel = purchase.paymentMode in PAYMENT_MODES
+    ? PAYMENT_MODES[purchase.paymentMode as PaymentMode]
+    : purchase.paymentMode;
 
   return (
       <Card className="p-5 border-slate-200 bg-white">
@@ -71,7 +85,7 @@ const PurchaseRecap = ({ purchase }: { purchase: any }) => {
   )
 };
 
-const DiagnosticCard = ({ result }: { result: any }) => {
+const DiagnosticCard = ({ result }: { result: AnalysisResult | null }) => {
   if (!result) return null;
   const theme = {
     green: { bg: 'bg-emerald-600', icon: CheckCircle },
@@ -135,7 +149,7 @@ const DiagnosticCard = ({ result }: { result: any }) => {
 
       {result.tips.length > 0 && (
         <div className="p-5 bg-white space-y-3">
-             {result.tips.map((tip: any, i: number) => (
+             {result.tips.map((tip: AnalysisTip, i: number) => (
                 <div key={i} className="flex gap-3 text-sm text-slate-600 items-start">
                    <div className="mt-0.5 text-indigo-500 shrink-0"><Info size={16} /></div>
                    <div className="leading-relaxed">{tip.text}</div>
@@ -148,7 +162,7 @@ const DiagnosticCard = ({ result }: { result: any }) => {
           <div className="px-5 pb-4 bg-white">
             <div className="pt-4 border-t border-slate-100">
                <p className="text-xs font-bold text-slate-400 mb-2">Points d&apos;attention :</p>
-               {result.issues.map((issue: any, i: number) => (
+               {result.issues.map((issue: AnalysisIssue, i: number) => (
                  <div key={i} className="text-xs font-medium text-slate-500 flex gap-2 items-center mb-1">
                    <div className={`w-1.5 h-1.5 rounded-full ${issue.level === 'red' ? 'bg-rose-500' : 'bg-amber-500'}`}></div>
                    {issue.text}
@@ -168,7 +182,7 @@ const DiagnosticCard = ({ result }: { result: any }) => {
 export default function SimulatorPage() {
   const router = useRouter();
   
-  const { profile, history, isLoaded, addDecision } = useFinancialData();
+  const { profile, isLoaded, addDecision } = useFinancialData();
   
   // ✅ ADAPTATION NOUVEAU MOTEUR (computeFinancialPlan)
   const stats = useMemo(() => {
@@ -183,7 +197,11 @@ export default function SimulatorPage() {
   const [isSaving, setIsSaving] = useState(false);
   const today = new Date().toISOString().split('T')[0];
 
-  const [purchase, setPurchase] = useState({
+  const [purchase, setPurchase] = useState<{
+    name: string; type: PurchaseType; amount: string; date: string;
+    paymentMode: PaymentMode; duration: string; rate: string;
+    isReimbursable: boolean; isPro: boolean;
+  }>({
     name: '',
     type: PurchaseType.NEED, 
     amount: '',
@@ -202,10 +220,10 @@ export default function SimulatorPage() {
   // ✅ APPEL DE L'ANALYSE (scenarios.ts)
   const result = useMemo(() => {
     if (step === 'result') {
-      return analyzePurchaseImpact(stats, purchase, profile, history);
+      return analyzePurchaseImpact(stats, purchase, profile, profile?.decisions || []);
     }
     return null;
-  }, [step, stats, purchase, profile, history]);
+  }, [step, stats, purchase, profile]);
 
   // ✅ SAUVEGARDE VIA LE HOOK
   const handleSavePurchase = async () => {
@@ -284,8 +302,8 @@ export default function SimulatorPage() {
               <div>
                 <label className="block text-sm font-medium text-slate-600 mb-2">Quel type d&apos;achat ?</label>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                  {Object.values(PURCHASE_TYPES).map((type: any) => (
-                    <button key={type.id} onClick={() => setPurchase({ ...purchase, type: type.id })} className={`p-3 rounded-lg text-sm font-medium border-2 transition-all text-left sm:text-center group ${purchase.type === type.id ? type.color : 'bg-white border-slate-100 text-slate-500 hover:border-slate-200'}`}>
+                  {Object.values(PURCHASE_TYPES).map((type) => (
+                    <button key={type.id} onClick={() => setPurchase({ ...purchase, type: type.id as PurchaseType })} className={`p-3 rounded-lg text-sm font-medium border-2 transition-all text-left sm:text-center group ${purchase.type === type.id ? type.color : 'bg-white border-slate-100 text-slate-500 hover:border-slate-200'}`}>
                       <div className="font-bold mb-1">{type.label}</div>
                       <div className="text-xs opacity-70 font-normal hidden sm:block">{type.description}</div>
                     </button>
@@ -301,7 +319,7 @@ export default function SimulatorPage() {
               <div>
                 <label className="block text-sm font-medium text-slate-600 mb-2">Comment tu paies ?</label>
                 <select className="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500" value={purchase.paymentMode} onChange={(e) => setPurchase({ ...purchase, paymentMode: e.target.value as PaymentMode })}>
-                  {Object.entries(PAYMENT_MODES).map(([key, label]: any) => <option key={key} value={key}>{label}</option>)}
+                  {Object.entries(PAYMENT_MODES).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
                 </select>
               </div>
               

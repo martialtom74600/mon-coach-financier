@@ -1,32 +1,24 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
-import { prisma } from '@/app/lib/prisma';
-import { AssetType } from '@prisma/client';
+import { createAssetSchema, validationError } from '@/app/lib/validations';
+import { assetService, ServiceError } from '@/app/services';
 
 export async function POST(req: Request) {
   const { userId } = auth();
   if (!userId) return new NextResponse("Non autorisé", { status: 401 });
 
-  const body = await req.json();
-  const profile = await prisma.financialProfile.findUnique({ where: { userId }, select: { id: true } });
+  try {
+    const body = await req.json();
+    const parsed = createAssetSchema.safeParse(body);
+    if (!parsed.success) return validationError(parsed.error);
 
-  if (!profile) return new NextResponse("Profil introuvable", { status: 404 });
-
-  // Création de l'asset
-  const newAsset = await prisma.asset.create({
-    data: {
-      profileId: profile.id,
-      name: body.name,
-      type: body.type as AssetType,
-      currentValue: parseFloat(body.currentValue),
-      monthlyFlow: parseFloat(body.monthlyFlow || 0),
-      transferDay: parseInt(body.transferDay || 1),
-      // On crée tout de suite un point d'historique initial
-      history: {
-        create: { value: parseFloat(body.currentValue) }
-      }
+    const newAsset = await assetService.createAsset(userId, parsed.data);
+    return NextResponse.json(newAsset);
+  } catch (error) {
+    if (error instanceof ServiceError) {
+      return new NextResponse(error.message, { status: error.status });
     }
-  });
-
-  return NextResponse.json(newAsset);
+    console.error("[API_POST_ASSET]", error);
+    return new NextResponse("Erreur interne", { status: 500 });
+  }
 }

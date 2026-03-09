@@ -11,13 +11,6 @@ const nextConfig = {
       },
     ],
   },
-  // On évite que des petites erreurs de style bloquent le déploiement
-  eslint: {
-    ignoreDuringBuilds: true,
-  },
-  typescript: {
-    ignoreBuildErrors: true,
-  },
 };
 
 // Configuration PWA intelligente

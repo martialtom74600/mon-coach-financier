@@ -123,14 +123,14 @@ model FinancialProfile {
   housingStatus     HousingStatus?
   
   // Coût du logement (Sert de cache/référence rapide)
-  housingCost       Float         @default(0) 
+  housingCost       Decimal       @default(0) @db.Decimal(12, 2)
   housingPaymentDay Int?          @default(5) 
 
   adults            Int           @default(1)
   children          Int           @default(0)
 
   // --- STRATÉGIE ---
-  funBudget         Float         @default(0)
+  funBudget         Decimal       @default(0) @db.Decimal(12, 2)
 
   // --- RELATIONS ---
   items     FinancialItem[]
@@ -149,7 +149,7 @@ model FinancialItem {
   profile   FinancialProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
 
   name      String
-  amount    Float        @default(0)
+  amount    Decimal      @default(0) @db.Decimal(12, 2)
   category  ItemCategory
   frequency Frequency    @default(MONTHLY)
   
@@ -171,8 +171,8 @@ model Asset {
   name         String
   type         AssetType // Utilise la liste étendue (LEP, PEL, etc.)
   
-  currentValue Float @default(0) 
-  monthlyFlow  Float @default(0) 
+  currentValue Decimal @default(0) @db.Decimal(12, 2)
+  monthlyFlow  Decimal @default(0) @db.Decimal(12, 2)
   transferDay  Int   @default(1) 
 
   history      AssetHistory[]
@@ -189,7 +189,7 @@ model AssetHistory {
   assetId   String
   asset     Asset    @relation(fields: [assetId], references: [id], onDelete: Cascade)
   
-  value     Float    // Valeur enregistrée
+  value     Decimal  @db.Decimal(12, 2) // Valeur enregistrée
   date      DateTime @default(now()) 
 
   // ✅ OPTIMISATION : Index composite pour tracer les courbes rapidement
@@ -205,13 +205,13 @@ model FinancialGoal {
   name      String
   category  GoalCategory @default(OTHER)
   
-  targetAmount        Float
-  currentSaved        Float    @default(0)
-  monthlyContribution Float    @default(0)
+  targetAmount        Decimal  @db.Decimal(12, 2)
+  currentSaved        Decimal  @default(0) @db.Decimal(12, 2)
+  monthlyContribution Decimal  @default(0) @db.Decimal(12, 2)
   
   deadline            DateTime
   
-  projectedYield      Float    @default(0)
+  projectedYield      Decimal  @default(0) @db.Decimal(5, 2)
   transferDay         Int?
 
   createdAt DateTime @default(now())
@@ -227,7 +227,7 @@ model PurchaseDecision {
   profile   FinancialProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
 
   name        String
-  amount      Float
+  amount      Decimal  @db.Decimal(12, 2)
   date        DateTime
   type        PurchaseType
   paymentMode PaymentMode
@@ -239,7 +239,7 @@ model PurchaseDecision {
 
   // --- CRÉDIT / SPLIT ---
   duration       Int?    // Mois
-  rate           Float?  // Taux
+  rate           Decimal?  @db.Decimal(5, 2) // Taux
 
   createdAt      DateTime @default(now())
 

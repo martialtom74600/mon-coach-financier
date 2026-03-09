@@ -12,7 +12,7 @@ import {
 } from '@/app/lib/logic';
 
 // 👇 IMPORT ENUMS (Source de vérité)
-import { GoalCategory, Goal } from '@/app/lib/definitions';
+import { GoalCategory, Goal, GoalStrategy, GoalProjectionPoint, GoalAllocation, GoalScenarioInput } from '@/app/lib/definitions';
 
 // 👇 IMPORTS ICONES
 import {
@@ -37,16 +37,36 @@ import { GOAL_CATEGORIES } from '@/app/lib/definitions'; // Import direct depuis
 // HELPERS UI
 // ============================================================================
 
-const applyStrategyToForm = (strategy: any, currentForm: any) => {
-    let updates: any = {};
+interface GoalFormData {
+  name: string;
+  category: string;
+  targetAmount: string;
+  currentSaved: string;
+  deadline: string;
+  projectedYield: string;
+  transferDay: string;
+}
+
+interface ContextToggleProps {
+  label: string;
+  subLabel: string;
+  icon: React.ComponentType<{ size?: number | string }>;
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+}
+
+const applyStrategyToForm = (strategy: GoalStrategy, currentForm: GoalFormData) => {
+    let updates: Partial<GoalFormData> = {};
     let triggerSavings = false;
 
     if (strategy.type === 'TIME' || strategy.type === 'HYBRID') {
-        const dateStr = new Date(strategy.value).toISOString().split('T')[0];
-        updates = { deadline: dateStr };
+        if (strategy.value != null) {
+            const dateStr = new Date(strategy.value as string | number).toISOString().split('T')[0];
+            updates = { deadline: dateStr };
+        }
     } 
     else if (strategy.type === 'BUDGET' && strategy.actionLabel === "Simuler un virement") {
-        const addedAmount = strategy.value;
+        const addedAmount = Number(strategy.value) || 0;
         const current = parseFloat(String(currentForm.currentSaved)) || 0;
         updates = { currentSaved: (current + addedAmount).toString() };
         triggerSavings = true;
@@ -55,7 +75,7 @@ const applyStrategyToForm = (strategy: any, currentForm: any) => {
     return { updates, triggerSavings };
 };
 
-const ProjectionChart = ({ data }: { data: any[] }) => {
+const ProjectionChart = ({ data }: { data: GoalProjectionPoint[] }) => {
   if (!data || data.length === 0) return null;
   return (
     <div className="h-[200px] w-full mt-4 animate-fade-in">
@@ -100,7 +120,7 @@ const StrategyIcon = ({ type }: { type: string }) => {
     }
 };
 
-const ContextToggle = ({ label, subLabel, icon: Icon, checked, onChange }: any) => (
+const ContextToggle = ({ label, subLabel, icon: Icon, checked, onChange }: ContextToggleProps) => (
   <label className={`flex items-center gap-4 p-4 border rounded-xl cursor-pointer transition-all duration-200 ${checked ? 'bg-emerald-50 border-emerald-200 ring-1 ring-emerald-200' : 'bg-white border-slate-200 hover:bg-slate-50'}`}>
     <div className={`p-2 rounded-lg ${checked ? 'bg-emerald-100 text-emerald-600' : 'bg-slate-100 text-slate-400'}`}>
       <Icon size={20} />
@@ -117,8 +137,9 @@ const ContextToggle = ({ label, subLabel, icon: Icon, checked, onChange }: any) 
 );
 
 const GoalItemCard = ({ goal, onDelete }: { goal: Goal, onDelete: (id: string) => void }) => {
-  // @ts-ignore - Fallback si la catégorie n'est pas dans la liste UI
-  const catInfo = GOAL_CATEGORIES[goal.category] || { label: 'Autre', icon: '🎯' };
+  const catInfo = goal.category in GOAL_CATEGORIES
+    ? GOAL_CATEGORIES[goal.category as GoalCategory]
+    : { label: 'Autre', icon: '🎯' };
   
   return (
       <Card className="p-5 border-slate-200 bg-white group hover:border-emerald-200 transition-all">
@@ -182,7 +203,7 @@ export default function GoalsPage() {
   const [isSaving, setIsSaving] = useState(false);
   
   // State Local (Formulaire)
-  const [newGoal, setNewGoal] = useState<any>({
+  const [newGoal, setNewGoal] = useState<GoalFormData>({
     name: '', category: 'REAL_ESTATE', targetAmount: '', currentSaved: '', deadline: '', projectedYield: '', transferDay: ''
   });
   const [hasSavings, setHasSavings] = useState(false);
@@ -191,14 +212,23 @@ export default function GoalsPage() {
   useEffect(() => { window.scrollTo({ top: 0, behavior: 'smooth' }); }, [step, inputStep]);
   
   useEffect(() => {
-    if (!hasSavings) setNewGoal((prev: any) => ({ ...prev, currentSaved: '' }));
-    if (!isInvested) setNewGoal((prev: any) => ({ ...prev, projectedYield: '' }));
+    if (!hasSavings) setNewGoal((prev: GoalFormData) => ({ ...prev, currentSaved: '' }));
+    if (!isInvested) setNewGoal((prev: GoalFormData) => ({ ...prev, projectedYield: '' }));
   }, [hasSavings, isInvested]);
 
   const simulation = useMemo(() => {
       if (inputStep !== 'check') return null;
       // On passe les stats calculées au simulateur
-      return simulateGoalScenario(newGoal, profile, stats);
+      const input: GoalScenarioInput = {
+        name: newGoal.name,
+        category: newGoal.category as GoalCategory,
+        targetAmount: parseFloat(newGoal.targetAmount) || 0,
+        currentSaved: parseFloat(newGoal.currentSaved) || 0,
+        deadline: new Date(newGoal.deadline),
+        projectedYield: parseFloat(newGoal.projectedYield) || 0,
+        isInvested: isInvested,
+      };
+      return simulateGoalScenario(input, profile, stats);
   }, [inputStep, newGoal, profile, stats]);
 
   const displayedGoalsEffort = (inputStep === 'check' && simulation) 
@@ -210,7 +240,7 @@ export default function GoalsPage() {
 
   // --- Handlers UI ---
 
-  const handleApplyStrategy = (strategy: any) => {
+  const handleApplyStrategy = (strategy: GoalStrategy) => {
     const { updates, triggerSavings } = applyStrategyToForm(strategy, newGoal);
     setNewGoal({ ...newGoal, ...updates });
     if (triggerSavings) setHasSavings(true);
@@ -227,10 +257,10 @@ export default function GoalsPage() {
             name: newGoal.name,
             category: newGoal.category as GoalCategory,
             targetAmount: parseFloat(newGoal.targetAmount),
-            currentSaved: parseFloat(newGoal.currentSaved || 0),
+            currentSaved: parseFloat(newGoal.currentSaved || '0'),
             monthlyContribution: simulation.monthlyEffort,
             deadline: new Date(newGoal.deadline), 
-            projectedYield: parseFloat(newGoal.projectedYield || 0),
+            projectedYield: parseFloat(newGoal.projectedYield || '0'),
             transferDay: newGoal.transferDay ? parseInt(newGoal.transferDay) : null
         };
 
@@ -301,7 +331,7 @@ export default function GoalsPage() {
                     <div>
                         <label className="block text-sm font-medium text-slate-600 mb-2">Type de projet</label>
                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                        {Object.values(GOAL_CATEGORIES).map((cat: any) => (
+                        {Object.values(GOAL_CATEGORIES).map((cat) => (
                             <button key={cat.id} onClick={() => setNewGoal({ ...newGoal, category: cat.id })} className={`p-2 rounded-lg text-xs font-medium border transition-all text-center hover:scale-105 ${newGoal.category === cat.id ? 'bg-emerald-50 border-emerald-500 text-emerald-800 ring-1 ring-emerald-500' : 'bg-white border-slate-100 text-slate-500 hover:border-slate-300'}`}>
                                 <div className="text-lg mb-1">{cat.icon}</div>
                                 {cat.label}
@@ -396,7 +426,7 @@ export default function GoalsPage() {
                                     <Settings size={14} /> Stratégies pour optimiser :
                                 </h3>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    {simulation.diagnosis.strategies.map((strat: any, i: number) => (
+                                    {simulation.diagnosis.strategies.map((strat: GoalStrategy, i: number) => (
                                         <div key={i} className={`flex flex-col p-4 border rounded-xl transition-colors relative overflow-hidden ${strat.painLevel === 'HIGH' ? 'bg-rose-50 border-rose-100' : 'bg-slate-50 border-slate-200 hover:border-indigo-200'}`}>
                                             <div className="flex items-center gap-2 mb-2 font-bold text-slate-800">
                                                 <div className="p-1.5 bg-white rounded-lg text-indigo-600 shadow-sm border border-slate-100">
@@ -467,7 +497,7 @@ export default function GoalsPage() {
                      <Button variant="outline" className="mt-4" onClick={() => { setStep('input'); setInputStep('form'); }}>Créer mon premier objectif</Button>
                   </div>
               ) : (
-                stats.goalsBreakdown.map((goal: any) => (
+                (profile?.goals || []).map((goal: Goal) => (
                     <GoalItemCard key={goal.id} goal={goal} onDelete={handleDeleteGoal} />
                 ))
               )}

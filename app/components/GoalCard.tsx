@@ -7,10 +7,11 @@ import {
 } from 'lucide-react';
 import { useGoalManager } from '@/app/hooks/useGoalManager';
 import Card from '@/app/components/ui/Card';
+import { Goal, GoalStrategy, formatCurrency } from '@/app/lib/definitions';
 
 interface GoalCardProps {
   goal: Goal;
-  onDelete: (id: string) => void; // <--- Nouvelle prop
+  onDelete: (id: string) => void;
 }
 
 export default function GoalCard({ goal, onDelete }: GoalCardProps) {
@@ -27,12 +28,13 @@ export default function GoalCard({ goal, onDelete }: GoalCardProps) {
   const target = typeof goal.targetAmount === 'string' ? parseFloat(goal.targetAmount) : goal.targetAmount;
   const percent = Math.min(100, Math.max(0, (current / target) * 100));
 
-  const theme = {
+  const themeMap: Record<string, { bg: string; border: string; text: string; bar: string; icon: typeof CheckCircle }> = {
     green: { bg: 'bg-emerald-50', border: 'border-emerald-100', text: 'text-emerald-700', bar: 'bg-emerald-500', icon: CheckCircle },
     red: { bg: 'bg-rose-50', border: 'border-rose-100', text: 'text-rose-700', bar: 'bg-rose-500', icon: AlertTriangle },
     orange: { bg: 'bg-amber-50', border: 'border-amber-100', text: 'text-amber-700', bar: 'bg-amber-500', icon: AlertTriangle },
     black: { bg: 'bg-slate-50', border: 'border-slate-200', text: 'text-slate-700', bar: 'bg-slate-500', icon: AlertTriangle },
-  }[color] || { bg: 'bg-slate-50', border: 'border-slate-100', text: 'text-slate-700', bar: 'bg-slate-400', icon: Target };
+  };
+  const theme = themeMap[color] || { bg: 'bg-slate-50', border: 'border-slate-100', text: 'text-slate-700', bar: 'bg-slate-400', icon: Target };
 
   const StatusIcon = theme.icon;
 
@@ -109,7 +111,7 @@ export default function GoalCard({ goal, onDelete }: GoalCardProps) {
       {strategies.length > 0 && (
         <div className="mt-4 space-y-2 pt-4 border-t border-slate-100">
           <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Stratégies recommandées</div>
-          {strategies.map((strat, i) => (
+          {strategies.map((strat: GoalStrategy, i: number) => (
             <button
               key={i}
               onClick={() => handleAction(strat)}

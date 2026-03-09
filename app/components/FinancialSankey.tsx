@@ -316,9 +316,14 @@ export default function FinancialSankey() {
                 labelPadding={12}
                 label={(node) => `${node.id}`}
                 labelTextColor={{ from: 'color', modifiers: [ [ 'darker', 2.5 ] ] }}
-                tooltip={({ node, source, target, value }: any) => (
+                nodeTooltip={({ node }) => (
                     <div className="bg-white text-slate-800 text-xs p-2 rounded border border-slate-200 shadow-lg z-50 font-medium">
-                        {node ? <span>{node.id}: <strong>{formatCurrency(value)}</strong></span> : <span>{source.id} → {target.id}: <strong>{formatCurrency(value)}</strong></span>}
+                        <span>{node.id}: <strong>{formatCurrency(node.value)}</strong></span>
+                    </div>
+                )}
+                linkTooltip={({ link }) => (
+                    <div className="bg-white text-slate-800 text-xs p-2 rounded border border-slate-200 shadow-lg z-50 font-medium">
+                        <span>{link.source.id} → {link.target.id}: <strong>{formatCurrency(link.value)}</strong></span>
                     </div>
                 )}
             />

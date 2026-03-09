@@ -1,33 +1,40 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
-import { prisma } from '@/app/lib/prisma';
+import { updateItemSchema, validationError } from '@/app/lib/validations';
+import { itemService, ServiceError } from '@/app/services';
 
-// PATCH: Modifier un item existant
 export async function PATCH(req: Request, { params }: { params: { id: string } }) {
   const { userId } = auth();
   if (!userId) return new NextResponse("Non autorisé", { status: 401 });
-  
-  const body = await req.json();
 
-  const updatedItem = await prisma.financialItem.update({
-    where: { id: params.id },
-    data: {
-        name: body.name,
-        amount: body.amount,
-        frequency: body.frequency,
-        dayOfMonth: body.dayOfMonth
+  try {
+    const body = await req.json();
+    const parsed = updateItemSchema.safeParse(body);
+    if (!parsed.success) return validationError(parsed.error);
+
+    const updatedItem = await itemService.updateItem(userId, params.id, parsed.data);
+    return NextResponse.json(updatedItem);
+  } catch (error) {
+    if (error instanceof ServiceError) {
+      return new NextResponse(error.message, { status: error.status });
     }
-  });
-  return NextResponse.json(updatedItem);
+    console.error("[API_PATCH_ITEM]", error);
+    return new NextResponse("Erreur interne", { status: 500 });
+  }
 }
 
-// DELETE: Supprimer un item
 export async function DELETE(req: Request, { params }: { params: { id: string } }) {
   const { userId } = auth();
   if (!userId) return new NextResponse("Non autorisé", { status: 401 });
 
-  await prisma.financialItem.delete({
-    where: { id: params.id }
-  });
-  return NextResponse.json({ success: true });
+  try {
+    const result = await itemService.deleteItem(userId, params.id);
+    return NextResponse.json(result);
+  } catch (error) {
+    if (error instanceof ServiceError) {
+      return new NextResponse(error.message, { status: error.status });
+    }
+    console.error("[API_DELETE_ITEM]", error);
+    return new NextResponse("Erreur interne", { status: 500 });
+  }
 }

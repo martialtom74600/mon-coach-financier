@@ -1,10 +1,10 @@
 import { differenceInMonths, addMonths } from 'date-fns';
 import { 
   Profile, Goal, SimulationResult, GoalDiagnosis, GoalStrategy, 
-  DeepAnalysis, OptimizationOpportunity, 
+  DeepAnalysis, OptimizationOpportunity, ActionGuide,
+  GoalScenarioInput, GoalScenarioContext, GoalScenarioResult,
   safeFloat, calculateListTotal, formatCurrency, 
   CONSTANTS, GOAL_CATEGORIES, PERSONA_PRESETS,
-  // ✅ IMPORTS TYPES & ENUMS
   AssetType,
   UserPersona,
   HousingStatus
@@ -39,15 +39,6 @@ const FINANCIAL_KNOWLEDGE = {
     { t: 82341, r: 0.41 }, 
     { t: 177106, r: 0.45 } 
   ]
-};
-
-type ActionGuide = {
-    title: string;
-    definition: string;
-    steps: string[];
-    tips: string[];
-    difficulty?: 'Facile' | 'Moyen' | 'Difficile';
-    impact?: 'Immédiat' | 'Long terme';
 };
 
 const ACTION_GUIDES: Record<string, ActionGuide> = {
@@ -194,7 +185,7 @@ const hasAsset = (profile: Profile, typeKeys: string[]): boolean => {
     if (typeKeys.includes(asset.type.toLowerCase())) return true;
     
     // 2. Mapping "catégorie" vers Enum
-    if (typeKeys.includes('livret') && [AssetType.LIVRET, AssetType.OTHER].includes(asset.type)) return true;
+    if (typeKeys.includes('livret') && (asset.type === AssetType.LIVRET || asset.type === AssetType.OTHER)) return true;
     if (typeKeys.includes('pea') && asset.type === AssetType.PEA) return true;
     if (typeKeys.includes('av') && asset.type === AssetType.AV) return true;
     if (typeKeys.includes('crypto') && asset.type === AssetType.CRYPTO) return true;
@@ -257,7 +248,8 @@ export const distributeGoals = (goals: Goal[], capacity: number) => {
         const req = calculateMonthlyEffort(g);
         const alloc = Math.min(available, req);
         available -= alloc;
-        allocations.push({ id: g.id, name: g.name, tier: 'GROWTH', requestedEffort: req, allocatedEffort: alloc, status: alloc >= req ? 'FULL' : 'PARTIAL', fillRate: req > 0 ? Math.round(alloc/req*100) : 100 });
+        const status: 'FULL' | 'PARTIAL' = alloc >= req ? 'FULL' : 'PARTIAL';
+        allocations.push({ id: g.id, name: g.name, tier: 'GROWTH', requestedEffort: req, allocatedEffort: alloc, status, fillRate: req > 0 ? Math.round(alloc/req*100) : 100 });
     }
     return { allocations, totalAllocated: max - available };
 };
@@ -300,7 +292,7 @@ export const computeFinancialPlan = (profile: Profile, customRates?: Partial<Sim
           const val = safeFloat(asset.currentValue);
           // ✅ Correction Enum AssetType
           if (asset.type === AssetType.CC) currentBalance += val;
-          else if ([AssetType.LIVRET, AssetType.PEE].includes(asset.type)) matelas += val;
+          else if (asset.type === AssetType.LIVRET || asset.type === AssetType.PEE) matelas += val;
           else investedStock += val;
       });
   }
@@ -332,12 +324,17 @@ export const computeFinancialPlan = (profile: Profile, customRates?: Partial<Sim
   };
 };
 
-export const simulateGoalScenario = (goalInput: any, profile: any, context: any, customRates?: Partial<SimulationRates>) => {
+export const simulateGoalScenario = (
+    goalInput: GoalScenarioInput,
+    _profile: Partial<Profile>,
+    context: GoalScenarioContext,
+    customRates?: Partial<SimulationRates>
+): GoalScenarioResult => {
     const RATES = { ...FINANCIAL_KNOWLEDGE.RATES, ...customRates };
     const tempGoal = { ...goalInput, id: 'temp' };
-    const effort = calculateMonthlyEffort(tempGoal);
+    const effort = calculateMonthlyEffort(tempGoal as Goal);
     const diagnosis = analyzeGoalStrategies(
-        tempGoal, effort, context.availableForProjects, 
+        tempGoal as Goal, effort, context.availableForProjects, 
         context.monthlyIncome, context.matelas, RATES
     );
     return { tempGoal, monthlyEffort: effort, projectionData: { projection: [], summary: { finalAmount: 0, totalInterests: 0, totalPocket: 0 } }, diagnosis };

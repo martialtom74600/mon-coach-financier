@@ -1,27 +1,24 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
-import { prisma } from '@/app/lib/prisma';
-import { GoalCategory } from '@prisma/client';
+import { createGoalSchema, validationError } from '@/app/lib/validations';
+import { goalService, ServiceError } from '@/app/services';
 
 export async function POST(req: Request) {
   const { userId } = auth();
   if (!userId) return new NextResponse("Non autorisé", { status: 401 });
-  const body = await req.json();
-  const profile = await prisma.financialProfile.findUnique({ where: { userId }, select: { id: true } });
 
-  if (!profile) return new NextResponse("Profil introuvable", { status: 404 });
+  try {
+    const body = await req.json();
+    const parsed = createGoalSchema.safeParse(body);
+    if (!parsed.success) return validationError(parsed.error);
 
-  const newGoal = await prisma.financialGoal.create({
-    data: {
-      profileId: profile.id,
-      name: body.name,
-      category: body.category as GoalCategory,
-      targetAmount: parseFloat(body.targetAmount),
-      currentSaved: parseFloat(body.currentSaved || 0),
-      monthlyContribution: parseFloat(body.monthlyContribution || 0),
-      deadline: new Date(body.deadline), // Format ISO attendu depuis le front
-      projectedYield: parseFloat(body.projectedYield || 0)
+    const newGoal = await goalService.createGoal(userId, parsed.data);
+    return NextResponse.json(newGoal);
+  } catch (error) {
+    if (error instanceof ServiceError) {
+      return new NextResponse(error.message, { status: error.status });
     }
-  });
-  return NextResponse.json(newGoal);
+    console.error("[API_POST_GOAL]", error);
+    return new NextResponse("Erreur interne", { status: 500 });
+  }
 }

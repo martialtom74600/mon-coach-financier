@@ -1,28 +1,24 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
-import { prisma } from '@/app/lib/prisma';
-import { ItemCategory, Frequency } from '@prisma/client';
+import { createItemSchema, validationError } from '@/app/lib/validations';
+import { itemService, ServiceError } from '@/app/services';
 
 export async function POST(req: Request) {
   const { userId } = auth();
   if (!userId) return new NextResponse("Non autorisé", { status: 401 });
 
-  const body = await req.json();
+  try {
+    const body = await req.json();
+    const parsed = createItemSchema.safeParse(body);
+    if (!parsed.success) return validationError(parsed.error);
 
-  // On récupère d'abord l'ID du profil financier
-  const profile = await prisma.financialProfile.findUnique({ where: { userId }, select: { id: true } });
-  if (!profile) return new NextResponse("Profil introuvable", { status: 404 });
-
-  const newItem = await prisma.financialItem.create({
-    data: {
-      profileId: profile.id,
-      name: body.name,
-      amount: parseFloat(body.amount),
-      category: body.category as ItemCategory,
-      frequency: body.frequency as Frequency || Frequency.MONTHLY, // Default important
-      dayOfMonth: body.dayOfMonth ? parseInt(body.dayOfMonth) : 1
+    const newItem = await itemService.createItem(userId, parsed.data);
+    return NextResponse.json(newItem);
+  } catch (error) {
+    if (error instanceof ServiceError) {
+      return new NextResponse(error.message, { status: error.status });
     }
-  });
-
-  return NextResponse.json(newItem);
+    console.error("[API_POST_ITEM]", error);
+    return new NextResponse("Erreur interne", { status: 500 });
+  }
 }

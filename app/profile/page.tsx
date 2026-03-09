@@ -53,9 +53,19 @@ interface AssetUiRow {
   transferDay: number; 
 }
 
-// Le formulaire étend le Profil mais avec des structures simplifiées pour l'édition
-interface FormProfile extends Omit<Profile, 'investments' | 'savingsContributions' | 'persona' | 'housing'> {
-  // On surcharge avec des types permissifs pour le formulaire, qu'on nettoiera au save
+interface FormItem {
+  id: string;
+  name: string;
+  amount: number | string;
+  dayOfMonth?: number;
+  frequency?: Frequency | string;
+  category?: ItemCategory;
+  profileId?: string;
+  createdAt?: Date;
+  [key: string]: unknown;
+}
+
+interface FormProfile extends Omit<Profile, 'investments' | 'savingsContributions' | 'persona' | 'housing' | 'incomes' | 'fixedCosts' | 'variableCosts' | 'credits' | 'subscriptions' | 'annualExpenses'> {
   persona: UserPersona | string;
   
   housing: {
@@ -66,13 +76,12 @@ interface FormProfile extends Omit<Profile, 'investments' | 'savingsContribution
 
   assetsUi: AssetUiRow[];
   
-  // Listes typées FinancialItem
-  incomes: FinancialItem[];
-  fixedCosts: FinancialItem[];
-  variableCosts: FinancialItem[];
-  credits: FinancialItem[];
-  subscriptions: FinancialItem[];
-  annualExpenses: FinancialItem[];
+  incomes: FormItem[];
+  fixedCosts: FormItem[];
+  variableCosts: FormItem[];
+  credits: FormItem[];
+  subscriptions: FormItem[];
+  annualExpenses: FormItem[];
 }
 
 // ============================================================================
@@ -135,7 +144,7 @@ const mapFormToPayload = (formData: FormProfile, lifestyle: number) => {
     category: item.category,
     // ✅ UTILISATION DE L'ENUM FREQUENCY
     frequency: Frequency.MONTHLY, 
-    dayOfMonth: item.category === ItemCategory.VARIABLE_COST ? null : ((item as any).dayOfMonth || 1)
+    dayOfMonth: item.category === ItemCategory.VARIABLE_COST ? null : (item.dayOfMonth ?? 1)
   }));
 
   // 2. Conversion Assets UI -> DB Assets
@@ -212,9 +221,9 @@ const mapFormToEngineProfile = (formData: FormProfile): Profile => {
         investedAmount: totalInvested,
         savings: totalSavings,
         currentBalance: totalCash,
-        investments: investments as any,
+        investments: investments as unknown as Profile['investments'],
         savingsContributions,
-        housing: { ...formData.housing } as any,
+        housing: { ...formData.housing } as Profile['housing'],
         updatedAt: new Date().toISOString()
     } as Profile;
 };
@@ -258,7 +267,8 @@ const WizardLayout = ({ title, subtitle, icon: Icon, children, footer, error }: 
   </div>
 );
 
-const SelectionTile = ({ selected, onClick, icon: Icon, title, desc }: any) => (
+interface SelectionTileProps { selected: boolean; onClick: () => void; icon: LucideIcon; title: string; desc: string; }
+const SelectionTile = ({ selected, onClick, icon: Icon, title, desc }: SelectionTileProps) => (
   <div onClick={onClick} role="button" className={`cursor-pointer relative p-4 rounded-xl border-2 transition-all duration-200 flex items-center gap-4 text-left ${selected ? 'border-indigo-600 bg-indigo-50/50' : 'border-slate-100 hover:border-slate-300 bg-white'}`}>
     <div className={`p-2.5 rounded-lg ${selected ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-500'}`}><Icon size={20} /></div>
     <div className="flex-1"><h3 className={`font-bold text-sm ${selected ? 'text-indigo-900' : 'text-slate-900'}`}>{title}</h3><p className="text-xs text-slate-500">{desc}</p></div>
@@ -266,7 +276,8 @@ const SelectionTile = ({ selected, onClick, icon: Icon, title, desc }: any) => (
   </div>
 );
 
-const CounterControl = ({ label, value, onChange }: any) => (
+interface CounterControlProps { label: string; value: number; onChange: (val: number) => void; }
+const CounterControl = ({ label, value, onChange }: CounterControlProps) => (
     <div className="flex flex-col items-center w-full p-4 border border-slate-100 rounded-xl bg-slate-50/50">
         <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">{label}</span>
         <div className="flex items-center gap-4">
@@ -359,10 +370,10 @@ interface StepProps {
     onPrev?: () => void;
     addItem?: (list: keyof FormProfile) => void;
     removeItem?: (list: keyof FormProfile, id: string) => void;
-    updateItem?: (list: keyof FormProfile, id: string, field: string, val: any) => void;
+    updateItem?: (list: keyof FormProfile, id: string, field: string, val: string | number) => void;
     onConfirm?: (lifestyle: number, savings: number) => void;
     isSaving?: boolean;
-    stats?: any;
+    stats?: { income: number; fixed: number; variable: number; investments: number; ratio: number; remaining: number } | null;
     error?: string | null;
 }
 
@@ -370,9 +381,9 @@ const StepIdentite = ({ formData, updateForm, onNext, error }: StepProps) => (
     <WizardLayout title="Qui êtes-vous ?" subtitle="Ces infos calibrent nos projections." icon={User} error={error}
         footer={<Button onClick={onNext} className="w-full" size="lg">C'est parti <ArrowRight className="ml-2" size={18}/></Button>}>
         <div className="space-y-6">
-            <InputGroup label="Votre Prénom" placeholder="Ex: Thomas" value={formData.firstName || ''} onChange={(e: any) => updateForm({...formData, firstName: getInputValue(e) as string})} autoFocus />
+            <InputGroup label="Votre Prénom" placeholder="Ex: Thomas" value={formData.firstName || ''} onChange={(val: string) => updateForm({...formData, firstName: val})} />
             <div className={`transition-opacity duration-500 ${formData.firstName ? 'opacity-100' : 'opacity-30'}`}>
-                <InputGroup label="Votre Âge" type="number" placeholder="30" value={formData.age || ''} onChange={(e: any) => updateForm({...formData, age: getInputValue(e) as string})} endAdornment={<span className="text-slate-400 font-bold px-3">ans</span>} />
+                <InputGroup label="Votre Âge" type="number" placeholder="30" value={formData.age || ''} onChange={(val: string) => updateForm({...formData, age: val as unknown as number})} />
             </div>
         </div>
     </WizardLayout>
@@ -412,7 +423,7 @@ const StepFixedFinances = ({ formData, updateForm, addItem, removeItem, updateIt
     <WizardLayout title="Revenus & Charges Fixes" subtitle="Ce qui tombe à date fixe chaque mois." icon={Wallet} error={error}
         footer={<><Button variant="ghost" onClick={onPrev}>Retour</Button><Button onClick={onNext}>Vie Quotidienne <ArrowRight className="ml-2" size={18}/></Button></>}>
         <div className="space-y-6">
-            <AccordionSection mode="expert" defaultOpen={true} title="Revenus (Net)" icon={Banknote} colorClass="text-emerald-600" items={formData.incomes} onItemChange={(id: string, f: string, v: any) => updateItem!('incomes', id, f, v)} onItemAdd={() => addItem!('incomes')} onItemRemove={(id: string) => removeItem!('incomes', id)} />
+            <AccordionSection mode="expert" defaultOpen={true} title="Revenus (Net)" icon={Banknote} colorClass="text-emerald-600" items={formData.incomes} onItemChange={(id, f, v) => updateItem!('incomes', id, f as string, v)} onItemAdd={() => addItem!('incomes')} onItemRemove={(id: string) => removeItem!('incomes', id)} />
             
             {formData.housing?.status !== HousingStatus.FREE && formData.housing?.status !== HousingStatus.OWNER_PAID && (
                 <div className="p-4 bg-slate-50 rounded-xl border border-slate-100 mb-6">
@@ -422,19 +433,19 @@ const StepFixedFinances = ({ formData, updateForm, addItem, removeItem, updateIt
                     </h3>
                     <div className="flex gap-4">
                           <div className="flex-1">
-                             <InputGroup label="Montant Mensuel" type="number" placeholder="800" value={formData.housing?.monthlyCost || ''} onChange={(e: any) => updateForm({ ...formData, housing: { ...formData.housing, monthlyCost: parseNumber(getInputValue(e)) } })} endAdornment={<span className="text-slate-400 font-bold px-3">€</span>} />
+                             <InputGroup label="Montant Mensuel" type="number" placeholder="800" value={formData.housing?.monthlyCost || ''} onChange={(val: string) => updateForm({ ...formData, housing: { ...formData.housing, monthlyCost: parseNumber(val) } })} suffix="€" />
                           </div>
                           <div className="w-24">
-                             <InputGroup label="Jour" type="number" placeholder="5" max={31} min={1} value={formData.housing?.paymentDay || ''} onChange={(e: any) => updateForm({ ...formData, housing: { ...formData.housing, paymentDay: parseNumber(getInputValue(e)) } })} />
+                             <InputGroup label="Jour" type="number" placeholder="5" value={formData.housing?.paymentDay || ''} onChange={(val: string) => updateForm({ ...formData, housing: { ...formData.housing, paymentDay: parseNumber(val) } })} />
                           </div>
                     </div>
                 </div>
             )}
 
-            <AccordionSection mode="expert" defaultOpen={false} title="Factures Fixes" icon={CreditCard} colorClass="text-slate-600" items={formData.fixedCosts} onItemChange={(id: string, f: string, v: any) => updateItem!('fixedCosts', id, f, v)} onItemAdd={() => addItem!('fixedCosts')} onItemRemove={(id: string) => removeItem!('fixedCosts', id)} />
-            <AccordionSection mode="expert" defaultOpen={false} title="Abonnements" icon={Zap} colorClass="text-purple-500" items={formData.subscriptions} onItemChange={(id: string, f: string, v: any) => updateItem!('subscriptions', id, f, v)} onItemAdd={() => addItem!('subscriptions')} onItemRemove={(id: string) => removeItem!('subscriptions', id)} />
-            <AccordionSection mode="expert" defaultOpen={false} title="Dépenses Annuelles" icon={Calendar} colorClass="text-orange-500" items={formData.annualExpenses} onItemChange={(id: string, f: string, v: any) => updateItem!('annualExpenses', id, f, v)} onItemAdd={() => addItem!('annualExpenses')} onItemRemove={(id: string) => removeItem!('annualExpenses', id)} />
-            <AccordionSection mode="expert" defaultOpen={false} title="Crédits Conso" icon={AlertCircle} colorClass="text-rose-500" items={formData.credits} onItemChange={(id: string, f: string, v: any) => updateItem!('credits', id, f, v)} onItemAdd={() => addItem!('credits')} onItemRemove={(id: string) => removeItem!('credits', id)} />
+            <AccordionSection mode="expert" defaultOpen={false} title="Factures Fixes" icon={CreditCard} colorClass="text-slate-600" items={formData.fixedCosts} onItemChange={(id, f, v) => updateItem!('fixedCosts', id, f as string, v)} onItemAdd={() => addItem!('fixedCosts')} onItemRemove={(id: string) => removeItem!('fixedCosts', id)} />
+            <AccordionSection mode="expert" defaultOpen={false} title="Abonnements" icon={Zap} colorClass="text-purple-500" items={formData.subscriptions} onItemChange={(id, f, v) => updateItem!('subscriptions', id, f as string, v)} onItemAdd={() => addItem!('subscriptions')} onItemRemove={(id: string) => removeItem!('subscriptions', id)} />
+            <AccordionSection mode="expert" defaultOpen={false} title="Dépenses Annuelles" icon={Calendar} colorClass="text-orange-500" items={formData.annualExpenses} onItemChange={(id, f, v) => updateItem!('annualExpenses', id, f as string, v)} onItemAdd={() => addItem!('annualExpenses')} onItemRemove={(id: string) => removeItem!('annualExpenses', id)} />
+            <AccordionSection mode="expert" defaultOpen={false} title="Crédits Conso" icon={AlertCircle} colorClass="text-rose-500" items={formData.credits} onItemChange={(id, f, v) => updateItem!('credits', id, f as string, v)} onItemAdd={() => addItem!('credits')} onItemRemove={(id: string) => removeItem!('credits', id)} />
         </div>
     </WizardLayout>
 );
@@ -459,7 +470,7 @@ const StepDailyLife = ({ formData, updateForm, addItem, removeItem, updateItem, 
                 icon={ShoppingCart} 
                 colorClass="text-indigo-600" 
                 items={formData.variableCosts} 
-                onItemChange={(id: string, f: string, v: any) => updateItem!('variableCosts', id, f, v)} 
+                onItemChange={(id, f, v) => updateItem!('variableCosts', id, f as string, v)} 
                 onItemAdd={() => addItem!('variableCosts')} 
                 onItemRemove={(id: string) => removeItem!('variableCosts', id)} 
             />
@@ -494,7 +505,7 @@ const StepAssets = ({ formData, updateForm, addItem, removeItem, updateItem, onN
       return formData.assetsUi.some(i => i.name.toLowerCase().includes(labelSubString.toLowerCase().split('/')[0].trim()));
     };
   
-    const toggleAsset = (type: any) => {
+    const toggleAsset = (type: typeof ASSET_TYPES[number]) => {
       if (hasAsset(type.label)) return; 
       const newList = [
           ...formData.assetsUi, 
@@ -503,7 +514,7 @@ const StepAssets = ({ formData, updateForm, addItem, removeItem, updateItem, onN
       updateForm({ ...formData, assetsUi: newList });
     };
 
-    const updateAssetRow = (id: string, field: keyof AssetUiRow, value: any) => {
+    const updateAssetRow = (id: string, field: keyof AssetUiRow, value: string | number) => {
         const newList = formData.assetsUi.map(a => a.id === id ? { ...a, [field]: value } : a);
         updateForm({ ...formData, assetsUi: newList });
     };
@@ -733,7 +744,7 @@ export default function ProfilePage() {
             }
         }
 
-        const checkList = (list: FinancialItem[], name: string) => {
+        const checkList = (list: FormItem[], name: string) => {
             for (const item of list) {
                 if (!item.name || item.name.trim() === '') return `Une ligne dans "${name}" n'a pas de nom.`;
                 if (!item.amount || isNaN(Number(item.amount))) return `Une ligne dans "${name}" n'a pas de montant.`;
@@ -784,21 +795,20 @@ export default function ProfilePage() {
   };
   const goPrev = () => { setError(null); setCurrentStep(s => Math.max(1, s - 1)); };
 
-  const updateItem = (list: keyof FormProfile, id: string, field: string, val: any) => {
+  const updateItem = (list: keyof FormProfile, id: string, field: string, val: string | number) => {
     if (!formData) return;
-    const currentList = formData[list] as FinancialItem[];
+    const currentList = formData[list] as FormItem[];
     updateForm({ ...formData, [list]: currentList.map((i) => i.id === id ? { ...i, [field]: val } : i) });
   };
   const addItem = (list: keyof FormProfile) => {
     if (!formData) return;
-    const currentList = formData[list] as FinancialItem[];
+    const currentList = formData[list] as FormItem[];
     const defaultDay = list === 'variableCosts' ? undefined : 1; 
-    // ✅ Utilisation de Frequency.MONTHLY
     updateForm({ ...formData, [list]: [...currentList, { id: generateIdHelper(), name: '', amount: '', frequency: Frequency.MONTHLY, dayOfMonth: defaultDay }] });
   };
   const removeItem = (list: keyof FormProfile, id: string) => {
     if (!formData) return;
-    const currentList = formData[list] as FinancialItem[];
+    const currentList = formData[list] as FormItem[];
     updateForm({ ...formData, [list]: currentList.filter((i) => i.id !== id) });
   };
 

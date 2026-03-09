@@ -15,6 +15,7 @@ import {
   analyzeProfileHealth, 
   DeepAnalysis,
   OptimizationOpportunity,
+  ActionGuide,
   formatCurrency
 } from '@/app/lib/logic';
 import { generateTimeline } from '@/app/lib/scenarios';
@@ -30,7 +31,13 @@ import {
 // 0. UI MICRO-COMPONENTS
 // ============================================================================
 
-const GlassCard = ({ children, className = "", onClick }: any) => (
+interface GlassCardProps {
+  children: React.ReactNode;
+  className?: string;
+  onClick?: () => void;
+}
+
+const GlassCard = ({ children, className = "", onClick }: GlassCardProps) => (
   <div onClick={onClick} className={`bg-white border border-slate-100 shadow-sm rounded-3xl p-6 transition-all duration-300 hover:shadow-xl hover:border-indigo-100 hover:-translate-y-0.5 ${className}`}>
     {children}
   </div>
@@ -63,7 +70,15 @@ const SimpleTooltip = ({ text }: { text: string }) => (
 // ============================================================================
 
 // --- JAUGE SAFE-TO-SPEND (LE CERVEAU DE L'INTERFACE) ---
-const SafeToSpendGauge = ({ currentBalance, upcomingFixed, upcomingSavings, safeToSpend, endOfMonthProjection }: any) => {
+interface SafeToSpendGaugeProps {
+  currentBalance: number;
+  upcomingFixed: number;
+  upcomingSavings: number;
+  safeToSpend: number;
+  endOfMonthProjection: number;
+}
+
+const SafeToSpendGauge = ({ currentBalance, upcomingFixed, upcomingSavings, safeToSpend, endOfMonthProjection }: SafeToSpendGaugeProps) => {
     
     // On normalise pour la barre visuelle (base 100%)
     const total = Math.max(currentBalance, 1); 
@@ -140,7 +155,7 @@ const SafeToSpendGauge = ({ currentBalance, upcomingFixed, upcomingSavings, safe
 };
 
 // --- MODALE ÉDUCATIVE ---
-const EducationalModal = ({ guide, onClose }: { guide: any, onClose: () => void }) => {
+const EducationalModal = ({ guide, onClose }: { guide: ActionGuide | null, onClose: () => void }) => {
     if (!guide) return null;
 
     return (
@@ -217,8 +232,8 @@ const EducationalModal = ({ guide, onClose }: { guide: any, onClose: () => void 
 function DashboardView() {
   const router = useRouter();
   const { user } = useUser();
-  const { profile, history, isLoaded: isProfileLoaded } = useFinancialData();
-  const [selectedGuide, setSelectedGuide] = useState<any | null>(null);
+  const { profile, isLoaded: isProfileLoaded } = useFinancialData();
+  const [selectedGuide, setSelectedGuide] = useState<ActionGuide | null>(null);
 
   const analysis: DeepAnalysis | null = useMemo(() => {
       if (!profile) return null; 
@@ -241,7 +256,7 @@ function DashboardView() {
       if (!profile) return null;
 
       // a. On génère la timeline
-      const timeline = generateTimeline(profile, history || [], [], 45);
+      const timeline = generateTimeline(profile, profile.decisions || [], [], 45);
       const currentMonthKey = new Date().toISOString().slice(0, 7); // Ex: "2025-02"
       const monthData = timeline.find(m => m.id === currentMonthKey);
       
@@ -293,7 +308,7 @@ function DashboardView() {
           safeToSpend,
           endOfMonthProjection
       };
-  }, [profile, history]);
+  }, [profile]);
 
   // ✅ 2. CALCUL DU GRAPHIQUE PATRIMOINE
   const chartData = useMemo(() => {
@@ -433,7 +448,7 @@ function DashboardView() {
                                     <XAxis dataKey="year" axisLine={false} tickLine={false} tick={{fontSize: 12, fill: '#94a3b8'}} dy={10} />
                                     <RechartsTooltip 
                                         contentStyle={{borderRadius: '16px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)', padding: '12px'}}
-                                        formatter={(val: number) => [<span className="font-bold text-indigo-600">{formatCurrency(val)}</span>, "Patrimoine"]}
+                                        formatter={(val) => [<span className="font-bold text-indigo-600">{formatCurrency(Number(val))}</span>, "Patrimoine"]}
                                         labelStyle={{display:'none'}}
                                         cursor={{ stroke: '#6366f1', strokeWidth: 2 }}
                                     />
@@ -533,9 +548,9 @@ function AuthScreen() {
                   <h1 className="text-3xl font-black text-slate-900">Finance OS</h1>
               </div>
               {isSignUpMode ? (
-                <SignUp key="signup" routing="virtual" appearance={{ baseTheme: clerkAppearanceHybrid, layout: { socialButtonsPlacement: 'bottom' }, elements: { card: "shadow-none p-0", formButtonPrimary: "bg-indigo-600 hover:bg-indigo-700 py-3 text-base shadow-lg shadow-indigo-200", footerActionLink: "hidden", headerTitle: "text-2xl font-bold", headerSubtitle: "text-slate-500" } }} signInUrl="/?mode=login" afterSignInUrl="/" />
+                <SignUp key="signup" routing="virtual" appearance={{ variables: clerkAppearanceHybrid.variables, layout: { socialButtonsPlacement: 'bottom' }, elements: { ...clerkAppearanceHybrid.elements, card: "shadow-none p-0", formButtonPrimary: "bg-indigo-600 hover:bg-indigo-700 py-3 text-base shadow-lg shadow-indigo-200", footerActionLink: "hidden", headerTitle: "text-2xl font-bold", headerSubtitle: "text-slate-500" } }} signInUrl="/?mode=login" afterSignInUrl="/" />
               ) : (
-                <SignIn key="login" routing="virtual" appearance={{ baseTheme: clerkAppearanceHybrid, layout: { socialButtonsPlacement: 'bottom' }, elements: { card: "shadow-none p-0", formButtonPrimary: "bg-slate-900 hover:bg-slate-800 py-3 text-base shadow-lg shadow-slate-200", footerActionLink: "hidden", headerTitle: "text-2xl font-bold", headerSubtitle: "text-slate-500" } }} signUpUrl="/?mode=signup" afterSignUpUrl="/" />
+                <SignIn key="login" routing="virtual" appearance={{ variables: clerkAppearanceHybrid.variables, layout: { socialButtonsPlacement: 'bottom' }, elements: { ...clerkAppearanceHybrid.elements, card: "shadow-none p-0", formButtonPrimary: "bg-slate-900 hover:bg-slate-800 py-3 text-base shadow-lg shadow-slate-200", footerActionLink: "hidden", headerTitle: "text-2xl font-bold", headerSubtitle: "text-slate-500" } }} signUpUrl="/?mode=signup" afterSignUpUrl="/" />
               )}
               <div className="text-center text-sm pt-4 border-t border-slate-100">
                   {isSignUpMode ? (<p className="text-slate-500">Déjà membre ? <button onClick={switchToSignIn} className="font-bold text-indigo-600 hover:underline ml-1">Connexion</button></p>) : (<p className="text-slate-500">Nouveau ici ? <button onClick={switchToSignUp} className="font-bold text-indigo-600 hover:underline ml-1">Créer un compte</button></p>)}

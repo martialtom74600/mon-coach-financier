@@ -1,10 +1,10 @@
 // app/lib/definitions.ts
 import { 
-  FinancialGoal, 
-  PurchaseDecision, 
-  FinancialProfile, 
+  FinancialGoal as PrismaGoal, 
+  PurchaseDecision as PrismaDecision, 
   FinancialItem as PrismaItem, 
   Asset as PrismaAsset,
+  Prisma,
   UserPersona,
   HousingStatus,
   ItemCategory,
@@ -14,6 +14,35 @@ import {
   PaymentMode,
   Frequency
 } from '@prisma/client';
+
+// ============================================================================
+// 0. UTILITAIRE DECIMAL → NUMBER (Migration Float → Decimal)
+// ============================================================================
+
+// Convertit les champs Prisma.Decimal en number au niveau des types
+type SerializedDecimal<T> = {
+  [K in keyof T]: T[K] extends Prisma.Decimal
+    ? number
+    : T[K] extends Prisma.Decimal | null
+    ? number | null
+    : T[K];
+};
+
+// Convertit récursivement les instances Prisma.Decimal en number à l'exécution
+export function serializeDecimals<T>(obj: T): T {
+  if (obj === null || obj === undefined) return obj;
+  if (obj instanceof Prisma.Decimal) return obj.toNumber() as unknown as T;
+  if (obj instanceof Date) return obj;
+  if (Array.isArray(obj)) return obj.map(item => serializeDecimals(item)) as unknown as T;
+  if (typeof obj === 'object') {
+    const result: Record<string, unknown> = {};
+    for (const [key, val] of Object.entries(obj as Record<string, unknown>)) {
+      result[key] = serializeDecimals(val);
+    }
+    return result as T;
+  }
+  return obj;
+}
 
 // ============================================================================
 // 1. CONSTANTES & CONFIGURATION
@@ -69,7 +98,7 @@ export const ASSET_TYPES = [
   { id: AssetType.OTHER,       label: 'Autre',               category: 'EXOTIC',    color: 'text-gray-600',    bg: 'bg-gray-50',    border: 'border-gray-200' },
 ] as const;
 
-export const PURCHASE_TYPES = {
+export const PURCHASE_TYPES: Record<PurchaseType, { id: string; label: string; description: string; color: string }> = {
   NEED:    { id: 'NEED',        label: 'Besoin Vital',     description: 'Nourriture, Santé', color: 'bg-blue-100 text-blue-700 border-blue-200' },
   PLEASURE:{ id: 'PLEASURE',    label: 'Envie / Plaisir',  description: 'Loisirs, Mode',     color: 'bg-purple-100 text-purple-700 border-purple-200' },
   OPPORTUNITY:{ id: 'OPPORTUNITY', label: 'Confort / Utile', description: 'Gain de temps',    color: 'bg-emerald-100 text-emerald-700 border-emerald-200' },
@@ -99,14 +128,14 @@ export {
   Frequency 
 };
 
-// 🔹 Financial Item (Flux)
-export type FinancialItem = PrismaItem;
+// 🔹 Financial Item (Flux) — Decimal → number via SerializedDecimal
+export type FinancialItem = SerializedDecimal<PrismaItem>;
 
-// 🔹 Asset (Patrimoine)
-export interface Investment extends PrismaAsset {
-  performance?: number; // Champ UI calculé
-}
-export type Asset = PrismaAsset;
+// 🔹 Asset (Patrimoine) — Decimal → number via SerializedDecimal
+export type Asset = SerializedDecimal<PrismaAsset>;
+export type Investment = Asset & {
+  performance?: number;
+};
 
 // 🔹 Goal (Objectifs)
 export interface GoalStrategy {
@@ -128,15 +157,86 @@ export interface GoalDiagnosis {
   strategies: GoalStrategy[];
 }
 
+// 🔹 Goal & Decision — Decimal → number via SerializedDecimal
+export type FinancialGoal = SerializedDecimal<PrismaGoal>;
+export type PurchaseDecision = SerializedDecimal<PrismaDecision>;
+
 export type Goal = FinancialGoal & {
-  // Champs calculés UI
   isInvested?: boolean; 
   monthlyNeed?: number;
   diagnosis?: GoalDiagnosis;
 };
 
-// 🔹 Decision
-export type { PurchaseDecision };
+// 🔹 Goal Scenario (entrée/sortie de simulateGoalScenario)
+export type GoalScenarioInput = Pick<Goal,
+  'name' | 'category' | 'targetAmount' | 'currentSaved' | 'deadline' | 'projectedYield' | 'isInvested'
+>;
+
+export type GoalScenarioContext = Pick<SimulationResult['budget'],
+  'availableForProjects' | 'monthlyIncome' | 'matelas'
+>;
+
+export interface GoalProjectionPoint {
+  date: string;
+  balance: number;
+  contributed: number;
+}
+
+export interface GoalScenarioResult {
+  tempGoal: GoalScenarioInput & { id: string };
+  monthlyEffort: number;
+  projectionData: {
+    projection: GoalProjectionPoint[];
+    summary: { finalAmount: number; totalInterests: number; totalPocket: number };
+  };
+  diagnosis: GoalDiagnosis;
+}
+
+// 🔹 Decision & Goal Prisma (définitions ci-dessus via SerializedDecimal)
+
+// 🔹 Purchase (entrée du simulateur d'achat — distinct de PurchaseDecision qui est le modèle Prisma)
+export interface Purchase {
+  name: string;
+  amount: number | string;
+  date?: Date | string;
+  type?: PurchaseType;
+  paymentMode: PaymentMode | string;
+  duration?: number | string;
+  rate?: number | string;
+  isReimbursable?: boolean;
+  isPro?: boolean;
+}
+
+// 🔹 AnalysisResult (sortie de analyzePurchaseImpact)
+export interface AnalysisTip {
+  text: string;
+}
+
+export interface AnalysisIssue {
+  text: string;
+  level: 'red' | 'orange';
+}
+
+export interface AnalysisResult {
+  verdict: 'green' | 'orange' | 'red';
+  score: number;
+  isBudgetOk: boolean;
+  isCashflowOk: boolean;
+  smartTitle: string;
+  smartMessage: string;
+  issues: AnalysisIssue[];
+  tips: AnalysisTip[];
+  newMatelas: number;
+  newRV: number;
+  newSafetyMonths: number;
+  newEngagementRate: number;
+  realCost: number;
+  creditCost: number;
+  opportunityCost: number;
+  timeToWork: number;
+  lowestProjectedBalance: number;
+  projectedCurve: { date: string; value: number }[];
+}
 
 // ============================================================================
 // 3. PROFIL UTILISATEUR (AGRÉGATION)
@@ -146,45 +246,71 @@ export interface Household { adults: number; children: number; }
 export interface Housing { status: HousingStatus; monthlyCost: number; paymentDay?: number; }
 export interface PersonaRules { safetyMonths: number; maxDebt: number; minLiving: number; }
 
-export interface Profile extends Omit<FinancialProfile, 'createdAt' | 'updatedAt' | 'items' | 'assets' | 'goals' | 'decisions'> {
-  // Champs Frontend spécifiques
+// 🔹 ProfileDB — Shape base de données (validable par Zod end-to-end)
+export interface ProfileDB {
+  id: string;
+  userId: string;
   email?: string;
   firstName?: string;
-  mode?: string; 
 
-  household: Household; 
-  housing: Housing;     
-  
-  // Relations complètes
-  items: FinancialItem[]; 
-  assets: Asset[];        
-  goals: Goal[];          
+  age: number | null;
+  persona: UserPersona | null;
+  housingStatus: HousingStatus | null;
+  housingCost: number;
+  housingPaymentDay: number | null;
+  adults: number;
+  children: number;
+  funBudget: number;
+
+  items: FinancialItem[];
+  assets: Asset[];
+  goals: FinancialGoal[];
   decisions: PurchaseDecision[];
 
-  // --- Helpers UI (tableaux filtrés) ---
+  updatedAt?: Date | string;
+}
+
+// 🔹 ProfileUI — Version enrichie pour le frontend (dérivés + calculés)
+export interface ProfileUI extends ProfileDB {
+  mode?: string;
+
+  household: Household;
+  housing: Housing;
+
   incomes: FinancialItem[];
   fixedCosts: FinancialItem[];
   variableCosts: FinancialItem[];
   subscriptions: FinancialItem[];
   credits: FinancialItem[];
   annualExpenses: FinancialItem[];
-  
-  savingsContributions: { id: string; name: string; amount: number; dayOfMonth: number }[]; 
-  investments: Investment[]; 
 
-  // --- Totaux Calculés ---
-  savings?: number; 
+  savingsContributions: { id: string; name: string; amount: number; dayOfMonth: number }[];
+  investments: Investment[];
+
+  savings?: number;
   investedAmount?: number;
   currentBalance?: number;
   monthlyIncome?: number;
   investmentYield?: number;
-  
-  updatedAt?: Date | string;
+
+  goals: Goal[];
 }
+
+// Alias backward-compatible
+export type Profile = ProfileUI;
 
 // ============================================================================
 // 4. TYPES D'ANALYSE
 // ============================================================================
+
+export interface ActionGuide {
+  title: string;
+  definition: string;
+  steps: string[];
+  tips: string[];
+  difficulty?: 'Facile' | 'Moyen' | 'Difficile';
+  impact?: 'Immédiat' | 'Long terme';
+}
 
 export type OpportunityLevel = 'CRITICAL' | 'WARNING' | 'INFO' | 'SUCCESS';
 export type OpportunityType = 'SAVINGS' | 'DEBT' | 'INVESTMENT' | 'BUDGET';
@@ -197,35 +323,62 @@ export interface OptimizationOpportunity {
   message: string;
   potentialGain?: number;
   actionLabel?: string;
+  guide?: ActionGuide;
+  link?: string;
 }
 
 export interface DeepAnalysis {
   globalScore: number;
   tags: string[];
+  ratios: { needs: number; wants: number; savings: number };
+  projections: { wealth10y: number; wealth20y: number; fireYear: number };
   opportunities: OptimizationOpportunity[];
 }
 
+export interface GoalAllocation {
+  id: string;
+  name: string;
+  tier: string;
+  requestedEffort: number;
+  allocatedEffort: number;
+  status: 'FULL' | 'PARTIAL';
+  fillRate: number;
+}
+
+export interface BudgetResult {
+  income: number;
+  fixed: number;
+  variable: number;
+  variableExpenses: number;
+  monthlyIncome: number;
+  mandatoryExpenses: number;
+  discretionaryExpenses: number;
+  capacityToSave: number;
+  rawCapacity: number;
+  endOfMonthBalance: number;
+  profitableExpenses: number;
+  totalRecurring: number;
+  remainingToLive: number;
+  realCashflow: number;
+  matelas: number;
+  investments: number;
+  totalWealth: number;
+  safetyMonths: number;
+  engagementRate: number;
+  rules: PersonaRules;
+  securityBuffer: number;
+  availableForProjects: number;
+  currentBalance: number;
+  capacity: number;
+  totalGoalsEffort: number;
+}
+
 export interface SimulationResult {
-  allocations: any[]; 
-  budget: { 
-      income: number; 
-      fixed: number; 
-      variable: number; 
-      capacityToSave: number; 
-      remainingToLive: number; 
-      matelas: number; 
-      securityBuffer: number; 
-      availableForProjects: number;
-      totalGoalsEffort: number;
-      endOfMonthBalance: number;
-      currentBalance: number;
-      safetyMonths: number;
-      monthlyIncome: number;      
-      mandatoryExpenses: number;  
-  };
-  freeCashFlow: number; 
+  allocations: GoalAllocation[];
+  budget: BudgetResult;
+  freeCashFlow: number;
   diagnosis?: DeepAnalysis;
-  usedRates?: any; 
+  usedRates?: Record<string, number>;
 }
 
 // ============================================================================
@@ -280,6 +433,7 @@ export const generateId = (): string => Math.random().toString(36).substr(2, 9);
 export const safeFloat = (val: any): number => {
   if (val === null || val === undefined || val === '') return 0;
   if (typeof val === 'number') return isNaN(val) ? 0 : val;
+  if (val instanceof Prisma.Decimal) return val.toNumber();
   const clean = String(val).replace(/[\s\u00A0]/g, '').replace(',', '.');
   const parsed = parseFloat(clean);
   return isNaN(parsed) ? 0 : parsed;
@@ -295,18 +449,17 @@ export const calculateFutureValue = (principal: number, rate: number, years: num
 };
 
 // ✅ UTILITAIRE MAJEUR : Utilisation de l'Enum Frequency
-export const calculateListTotal = (items: FinancialItem[]): number => {
+export const calculateListTotal = (items: { amount: number | string; frequency?: Frequency | string }[]): number => {
   if (!Array.isArray(items)) return 0; 
   
   return items.reduce((acc, item) => {
     let amount = Math.abs(safeFloat(item.amount));
     
-    // Si c'est Annuel ou Trimestriel, on mensualise
     if (item.frequency === Frequency.YEARLY) amount = amount / 12;
     if (item.frequency === Frequency.QUARTERLY) amount = amount / 3;
     if (item.frequency === Frequency.WEEKLY) amount = amount * 4.33;
     if (item.frequency === Frequency.DAILY) amount = amount * 30;
-    if (item.frequency === Frequency.ONCE) amount = 0; // On ne compte pas le ponctuel dans le budget mensuel
+    if (item.frequency === Frequency.ONCE) amount = 0;
 
     return acc + amount;
   }, 0);

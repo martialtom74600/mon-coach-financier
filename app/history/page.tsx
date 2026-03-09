@@ -25,7 +25,8 @@ import CalendarView from '@/app/components/CalendarView';
 
 export default function HistoryPage() {
   const router = useRouter();
-  const { history, profile, isLoaded, deleteDecision } = useFinancialData();
+  const { profile, isLoaded, deleteDecision } = useFinancialData();
+  const history = profile?.decisions || [];
   
   const [viewMode, setViewMode] = useState<'list' | 'calendar'>('calendar');
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
@@ -44,20 +45,17 @@ export default function HistoryPage() {
 
   // Tris
   const sortedHistory = useMemo(() => {
-    return [...(history || [])].sort((a, b) => {
-        const dateA = new Date(a.purchase?.date || a.date).getTime();
-        const dateB = new Date(b.purchase?.date || b.date).getTime();
+    return [...history].sort((a, b) => {
+        const dateA = new Date(a.date).getTime();
+        const dateB = new Date(b.date).getTime();
         return dateB - dateA;
     });
   }, [history]);
 
-  // Stats
   const stats = useMemo(() => {
     const total = sortedHistory.length;
-    const accepted = sortedHistory.filter((h) => h.result?.verdict === 'green').length;
-    const rejected = sortedHistory.filter((h) => h.result?.verdict === 'red').length;
-    const amountTotal = sortedHistory.reduce((acc, h) => acc + (parseFloat(h.purchase?.amount) || 0), 0);
-    return { total, accepted, rejected, amountTotal };
+    const amountTotal = sortedHistory.reduce((acc, h) => acc + (h.amount || 0), 0);
+    return { total, accepted: 0, rejected: 0, amountTotal };
   }, [sortedHistory]);
 
   // ACTION SUPPRESSION
@@ -122,14 +120,12 @@ export default function HistoryPage() {
                 </div>
                 ) : (
                 sortedHistory.map((item) => {
-                    const theme = getTheme(item.result?.verdict);
+                    const theme = getTheme('green');
                     const Icon = theme.icon;
-                    const displayDate = item.purchase?.date || item.date;
                     
                     return (
                     <Card key={item.id} className={`p-5 flex flex-col sm:flex-row gap-4 sm:items-center transition-all hover:shadow-md border-l-4 ${theme.border.replace('border', 'border-l')} relative group`}>
                         
-                        {/* Bouton Poubelle */}
                         <button 
                             onClick={(e) => handleDelete(item.id, e)}
                             className="absolute top-4 right-4 p-2 bg-white text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-full transition-all opacity-0 group-hover:opacity-100 shadow-sm border border-slate-100"
@@ -138,39 +134,32 @@ export default function HistoryPage() {
                             {isDeleting === item.id ? <div className="animate-spin h-4 w-4 border-2 border-rose-500 border-t-transparent rounded-full"></div> : <Trash2 size={16} />}
                         </button>
 
-                        {/* Date & Icône */}
                         <div className="flex items-center gap-4 sm:w-1/4">
                             <div className={`p-3 rounded-xl ${theme.bg} ${theme.color} shrink-0`}><Icon size={24} /></div>
                             <div className="flex flex-col">
                                 <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Date</span>
-                                <span className="text-sm font-bold text-slate-700">{formatDate(displayDate)}</span>
+                                <span className="text-sm font-bold text-slate-700">{formatDate(item.date.toString())}</span>
                             </div>
                         </div>
 
-                        {/* Détails */}
                         <div className="flex-1">
-                            <h3 className="font-bold text-slate-800 text-lg mb-1">{item.purchase?.name}</h3>
+                            <h3 className="font-bold text-slate-800 text-lg mb-1">{item.name}</h3>
                             <div className="flex flex-wrap gap-2">
                                 <Badge color="bg-slate-100 text-slate-600 border border-slate-200">
-                                    {item.purchase?.type === 'need' ? 'Besoin' : item.purchase?.type === 'useful' ? 'Utile' : 'Envie'}
+                                    {item.type === 'NEED' ? 'Besoin' : item.type === 'OPPORTUNITY' ? 'Utile' : 'Envie'}
                                 </Badge>
                                 <Badge color="bg-slate-100 text-slate-600 border border-slate-200">
-                                    {item.purchase?.paymentMode === 'CASH_SAVINGS' ? 'Épargne' : 
-                                     item.purchase?.paymentMode === 'CREDIT' ? 'Crédit' : 'Compte courant'}
+                                    {item.paymentMode === 'CASH_SAVINGS' ? 'Épargne' : 
+                                     item.paymentMode === 'CREDIT' ? 'Crédit' : 'Compte courant'}
                                 </Badge>
                             </div>
                         </div>
 
-                        {/* Montant & Verdict */}
                         <div className="text-right flex flex-col items-end gap-1 sm:pr-12">
                             <div className="font-black text-slate-900 text-xl tracking-tight">
-                                {formatCurrency(item.purchase?.amount)}
+                                {formatCurrency(item.amount)}
                             </div>
-                            {item.result?.issues?.length > 0 ? (
-                                <Badge color={theme.badge}>{item.result.issues.length} alerte(s)</Badge>
-                            ) : (
-                                <Badge color="bg-emerald-100 text-emerald-700">RAS - Sain</Badge>
-                            )}
+                            <Badge color="bg-emerald-100 text-emerald-700">Enregistré</Badge>
                         </div>
                     </Card>
                     );
