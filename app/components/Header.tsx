@@ -32,6 +32,11 @@ export default function Header() {
       emoji: '👤',
       subtitle: 'Configure ta situation pour affiner le coach.',
     },
+    '/goals': {
+      title: 'Mes objectifs',
+      emoji: '🎯',
+      subtitle: 'Définis et suis tes objectifs financiers.',
+    },
     '/simulator': {
       title: 'Nouveau Projet',
       emoji: '🚀',

@@ -71,9 +71,10 @@ export default function ProactiveInsightsCard({ insights, onDismiss, onOpenGuide
   const snoozeTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
 
   useEffect(() => {
+    const timers = snoozeTimersRef.current;
     return () => {
-      snoozeTimersRef.current.forEach((t) => clearTimeout(t));
-      snoozeTimersRef.current.clear();
+      timers.forEach((t) => clearTimeout(t));
+      timers.clear();
     };
   }, []);
 
