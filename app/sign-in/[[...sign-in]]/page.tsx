@@ -16,7 +16,7 @@ export default function SignInPage() {
           layout: { socialButtonsPlacement: 'bottom' },
           elements: {
             ...clerkAppearanceHybrid.elements,
-            card: 'shadow-none p-0',
+            card: 'shadow-none p-4 sm:p-6',
             formButtonPrimary:
               'bg-slate-900 hover:bg-slate-800 py-3 text-base shadow-lg shadow-slate-200',
             footerActionLink: 'hidden',

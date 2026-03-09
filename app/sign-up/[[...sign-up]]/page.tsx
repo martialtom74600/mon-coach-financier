@@ -16,7 +16,7 @@ export default function SignUpPage() {
           layout: { socialButtonsPlacement: 'bottom' },
           elements: {
             ...clerkAppearanceHybrid.elements,
-            card: 'shadow-none p-0',
+            card: 'shadow-none p-4 sm:p-6',
             formButtonPrimary:
               'bg-indigo-600 hover:bg-indigo-700 py-3 text-base shadow-lg shadow-indigo-200',
             footerActionLink: 'hidden',
