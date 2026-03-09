@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { usePathname } from 'next/navigation';
+import { UserButton } from '@clerk/nextjs';
 import { useFinancialData } from '@/app/hooks/useFinancialData';
 
 export default function Header() {
@@ -62,6 +63,16 @@ export default function Header() {
         <p className="text-slate-500 mt-2 text-base">
           {content.subtitle}
         </p>
+      </div>
+      <div className="mt-4 md:mt-0">
+        <UserButton
+          afterSignOutUrl="/"
+          appearance={{
+            elements: {
+              avatarBox: 'w-10 h-10',
+            },
+          }}
+        />
       </div>
     </header>
   );
