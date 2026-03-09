@@ -13,6 +13,8 @@ const isPublicRoute = createRouteMatcher([
 ]);
 
 const isApiRoute = createRouteMatcher(['/api(.*)']);
+// F.3 — Route CRON : protégée par CRON_SECRET dans le handler, pas par Clerk
+const isCronRoute = createRouteMatcher(['/api/cron(.*)']);
 
 export default clerkMiddleware(async (auth, req) => {
   // E.1 — Rate limiting sur toutes les routes API (20 req/10s par IP)
@@ -23,10 +25,17 @@ export default clerkMiddleware(async (auth, req) => {
     }
   }
 
+  // F.3 — Les routes CRON bypassent Clerk (auth via CRON_SECRET dans le handler)
+  if (isCronRoute(req)) {
+    return NextResponse.next();
+  }
+
   // RÈGLE : Si ce n'est PAS une route publique, on bloque l'accès (404/Redirection).
   if (!isPublicRoute(req)) {
     auth().protect();
   }
+
+  return NextResponse.next();
 });
 
 export const config = {

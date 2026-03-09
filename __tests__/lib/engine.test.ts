@@ -13,6 +13,7 @@ import {
   computeFinancialPlan,
   simulateGoalScenario,
   analyzeProfileHealth,
+  estimateTaxSavings,
 } from '@/app/lib/engine';
 import type { SimulationRates } from '@/app/lib/engine';
 import {
@@ -115,6 +116,59 @@ const RATES: SimulationRates = {
   MARKET_AVG: 0.07,
   SAFE_WITHDRAWAL: 0.04,
 };
+
+// ============================================================================
+// estimateTaxSavings — TAX_BRACKETS (Tranches 2025)
+// TMI: 0-11294→11%, 11294-28797→30%, 28797-82341→41%, 82341-177106→45%, >177106→45%
+// ============================================================================
+
+describe('estimateTaxSavings', () => {
+  it('retourne 0 si revenu ou versement <= 0', () => {
+    expect(estimateTaxSavings(0, 1000)).toBe(0);
+    expect(estimateTaxSavings(30000, 0)).toBe(0);
+    expect(estimateTaxSavings(-100, 1000)).toBe(0);
+  });
+
+  it('TMI 11% : revenu 10 000€, versement 1 000€ → économie 110€', () => {
+    const annualIncome = 10000;
+    const perContribution = 1000;
+    const expected = Math.round(perContribution * 0.11);
+    expect(estimateTaxSavings(annualIncome, perContribution)).toBe(expected);
+    expect(expected).toBe(110);
+  });
+
+  it('TMI 30% : revenu 20 000€, versement 1 000€ → économie 300€', () => {
+    const annualIncome = 20000;
+    const perContribution = 1000;
+    const expected = Math.round(perContribution * 0.30);
+    expect(estimateTaxSavings(annualIncome, perContribution)).toBe(expected);
+    expect(expected).toBe(300);
+  });
+
+  it('TMI 41% : revenu 50 000€, versement 3 000€ → économie 1 230€', () => {
+    const annualIncome = 50000;
+    const perContribution = 3000;
+    const expected = Math.round(perContribution * 0.41);
+    expect(estimateTaxSavings(annualIncome, perContribution)).toBe(expected);
+    expect(expected).toBe(1230);
+  });
+
+  it('TMI 45% : revenu 100 000€, versement 2 000€ → économie 900€', () => {
+    const annualIncome = 100000;
+    const perContribution = 2000;
+    const expected = Math.round(perContribution * 0.45);
+    expect(estimateTaxSavings(annualIncome, perContribution)).toBe(expected);
+    expect(expected).toBe(900);
+  });
+
+  it('Revenu > 177 106€ : TMI 45% (dernière tranche)', () => {
+    const annualIncome = 200000;
+    const perContribution = 1000;
+    const expected = Math.round(perContribution * 0.45);
+    expect(estimateTaxSavings(annualIncome, perContribution)).toBe(expected);
+    expect(expected).toBe(450);
+  });
+});
 
 // ============================================================================
 // INVARIANT : Calcul théorique des efforts mensuels
@@ -743,5 +797,26 @@ describe('analyzeProfileHealth', () => {
     const highSaver = analyzeProfileHealth(profile, makeContext({ ...base, capacityToSave: 2000 }));
 
     expect(highSaver.projections.fireYear).toBeLessThan(lowSaver.projections.fireYear);
+  });
+
+  it('tax_optim_open inclut potentialGain calculé via TAX_BRACKETS (Blind & Logic)', () => {
+    const profile = makeProfile();
+    const monthlyIncome = 4000;
+    const annualIncome = monthlyIncome * 12;
+    const context = makeContext({
+      monthlyIncome,
+      endOfMonthBalance: 500,
+      matelas: 5000,
+      investments: 5000,
+      totalWealth: 10000,
+    });
+
+    const result = analyzeProfileHealth(profile, context);
+    const taxOpp = result.opportunities.find((o) => o.id === 'tax_optim_open');
+    expect(taxOpp).toBeDefined();
+
+    const expectedSavings = estimateTaxSavings(annualIncome, 3000);
+    expect(taxOpp!.potentialGain).toBe(expectedSavings);
+    expect(taxOpp!.message).toContain('économisez');
   });
 });

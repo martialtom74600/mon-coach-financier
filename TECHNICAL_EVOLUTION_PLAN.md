@@ -534,10 +534,11 @@ Chaque étape est **atomique** : elle peut être livrée indépendamment, testé
 - **Impact** : Nouveau `sentry.client.config.ts`, `sentry.server.config.ts`, `sentry.edge.config.ts`, modification de `next.config.js`.
 - **Fichiers touchés** : `next.config.js`, `sentry.client.config.ts`, `sentry.server.config.ts`, `sentry.edge.config.ts`, `instrumentation.ts`, `app/lib/logger.ts`, `app/lib/validations.ts`, `app/global-error.tsx`, `app/error.tsx`, toutes les routes `app/api/**/route.ts`.
 
-#### E.6 — Créer `.env.example`
+#### E.6 — [TERMINÉ] Créer `.env.example`
 
 - **Quoi** : Documenter toutes les variables d'environnement nécessaires.
 - **Pourquoi** : Aucun nouveau développeur ne sait quelles variables configurer. Le projet ne démarre pas sans `POSTGRES_URL`, `POSTGRES_PRISMA_URL`, les clés Clerk, etc.
+- **Implémentation réalisée** : Fichier `.env.example` avec sections commentées : Base de données (POSTGRES_URL, POSTGRES_PRISMA_URL), Clerk (NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY, CLERK_SECRET_KEY), Rate limiting (UPSTASH_REDIS_REST_URL, UPSTASH_REDIS_REST_TOKEN), Sentry (NEXT_PUBLIC_SENTRY_DSN, SENTRY_AUTH_TOKEN, etc.).
 - **Impact** : Nouveau fichier `.env.example` à la racine.
 - **Fichiers touchés** : `.env.example` (nouveau).
 
@@ -547,34 +548,38 @@ Chaque étape est **atomique** : elle peut être livrée indépendamment, testé
 
 > Priorité : **MOYENNE**. Forte valeur produit, effort modéré.
 
-#### F.1 — Utiliser `TAX_BRACKETS` pour le calcul fiscal PER
+#### F.1 — [TERMINÉ] Utiliser `TAX_BRACKETS` pour le calcul fiscal PER
 
 - **Quoi** : Créer une fonction `estimateTaxSavings(annualIncome, perContribution)` utilisant `FINANCIAL_KNOWLEDGE.TAX_BRACKETS`.
 - **Pourquoi** : Le guide PER (engine.ts:136-147) recommande d'ouvrir un PER mais ne chiffre jamais l'économie d'impôt. Avec les tranches, on peut dire "Vous économisez X€ d'impôt sur ce versement".
 - **Impact** : Nouveau helper dans `engine.ts`, enrichissement de l'opportunité `tax_optim_open/boost`.
 - **Fichiers touchés** : `engine.ts`.
+- **Implémentation réalisée** : `estimateTaxSavings(annualIncome, perContribution)` calcule le TMI via TAX_BRACKETS et retourne `perContribution × TMI`. Les opportunités PER incluent `potentialGain` et un message chiffré ("Vous économisez ~X€ d'impôt sur un versement de Y€"). Tests Blind & Logic dans `engine.test.ts`.
 
-#### F.2 — Exploiter `AssetHistory` pour les tendances
+#### F.2 — [TERMINÉ] Exploiter `AssetHistory` pour les tendances
 
 - **Quoi** : Créer un endpoint `GET /api/assets/[id]/history` et un composant `AssetChart` affichant l'évolution de chaque actif dans le temps.
 - **Pourquoi** : Les données sont collectées par `assetService.ts:42-47` à chaque modification mais jamais affichées. C'est un trésor dormant : montrer la croissance du patrimoine est le meilleur motivateur comportemental.
+- **Implémentation réalisée** : `getAssetHistory(userId, assetId)` dans `assetService.ts` (ownership via `findOwnedAsset`, sérialisation Decimal→number). Route `GET /api/assets/[id]/history` avec auth Clerk et `validateId`. Composant `AssetChart.tsx` (Recharts AreaChart, fetch on expand, états loading/error/empty). Intégration dans `StepAssets` (profile/page.tsx). Tests unitaires `assetService.test.ts` (Blind & Logic : valeurs 1000€ et 1500€ attendues).
 - **Impact** : Nouveau route `api/assets/[id]/history/route.ts`, nouveau composant, modification de la page profil ou dashboard.
-- **Fichiers touchés** : Nouveaux fichiers + `page.tsx` ou `profile/page.tsx`.
+- **Fichiers touchés** : `assetService.ts`, `api/assets/[id]/history/route.ts`, `AssetChart.tsx`, `profile/page.tsx`, `__tests__/lib/assetService.test.ts`.
 
-#### F.3 — Implémenter la rétention `AssetHistory`
+#### F.3 — [TERMINÉ] Implémenter la rétention `AssetHistory`
 
 - **Quoi** : Créer un job d'agrégation qui compresse les snapshots quotidiens en snapshots mensuels après 1 an.
 - **Pourquoi** : Sans rétention, la table `asset_history` croît indéfiniment. Un utilisateur actif avec 5 actifs modifiés hebdomairement = 260 lignes/an. Sur 10 ans et 10 000 utilisateurs = 26M lignes.
 - **Implémentation** : CRON job (Vercel Cron ou API route déclenchée) qui agrège en moyenne mensuelle les snapshots > 12 mois.
+- **Implémentation réalisée** : `aggregateAssetHistory()` dans `assetService.ts` (cutoff 12 mois, regroupement par assetId+mois, moyenne arrondie à 2 décimales, transaction deleteMany+createMany). Route `GET /api/cron/aggregate-history` protégée par `CRON_SECRET` (Authorization: Bearer). `vercel.json` : cron quotidien à 03:00 UTC. Middleware : bypass Clerk pour `/api/cron/*`. Tests Blind & Logic dans `assetService.test.ts` (vide, 1 mois, 2 mois, arrondi).
 - **Impact** : Nouveau `api/cron/aggregate-history/route.ts`.
-- **Fichiers touchés** : Nouveau fichier, potentiellement `vercel.json` pour le cron.
+- **Fichiers touchés** : `assetService.ts`, `api/cron/aggregate-history/route.ts`, `vercel.json`, `middleware.ts`, `__tests__/lib/assetService.test.ts`.
 
-#### F.4 — Ajouter l'analyse rétrospective des décisions
+#### F.4 — [TERMINÉ] Ajouter l'analyse rétrospective des décisions
 
 - **Quoi** : Ajouter un champ `outcome: 'SATISFIED' | 'REGRETTED' | null` au modèle `PurchaseDecision` et une UI de feedback dans la page historique.
 - **Pourquoi** : Le journal de décisions est actuellement en écriture seule. Permettre un feedback rétrospectif ferme la boucle comportementale : "Est-ce que cet achat valait le coup ?" C'est le cœur de la mission éducative.
 - **Impact** : Migration Prisma (nouveau champ), modification `history/page.tsx`, `stats.accepted`/`stats.rejected` auront enfin des valeurs.
 - **Fichiers touchés** : `schema.prisma`, `history/page.tsx`, `decisionService.ts`, `validations.ts`.
+- **Implémentation réalisée** : Enum `DecisionOutcome` (SATISFIED, REGRETTED) dans `schema.prisma` ; champ `outcome` optionnel sur `PurchaseDecision` ; migration `20260309000000_add_decision_outcome` ; `updateDecisionSchema` et `purchaseDecisionResponseSchema` avec `outcome` ; `updateDecisionOutcome` dans `useFinancialData` ; UI feedback (boutons "J'ai bien fait" / "Je regrette" / "Réinitialiser") dans `history/page.tsx` ; stats `accepted`/`rejected` calculées depuis `outcome`. PATCH `/api/decisions/[id]` existant réutilisé. Tests validations (Blind & Logic) : outcome valide/invalide/null.
 
 ---
 
@@ -731,7 +736,7 @@ Chaque étape est **atomique** : elle peut être livrée indépendamment, testé
 | `userService.ts` / `api/user/route.ts` | 34/36 | ~~Fallback `"no-email"` → violation unique~~ [TERMINÉ E.4] | ✅ |
 | `profileService.ts` | 18-21 | Pas de check d'existence → 500 au lieu de 404 | 🟡 |
 | `useFinancialData.ts` | ~fetchData | Full refetch (cache-busting supprimé D.3) | 🟡 |
-| `engine.ts` | 36-41 | `TAX_BRACKETS` définis mais jamais utilisés | 🟡 |
+| `engine.ts` | 36-41 | ~~`TAX_BRACKETS` définis mais jamais utilisés~~ [TERMINÉ F.1] | ✅ |
 | `next.config.js` | — | ~~Aucun security header~~ [TERMINÉ E.2] | ✅ |
 | Toutes routes API | — | ~~Aucun rate limiting~~ [TERMINÉ E.1] | ✅ |
 | Routes `[id]` | — | ~~Pas de validation de format d'ID~~ [TERMINÉ E.3] | ✅ |

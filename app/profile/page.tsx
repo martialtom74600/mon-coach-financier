@@ -29,6 +29,7 @@ import InputGroup from '@/app/components/ui/InputGroup';
 import ProgressBar from '@/app/components/ui/ProgressBar';
 import Badge from '@/app/components/ui/Badge';
 import AccordionSection from '@/app/components/AccordionSection';
+import AssetChart from '@/app/components/AssetChart';
 
 // Icons
 import {
@@ -147,16 +148,13 @@ const mapFormToPayload = (formData: FormProfile, lifestyle: number) => {
     dayOfMonth: item.category === ItemCategory.VARIABLE_COST ? null : (item.dayOfMonth ?? 1)
   }));
 
-  // 2. Conversion Assets UI -> DB Assets
+  // 2. Conversion Assets UI -> DB Assets (id préservé pour upsert → AssetHistory)
   const assets = formData.assetsUi.map(asset => {
-    // Mapping UI type -> DB Enum AssetType si besoin (normalement c'est aligné)
-    // Ici on fait confiance à l'UI qui utilise les IDs de ASSET_TYPES qui doivent matcher
     let typeKey = asset.type; 
-    
-    // Petite sécurité pour les vieux profils
     if (typeKey === 'cc') typeKey = 'CC';
     
     return {
+      id: asset.id, // CUID existant si chargé depuis le profil
       name: asset.name,
       type: typeKey as AssetType, 
       currentValue: asset.stock,      
@@ -600,6 +598,7 @@ const StepAssets = ({ formData, updateForm, addItem, removeItem, updateItem, onN
                                             </>
                                         )}
                                     </div>
+                                    <AssetChart assetId={item.id} assetName={item.name} className="mt-3 pt-3 border-t border-slate-100" />
                                 </div>
                             );
                         })}

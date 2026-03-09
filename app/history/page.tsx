@@ -12,7 +12,10 @@ import {
   ArrowRight, 
   List,
   LayoutGrid,
-  Trash2
+  Trash2,
+  ThumbsUp,
+  ThumbsDown,
+  RotateCcw
 } from 'lucide-react';
 import { useFinancialData } from '@/app/hooks/useFinancialData';
 import { formatCurrency, generateTimeline } from '@/app/lib/logic'; // Utilise le nouvel export unifié
@@ -25,11 +28,12 @@ import CalendarView from '@/app/components/CalendarView';
 
 export default function HistoryPage() {
   const router = useRouter();
-  const { profile, isLoaded, deleteDecision } = useFinancialData();
+  const { profile, isLoaded, deleteDecision, updateDecisionOutcome } = useFinancialData();
   const history = useMemo(() => profile?.decisions || [], [profile?.decisions]);
   
   const [viewMode, setViewMode] = useState<'list' | 'calendar'>('calendar');
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
+  const [updatingOutcome, setUpdatingOutcome] = useState<string | null>(null);
 
   // --- TIMELINE (Génération sécurisée) ---
   const timeline = useMemo(() => {
@@ -55,7 +59,9 @@ export default function HistoryPage() {
   const stats = useMemo(() => {
     const total = sortedHistory.length;
     const amountTotal = sortedHistory.reduce((acc, h) => acc + (h.amount || 0), 0);
-    return { total, accepted: 0, rejected: 0, amountTotal };
+    const accepted = sortedHistory.filter((h) => (h as { outcome?: string }).outcome === 'SATISFIED').length;
+    const rejected = sortedHistory.filter((h) => (h as { outcome?: string }).outcome === 'REGRETTED').length;
+    return { total, accepted, rejected, amountTotal };
   }, [sortedHistory]);
 
   // ACTION SUPPRESSION
@@ -87,6 +93,15 @@ export default function HistoryPage() {
     }
   };
 
+  const handleOutcome = async (id: string, outcome: 'SATISFIED' | 'REGRETTED' | null) => {
+    setUpdatingOutcome(id);
+    try {
+      await updateDecisionOutcome(id, outcome);
+    } finally {
+      setUpdatingOutcome(null);
+    }
+  };
+
   if (!isLoaded) return <div className="min-h-[50vh] flex items-center justify-center"><div className="animate-pulse h-12 w-12 bg-slate-200 rounded-full"></div></div>;
 
   return (
@@ -114,14 +129,16 @@ export default function HistoryPage() {
                 {sortedHistory.length === 0 ? (
                 <div className="text-center py-20 opacity-60 bg-white rounded-3xl border border-slate-200 border-dashed">
                     <div className="bg-slate-50 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6"><LayoutGrid size={32} className="text-slate-400" /></div>
-                    <h3 className="text-xl font-bold text-slate-800 mb-2">C&apos;est encore vide ici</h3>
-                    <p className="text-slate-500 max-w-xs mx-auto mb-8">Tes futures simulations s&apos;afficheront ici.</p>
+                    <h3 className="text-xl font-bold text-slate-800 mb-2">{"C'est encore vide ici"}</h3>
+                    <p className="text-slate-500 max-w-xs mx-auto mb-8">{"Tes futures simulations s'afficheront ici."}</p>
                     <Button onClick={() => router.push('/simulator')}>Faire une simulation <ArrowRight size={18} /></Button>
                 </div>
                 ) : (
                 sortedHistory.map((item) => {
-                    const theme = getTheme('green');
+                    const outcome = (item as { outcome?: string }).outcome;
+                    const theme = outcome === 'SATISFIED' ? getTheme('green') : outcome === 'REGRETTED' ? getTheme('red') : getTheme('default');
                     const Icon = theme.icon;
+                    const isUpdating = updatingOutcome === item.id;
                     
                     return (
                     <Card key={item.id} className={`p-5 flex flex-col sm:flex-row gap-4 sm:items-center transition-all hover:shadow-md border-l-4 ${theme.border.replace('border', 'border-l')} relative group`}>
@@ -153,13 +170,46 @@ export default function HistoryPage() {
                                      item.paymentMode === 'CREDIT' ? 'Crédit' : 'Compte courant'}
                                 </Badge>
                             </div>
+                            <div className="flex items-center gap-3 mt-3">
+                                <span className="text-xs text-slate-500 font-medium">Cet achat valait le coup ?</span>
+                                <div className="flex items-center gap-1 p-0.5 rounded-xl bg-slate-100/80 border border-slate-200/80">
+                                    <button
+                                        onClick={() => handleOutcome(item.id, 'SATISFIED')}
+                                        disabled={isUpdating}
+                                        title="J'ai bien fait"
+                                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all disabled:opacity-60 disabled:cursor-not-allowed ${outcome === 'SATISFIED' ? 'bg-emerald-500 text-white shadow-sm' : 'text-slate-500 hover:bg-white hover:text-emerald-600'}`}
+                                    >
+                                        <ThumbsUp size={14} strokeWidth={2.5} /><span className="hidden sm:inline">Oui</span>
+                                    </button>
+                                    <button
+                                        onClick={() => handleOutcome(item.id, 'REGRETTED')}
+                                        disabled={isUpdating}
+                                        title="Je regrette"
+                                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all disabled:opacity-60 disabled:cursor-not-allowed ${outcome === 'REGRETTED' ? 'bg-rose-500 text-white shadow-sm' : 'text-slate-500 hover:bg-white hover:text-rose-600'}`}
+                                    >
+                                        <ThumbsDown size={14} strokeWidth={2.5} /><span className="hidden sm:inline">Non</span>
+                                    </button>
+                                    {outcome && (
+                                        <button
+                                            onClick={() => handleOutcome(item.id, null)}
+                                            disabled={isUpdating}
+                                            title="Réinitialiser"
+                                            className="ml-1 p-1.5 rounded-lg text-slate-400 hover:bg-slate-200/60 hover:text-slate-600 transition-colors"
+                                        >
+                                            <RotateCcw size={12} />
+                                        </button>
+                                    )}
+                                </div>
+                            </div>
                         </div>
 
                         <div className="text-right flex flex-col items-end gap-1 sm:pr-12">
                             <div className="font-black text-slate-900 text-xl tracking-tight">
                                 {formatCurrency(item.amount)}
                             </div>
-                            <Badge color="bg-emerald-100 text-emerald-700">Enregistré</Badge>
+                            <Badge color={outcome === 'SATISFIED' ? 'bg-emerald-100 text-emerald-700' : outcome === 'REGRETTED' ? 'bg-rose-100 text-rose-700' : 'bg-slate-100 text-slate-600'}>
+                                {outcome === 'SATISFIED' ? 'Satisfait' : outcome === 'REGRETTED' ? 'Regretté' : 'À évaluer'}
+                            </Badge>
                         </div>
                     </Card>
                     );
@@ -201,7 +251,7 @@ export default function HistoryPage() {
                         <span className="font-bold text-rose-600">{stats.rejected}</span>
                     </div>
                     <ProgressBar value={stats.rejected} max={stats.total || 1} colorClass="bg-rose-500" />
-                    <p className="text-xs text-slate-500 mt-2 italic">Ces projets ont été marqués comme &quot;Pas maintenant&quot;.</p>
+                    <p className="text-xs text-slate-500 mt-2 italic">Ces achats ont été marqués comme regrettés.</p>
                 </div>
             )}
           </div>

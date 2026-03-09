@@ -175,6 +175,26 @@ const calculateCompoundMonths = (target: number, pmt: number, rate: number) => {
     } catch { return 999; }
 };
 
+/**
+ * Estime l'économie d'impôt sur un versement PER (déduction du revenu imposable).
+ * Utilise TAX_BRACKETS pour le TMI (taux marginal d'imposition).
+ * @param annualIncome Revenu imposable annuel (€)
+ * @param perContribution Montant du versement PER (€)
+ * @returns Économie d'impôt estimée (€)
+ */
+export const estimateTaxSavings = (annualIncome: number, perContribution: number): number => {
+  if (annualIncome <= 0 || perContribution <= 0) return 0;
+  const brackets = FINANCIAL_KNOWLEDGE.TAX_BRACKETS;
+  let marginalRate = brackets[brackets.length - 1].r;
+  for (const b of brackets) {
+    if (annualIncome <= b.t) {
+      marginalRate = b.r;
+      break;
+    }
+  }
+  return Math.round(perContribution * marginalRate);
+};
+
 // ✅ HELPER INTELLIGENT TYPÉ : Vérifie si l'utilisateur possède déjà un actif
 const hasAsset = (profile: Profile, typeKeys: string[]): boolean => {
   const assets = profile.assets || [];
@@ -499,17 +519,23 @@ export const analyzeProfileHealth = (
 
   // C. OPTIMISATION FISCALE (PER)
   if (totalIncome > 3500 && invested < 20000) {
+      const annualIncome = totalIncome * 12;
+      const exampleContribution = Math.max(500, Math.min(3000, Math.round(annualIncome * 0.08 / 100) * 100));
+      const taxSavings = estimateTaxSavings(annualIncome, exampleContribution);
+      const savingsMsg = taxSavings > 0 ? ` Vous économisez ~${formatCurrency(taxSavings)} d'impôt sur un versement de ${formatCurrency(exampleContribution)}.` : '';
       if (hasAsset(profile, ['per'])) {
           opps.push({ 
              id: 'tax_optim_boost', type: 'INVESTMENT', level: 'INFO', 
-             title: 'Défiscalisation', message: 'Optimisez vos versements PER avant fin d\'année.', 
-             guide: ACTION_GUIDES.PER_BOOST 
+             title: 'Défiscalisation', message: `Optimisez vos versements PER avant fin d'année.${savingsMsg}`, 
+             guide: ACTION_GUIDES.PER_BOOST,
+             potentialGain: taxSavings
           });
       } else {
           opps.push({ 
              id: 'tax_optim_open', type: 'INVESTMENT', level: 'INFO', 
-             title: 'Trop d\'impôts ?', message: 'Avec vos revenus, le PER devient très intéressant.', 
-             guide: ACTION_GUIDES.PER_OPEN 
+             title: 'Trop d\'impôts ?', message: `Avec vos revenus, le PER devient très intéressant.${savingsMsg}`, 
+             guide: ACTION_GUIDES.PER_OPEN,
+             potentialGain: taxSavings
           });
       }
   }

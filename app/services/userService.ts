@@ -203,18 +203,51 @@ export async function saveFullUserProfile(
       });
     }
 
-    if (Array.isArray(assets) && assets.length > 0) {
-      await tx.asset.deleteMany({ where: { profileId: financialProfile.id } });
-      await tx.asset.createMany({
-        data: assets.map((asset) => ({
-          profileId: financialProfile.id,
+    if (Array.isArray(assets)) {
+      const existingAssets = await tx.asset.findMany({
+        where: { profileId: financialProfile.id },
+        select: { id: true, currentValue: true },
+      });
+      const existingById = new Map(existingAssets.map((a) => [a.id, a]));
+      const incomingIds = new Set(assets.map((a) => a.id).filter(Boolean));
+
+      for (const asset of assets) {
+        const currentValue = asset.currentValue ?? 0;
+        const data = {
           name: asset.name,
           type: asset.type,
-          currentValue: asset.currentValue ?? 0,
+          currentValue,
           monthlyFlow: asset.monthlyFlow ?? 0,
           transferDay: asset.transferDay ?? 1,
-        })),
-      });
+        };
+
+        const existing = asset.id ? existingById.get(asset.id) : null;
+        if (existing) {
+          await tx.asset.update({
+            where: { id: asset.id },
+            data,
+          });
+          if (Number(existing.currentValue) !== currentValue) {
+            await tx.assetHistory.create({
+              data: { assetId: asset.id!, value: currentValue },
+            });
+          }
+        } else {
+          const created = await tx.asset.create({
+            data: { profileId: financialProfile.id, ...data },
+          });
+          await tx.assetHistory.create({
+            data: { assetId: created.id, value: currentValue },
+          });
+        }
+      }
+
+      const toDelete = existingAssets.filter((a) => !incomingIds.has(a.id));
+      if (toDelete.length > 0) {
+        await tx.asset.deleteMany({
+          where: { id: { in: toDelete.map((a) => a.id) } },
+        });
+      }
     }
 
     if (Array.isArray(goals) && goals.length > 0) {

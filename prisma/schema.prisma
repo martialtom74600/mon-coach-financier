@@ -95,6 +95,11 @@ enum PaymentMode {
   SPLIT
 }
 
+enum DecisionOutcome {
+  SATISFIED
+  REGRETTED
+}
+
 // =========================================================
 // 3. TABLES (MODÈLES)
 // =========================================================
@@ -240,6 +245,9 @@ model PurchaseDecision {
   // --- CRÉDIT / SPLIT ---
   duration       Int?    // Mois
   rate           Decimal?  @db.Decimal(5, 2) // Taux
+
+  // --- RÉTROSPECTIVE ---
+  outcome        DecisionOutcome? // Feedback utilisateur : "J'ai bien fait" / "Je regrette"
 
   createdAt      DateTime @default(now())
 

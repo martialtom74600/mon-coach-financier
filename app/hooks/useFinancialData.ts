@@ -273,6 +273,45 @@ export function useFinancialData() {
     } catch (err) { console.error(err); }
   };
 
+  const updateDecisionOutcome = async (id: string, outcome: 'SATISFIED' | 'REGRETTED' | null) => {
+    const previous = profile.decisions?.find((d) => d.id === id);
+    setProfile((prev) => ({
+      ...prev,
+      decisions: (prev.decisions || []).map((d) =>
+        d.id === id ? { ...d, outcome } : d
+      ),
+    }));
+    try {
+      const res = await fetch(`/api/decisions/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ outcome }),
+      });
+      if (res.ok) {
+        const raw = await res.json();
+        if (!parseAPIResponse(purchaseDecisionResponseSchema, raw, 'PATCH /api/decisions/:id')) {
+          setError("Données incohérentes reçues du serveur.");
+          fetchData();
+        }
+      } else {
+        setProfile((prev) => ({
+          ...prev,
+          decisions: (prev.decisions || []).map((d) =>
+            d.id === id && previous ? { ...d, outcome: (previous as { outcome?: string }).outcome } : d
+          ),
+        }));
+      }
+    } catch (err) {
+      console.error(err);
+      setProfile((prev) => ({
+        ...prev,
+        decisions: (prev.decisions || []).map((d) =>
+          d.id === id && previous ? { ...d, outcome: (previous as { outcome?: string }).outcome } : d
+        ),
+      }));
+    }
+  };
+
   return { 
       // Données
       profile, 
@@ -295,6 +334,7 @@ export function useFinancialData() {
       deleteGoal,
       
       addDecision,
-      deleteDecision
+      deleteDecision,
+      updateDecisionOutcome
   };
 }

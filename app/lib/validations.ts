@@ -31,6 +31,10 @@ const PaymentModeEnum = z.enum([
   'CASH_SAVINGS', 'CASH_CURRENT', 'CREDIT', 'SPLIT',
 ]);
 
+const DecisionOutcomeEnum = z.enum([
+  'SATISFIED', 'REGRETTED',
+]);
+
 const UserPersonaEnum = z.enum([
   'SALARIED', 'FREELANCE', 'STUDENT', 'RETIRED', 'UNEMPLOYED',
 ]);
@@ -137,6 +141,7 @@ export const updateDecisionSchema = z.object({
   reimbursedAt: z.coerce.date().nullable().optional(),
   duration: z.coerce.number().int().min(1).nullable().optional(),
   rate: z.coerce.number().finite().min(0).nullable().optional(),
+  outcome: DecisionOutcomeEnum.nullable().optional(),
 });
 
 // ============================================================================
@@ -178,6 +183,7 @@ const wizardItemSchema = z.object({
 });
 
 const wizardAssetSchema = z.object({
+  id: z.string().optional(), // CUID existant pour upsert (préserve AssetHistory)
   name: shortText,
   type: AssetTypeEnum,
   currentValue: amount.default(0),
@@ -288,6 +294,7 @@ export const purchaseDecisionResponseSchema = z.object({
   reimbursedAt: z.string().nullable(),
   duration: z.number().nullable(),
   rate: z.number().nullable(),
+  outcome: DecisionOutcomeEnum.nullable().optional(),
   createdAt: z.string(),
 });
 

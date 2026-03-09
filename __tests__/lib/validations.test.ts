@@ -11,6 +11,7 @@ import {
   createAssetSchema,
   createGoalSchema,
   createDecisionSchema,
+  updateDecisionSchema,
   updateProfileSchema,
   validateId,
   financialItemResponseSchema,
@@ -157,6 +158,40 @@ describe('createDecisionSchema — Tests adverses', () => {
       paymentMode: 'CASH_CURRENT',
     });
     expect(result.success).toBe(false);
+  });
+});
+
+// ============================================================================
+// updateDecisionSchema — F.4 Analyse rétrospective (outcome)
+// ============================================================================
+
+describe('updateDecisionSchema — outcome (F.4)', () => {
+  it('accepte outcome SATISFIED', () => {
+    const result = updateDecisionSchema.safeParse({ outcome: 'SATISFIED' });
+    expect(result.success).toBe(true);
+    expect(result.success && result.data.outcome).toBe('SATISFIED');
+  });
+
+  it('accepte outcome REGRETTED', () => {
+    const result = updateDecisionSchema.safeParse({ outcome: 'REGRETTED' });
+    expect(result.success).toBe(true);
+    expect(result.success && result.data.outcome).toBe('REGRETTED');
+  });
+
+  it('accepte outcome null (réinitialisation)', () => {
+    const result = updateDecisionSchema.safeParse({ outcome: null });
+    expect(result.success).toBe(true);
+    expect(result.success && result.data.outcome).toBeNull();
+  });
+
+  it('rejette outcome invalide', () => {
+    const result = updateDecisionSchema.safeParse({ outcome: 'INVALID_OUTCOME' });
+    expect(result.success).toBe(false);
+  });
+
+  it('accepte objet vide (PATCH partiel)', () => {
+    const result = updateDecisionSchema.safeParse({});
+    expect(result.success).toBe(true);
   });
 });
 
@@ -319,6 +354,48 @@ describe('purchaseDecisionResponseSchema — Bouclier (amount string)', () => {
     };
     const result = purchaseDecisionResponseSchema.safeParse(corrupted);
     expect(result.success).toBe(false);
+  });
+
+  it('accepte objet valide avec outcome (F.4)', () => {
+    const valid = {
+      id: 'd1',
+      profileId: 'p1',
+      name: 'Achat',
+      amount: 500,
+      date: '2026-04-01',
+      type: 'NEED',
+      paymentMode: 'CASH_CURRENT',
+      isPro: false,
+      isReimbursable: false,
+      reimbursedAt: null,
+      duration: null,
+      rate: null,
+      outcome: 'SATISFIED',
+      createdAt: '2026-01-01',
+    };
+    const result = purchaseDecisionResponseSchema.safeParse(valid);
+    expect(result.success).toBe(true);
+    expect(result.success && result.data.outcome).toBe('SATISFIED');
+  });
+
+  it('accepte objet valide sans outcome (rétrocompatibilité)', () => {
+    const valid = {
+      id: 'd1',
+      profileId: 'p1',
+      name: 'Achat',
+      amount: 500,
+      date: '2026-04-01',
+      type: 'NEED',
+      paymentMode: 'CASH_CURRENT',
+      isPro: false,
+      isReimbursable: false,
+      reimbursedAt: null,
+      duration: null,
+      rate: null,
+      createdAt: '2026-01-01',
+    };
+    const result = purchaseDecisionResponseSchema.safeParse(valid);
+    expect(result.success).toBe(true);
   });
 });
 
