@@ -30,14 +30,12 @@ const nextConfig = {
   },
 };
 
-// Configuration PWA intelligente
+// Configuration PWA — même comportement en dev et prod (évite les écarts Clerk, notifications)
 const withPWA = require("@ducanh2912/next-pwa").default({
   dest: "public",
-  // IMPORTANT : On désactive le PWA en mode développement pour éviter les bugs de cache
-  disable: process.env.NODE_ENV === "development",
+  disable: false,
   register: true,
   skipWaiting: true,
-  // I.3 — Custom worker pour push notifications
   customWorkerSrc: "worker",
 });
 
