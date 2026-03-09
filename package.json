@@ -18,6 +18,8 @@
     "@nivo/core": "^0.99.0",
     "@nivo/sankey": "^0.99.0",
     "@prisma/client": "^5.16.1",
+    "@upstash/ratelimit": "^2.0.8",
+    "@upstash/redis": "^1.36.4",
     "clsx": "^2.1.1",
     "date-fns": "^3.6.0",
     "lucide-react": "^0.395.0",

@@ -33,7 +33,7 @@ export async function POST(req: Request) {
     const parsed = saveUserSchema.safeParse(body);
     if (!parsed.success) return validationError(parsed.error);
 
-    const email = userAuth.emailAddresses[0]?.emailAddress || "no-email";
+    const email = userAuth.emailAddresses[0]?.emailAddress || `noemail+${userId}@placeholder.local`;
     const defaultFirstName = userAuth.firstName || "";
 
     const result = await userService.saveFullUserProfile(

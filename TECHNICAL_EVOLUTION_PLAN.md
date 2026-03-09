@@ -480,7 +480,7 @@ Chaque étape est **atomique** : elle peut être livrée indépendamment, testé
 
 > Priorité : **HAUTE** pour un déploiement réel.
 
-#### E.1 — Ajouter le rate limiting
+#### E.1 — [TERMINÉ] Ajouter le rate limiting
 
 - **Quoi** : Implémenter un rate limiter sur toutes les routes API.
 - **Pourquoi** : Sans rate limiting, un script automatisé peut saturer la DB Prisma/PostgreSQL.
@@ -489,10 +489,11 @@ Chaque étape est **atomique** : elle peut être livrée indépendamment, testé
   // middleware.ts ou helper partagé
   const ratelimit = new Ratelimit({ redis: kv, limiter: Ratelimit.slidingWindow(20, '10 s') });
   ```
+- **Implémentation réalisée** : `app/lib/ratelimit.ts` (helper conditionnel Upstash), `middleware.ts` (rate limit sur `/api/*` avant Clerk). 20 req/10s par IP (sliding window). Pass-through quand `UPSTASH_REDIS_REST_URL` et `UPSTASH_REDIS_REST_TOKEN` non configurés (dev local).
 - **Impact** : `middleware.ts` ou nouveau `lib/ratelimit.ts` + modification des routes.
-- **Fichiers touchés** : `middleware.ts`, potentiellement toutes les routes API.
+- **Fichiers touchés** : `middleware.ts`, `app/lib/ratelimit.ts`, `__tests__/lib/ratelimit.test.ts`.
 
-#### E.2 — Ajouter les security headers
+#### E.2 — [TERMINÉ] Ajouter les security headers
 
 - **Quoi** : Configurer `Content-Security-Policy`, `X-Frame-Options`, `X-Content-Type-Options`, `Strict-Transport-Security` dans `next.config.js`.
 - **Pourquoi** : Le PWA est actuellement vulnérable au clickjacking (pas de `X-Frame-Options`) et à l'injection de scripts tiers (pas de CSP).
@@ -508,7 +509,7 @@ Chaque étape est **atomique** : elle peut être livrée indépendamment, testé
 - **Impact** : `next.config.js` uniquement.
 - **Fichiers touchés** : `next.config.js`.
 
-#### E.3 — Valider les IDs dans les routes `[id]`
+#### E.3 — [TERMINÉ] Valider les IDs dans les routes `[id]`
 
 - **Quoi** : Ajouter un schéma Zod `z.string().cuid()` pour les paramètres d'URL.
 - **Pourquoi** : Un ID invalide (ex: `../../../etc/passwd`) est actuellement passé directement à Prisma. Même si Prisma paramétrise les requêtes (pas d'injection SQL), l'erreur Prisma brute peut leaker des infos de schéma.
@@ -516,13 +517,14 @@ Chaque étape est **atomique** : elle peut être livrée indépendamment, testé
 - **Impact** : Les 8 routes `[id]/route.ts`.
 - **Fichiers touchés** : `validations.ts`, `api/*/[id]/route.ts`.
 
-#### E.4 — Corriger le fallback "no-email"
+#### E.4 — [TERMINÉ] Corriger le fallback "no-email"
 
 - **Quoi** : Remplacer `"no-email"` par une génération d'email unique ou lever une erreur explicite.
 - **Pourquoi** : Deux utilisateurs sans email = violation de contrainte unique = crash Prisma P2002 en production.
 - **Implémentation** : `email: userAuth.emailAddresses[0]?.emailAddress || \`noemail+${userId}@placeholder.local\`` ou rejeter avec une erreur 400.
-- **Impact** : `services/userService.ts:34`.
-- **Fichiers touchés** : `services/userService.ts`.
+- **Implémentation réalisée** : `app/api/user/route.ts:36` — fallback `noemail+${userId}@placeholder.local` (unicité garantie par userId Clerk).
+- **Impact** : `app/api/user/route.ts:36`.
+- **Fichiers touchés** : `app/api/user/route.ts`.
 
 #### E.5 — Ajouter Sentry + structured logging
 
@@ -725,10 +727,10 @@ Chaque étape est **atomique** : elle peut être livrée indépendamment, testé
 | `scenarios.ts` | 60 | ~~`const events: any[]`~~ [TERMINÉ] | ✅ |
 | `scenarios.ts` | 107 | ~~`history: any[]`~~ [TERMINÉ] | ✅ |
 | `scenarios.ts` | 285 | ~~`currentStats: any`~~ [TERMINÉ] | ✅ |
-| `userService.ts` | 34 | Fallback `"no-email"` → violation unique | 🟠 |
+| `userService.ts` / `api/user/route.ts` | 34/36 | ~~Fallback `"no-email"` → violation unique~~ [TERMINÉ E.4] | ✅ |
 | `profileService.ts` | 18-21 | Pas de check d'existence → 500 au lieu de 404 | 🟡 |
 | `useFinancialData.ts` | ~fetchData | Full refetch (cache-busting supprimé D.3) | 🟡 |
 | `engine.ts` | 36-41 | `TAX_BRACKETS` définis mais jamais utilisés | 🟡 |
-| `next.config.js` | — | Aucun security header | 🟡 |
-| Toutes routes API | — | Aucun rate limiting | 🟠 |
-| Routes `[id]` | — | Pas de validation de format d'ID | 🟡 |
+| `next.config.js` | — | ~~Aucun security header~~ [TERMINÉ E.2] | ✅ |
+| Toutes routes API | — | ~~Aucun rate limiting~~ [TERMINÉ E.1] | ✅ |
+| Routes `[id]` | — | ~~Pas de validation de format d'ID~~ [TERMINÉ E.3] | ✅ |

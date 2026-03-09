@@ -1,18 +1,29 @@
+import { NextResponse } from 'next/server';
 import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server';
+import { checkRateLimit } from '@/app/lib/ratelimit';
 
 // LISTE BLANCHE : Les seules routes accessibles sans être connecté
 // 1. '/' : CRUCIAL pour la PWA. On laisse l'accès à l'accueil pour que l'app ne redirige pas.
 //    C'est le fichier app/page.tsx qui décidera d'afficher le Login ou le Dashboard.
 // 2. '/sign-in' & '/sign-up' : Pour pouvoir s'authentifier.
 const isPublicRoute = createRouteMatcher([
-  '/', 
+  '/',
   '/sign-in(.*)',
-  '/sign-up(.*)'
+  '/sign-up(.*)',
 ]);
 
-export default clerkMiddleware((auth, req) => {
+const isApiRoute = createRouteMatcher(['/api(.*)']);
+
+export default clerkMiddleware(async (auth, req) => {
+  // E.1 — Rate limiting sur toutes les routes API (20 req/10s par IP)
+  if (isApiRoute(req)) {
+    const result = await checkRateLimit(req);
+    if (!result.success) {
+      return new NextResponse('Too Many Requests', { status: 429 });
+    }
+  }
+
   // RÈGLE : Si ce n'est PAS une route publique, on bloque l'accès (404/Redirection).
-  // Mais comme '/' est public, l'utilisateur arrive sur la page d'accueil sans flash.
   if (!isPublicRoute(req)) {
     auth().protect();
   }

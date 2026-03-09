@@ -12,6 +12,7 @@ import {
   createGoalSchema,
   createDecisionSchema,
   updateProfileSchema,
+  validateId,
   financialItemResponseSchema,
   assetResponseSchema,
   financialGoalResponseSchema,
@@ -176,6 +177,48 @@ describe('updateProfileSchema — Tests adverses', () => {
       persona: 'PERSONA_INVENTE',
     });
     expect(result.success).toBe(false);
+  });
+});
+
+// ============================================================================
+// validateId — Paramètres d'URL [id] (format CUID)
+// ============================================================================
+
+describe('validateId — Tests adverses (E.3)', () => {
+  it('retourne null pour un CUID valide', () => {
+    // CUID Prisma typique : 25 caractères, commence par 'c'
+    const validCuid = 'clh2abc123def456ghi789jkl';
+    expect(validateId(validCuid)).toBeNull();
+  });
+
+  it('retourne 400 pour path traversal', () => {
+    const response = validateId('../../../etc/passwd');
+    expect(response).not.toBeNull();
+    expect(response!.status).toBe(400);
+  });
+
+  it('retourne 400 pour chaîne vide', () => {
+    const response = validateId('');
+    expect(response).not.toBeNull();
+    expect(response!.status).toBe(400);
+  });
+
+  it('retourne 400 pour ID trop court', () => {
+    const response = validateId('c123');
+    expect(response).not.toBeNull();
+    expect(response!.status).toBe(400);
+  });
+
+  it('retourne 400 pour caractères invalides (SQL-like)', () => {
+    const response = validateId("c'; DROP TABLE users;--");
+    expect(response).not.toBeNull();
+    expect(response!.status).toBe(400);
+  });
+
+  it('retourne 400 pour UUID au lieu de CUID', () => {
+    const response = validateId('550e8400-e29b-41d4-a716-446655440000');
+    expect(response).not.toBeNull();
+    expect(response!.status).toBe(400);
   });
 });
 

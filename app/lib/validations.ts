@@ -204,6 +204,22 @@ export const saveUserSchema = z.object({
 });
 
 // ============================================================================
+// ID VALIDATION — Paramètres d'URL [id] (format CUID Prisma)
+// ============================================================================
+
+const cuidSchema = z.string().cuid('ID invalide');
+
+/**
+ * Valide un paramètre d'URL [id]. Retourne une NextResponse 400 si invalide,
+ * null si valide (l'appelant peut alors utiliser params.id en toute sécurité).
+ */
+export function validateId(id: string): NextResponse | null {
+  const result = cuidSchema.safeParse(id);
+  if (result.success) return null;
+  return NextResponse.json({ error: 'ID invalide' }, { status: 400 });
+}
+
+// ============================================================================
 // HELPER — Réponse d'erreur standardisée
 // ============================================================================
 

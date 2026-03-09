@@ -1,12 +1,14 @@
 import { NextResponse } from 'next/server';
 import { revalidateTag } from 'next/cache';
 import { auth } from '@clerk/nextjs/server';
-import { updateItemSchema, validationError } from '@/app/lib/validations';
+import { updateItemSchema, validationError, validateId } from '@/app/lib/validations';
 import { itemService, ServiceError } from '@/app/services';
 
 export async function PATCH(req: Request, { params }: { params: { id: string } }) {
   const { userId } = auth();
   if (!userId) return new NextResponse("Non autorisé", { status: 401 });
+  const idError = validateId(params.id);
+  if (idError) return idError;
 
   try {
     const body = await req.json();
@@ -29,6 +31,8 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
 export async function DELETE(req: Request, { params }: { params: { id: string } }) {
   const { userId } = auth();
   if (!userId) return new NextResponse("Non autorisé", { status: 401 });
+  const idError = validateId(params.id);
+  if (idError) return idError;
 
   try {
     const result = await itemService.deleteItem(userId, params.id);

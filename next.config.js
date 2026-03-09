@@ -2,6 +2,22 @@
 
 // Configuration de base propre
 const nextConfig = {
+  // Security headers (E.2 — OWASP)
+  async headers() {
+    return [
+      {
+        source: "/(.*)",
+        headers: [
+          { key: "X-Frame-Options", value: "DENY" },
+          { key: "X-Content-Type-Options", value: "nosniff" },
+          {
+            key: "Strict-Transport-Security",
+            value: "max-age=31536000; includeSubDomains",
+          },
+        ],
+      },
+    ];
+  },
   // Optimisation des images pour Clerk (avatars)
   images: {
     remotePatterns: [
