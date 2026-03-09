@@ -6,6 +6,11 @@ import { INITIAL_PROFILE, Profile, FinancialItem, Asset, Goal, HousingStatus } f
 import {
   profileAPIResponseSchema,
   financialItemResponseSchema,
+  assetResponseSchema,
+  financialGoalResponseSchema,
+  purchaseDecisionResponseSchema,
+  profilePatchResponseSchema,
+  successResponseSchema,
   parseAPIResponse,
 } from '@/app/lib/validations';
 
@@ -104,15 +109,20 @@ export function useFinancialData() {
     setProfile(prev => ({ ...prev, ...updates }));
 
     try {
-      await fetch('/api/profile', {
+      const res = await fetch('/api/profile', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updates),
       });
+      if (res.ok) {
+        const raw = await res.json();
+        if (!parseAPIResponse(profilePatchResponseSchema, raw, 'PATCH /api/profile')) {
+          setError("Données incohérentes reçues du serveur.");
+        }
+      }
     } catch (err) {
       console.error("Erreur save profile:", err);
-      // En cas d'erreur, on pourrait rollback ici (fetchData())
-      fetchData(); 
+      fetchData();
     }
   };
 
@@ -125,12 +135,15 @@ export function useFinancialData() {
         body: JSON.stringify(item),
       });
       if (res.ok) {
-          const raw = await res.json();
-          const newItem = parseAPIResponse(
-            financialItemResponseSchema, raw, 'POST /api/items',
-          );
-          fetchData();
-          return newItem;
+        const raw = await res.json();
+        const newItem = parseAPIResponse(
+          financialItemResponseSchema, raw, 'POST /api/items',
+        );
+        if (!newItem) {
+          setError("Données incohérentes reçues du serveur.");
+        }
+        fetchData();
+        return newItem;
       }
     } catch (err) { console.error(err); }
   };
@@ -140,7 +153,6 @@ export function useFinancialData() {
     // Optimistic UI : On le retire visuellement tout de suite
     setProfile(prev => ({
         ...prev,
-        // On filtre toutes les listes potentielles (bourrin mais efficace visuellement)
         incomes: prev.incomes.filter(i => i.id !== itemId),
         fixedCosts: prev.fixedCosts.filter(i => i.id !== itemId),
         variableCosts: prev.variableCosts.filter(i => i.id !== itemId),
@@ -150,70 +162,114 @@ export function useFinancialData() {
     }));
 
     try {
-        await fetch(`/api/items/${itemId}`, { method: 'DELETE' });
+      const res = await fetch(`/api/items/${itemId}`, { method: 'DELETE' });
+      if (res.ok) {
+        const raw = await res.json();
+        if (!parseAPIResponse(successResponseSchema, raw, 'DELETE /api/items/:id')) {
+          setError("Données incohérentes reçues du serveur.");
+        }
+      } else {
+        fetchData();
+      }
     } catch (err) { console.error(err); fetchData(); }
   };
 
   // 🔹 Ajouter/Modifier un Asset (Patrimoine)
   const saveAsset = async (asset: Partial<Asset>) => {
-      const method = asset.id ? 'PATCH' : 'POST';
-      const url = asset.id ? `/api/assets/${asset.id}` : '/api/assets';
+    const method = asset.id ? 'PATCH' : 'POST';
+    const url = asset.id ? `/api/assets/${asset.id}` : '/api/assets';
 
-      try {
-          await fetch(url, {
-              method,
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(asset),
-          });
-          fetchData(); // On recharge pour mettre à jour les graphiques
-      } catch (err) { console.error(err); }
+    try {
+      const res = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(asset),
+      });
+      if (res.ok) {
+        const raw = await res.json();
+        if (!parseAPIResponse(assetResponseSchema, raw, `${method} /api/assets`)) {
+          setError("Données incohérentes reçues du serveur.");
+        }
+      }
+      fetchData();
+    } catch (err) { console.error(err); }
   };
 
   const deleteAsset = async (assetId: string) => {
-      try {
-          await fetch(`/api/assets/${assetId}`, { method: 'DELETE' });
-          fetchData();
-      } catch (err) { console.error(err); }
+    try {
+      const res = await fetch(`/api/assets/${assetId}`, { method: 'DELETE' });
+      if (res.ok) {
+        const raw = await res.json();
+        if (!parseAPIResponse(successResponseSchema, raw, 'DELETE /api/assets/:id')) {
+          setError("Données incohérentes reçues du serveur.");
+        }
+      }
+      fetchData();
+    } catch (err) { console.error(err); }
   };
 
   // 🔹 Gérer les Objectifs (Goals)
   const saveGoal = async (goal: Partial<Goal>) => {
-      const method = goal.id ? 'PATCH' : 'POST';
-      const url = goal.id ? `/api/goals/${goal.id}` : '/api/goals';
+    const method = goal.id ? 'PATCH' : 'POST';
+    const url = goal.id ? `/api/goals/${goal.id}` : '/api/goals';
 
-      try {
-          await fetch(url, {
-              method,
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(goal),
-          });
-          fetchData();
-      } catch (err) { console.error(err); }
+    try {
+      const res = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(goal),
+      });
+      if (res.ok) {
+        const raw = await res.json();
+        if (!parseAPIResponse(financialGoalResponseSchema, raw, `${method} /api/goals`)) {
+          setError("Données incohérentes reçues du serveur.");
+        }
+      }
+      fetchData();
+    } catch (err) { console.error(err); }
   };
 
   const deleteGoal = async (goalId: string) => {
     try {
-        await fetch(`/api/goals/${goalId}`, { method: 'DELETE' });
-        fetchData();
+      const res = await fetch(`/api/goals/${goalId}`, { method: 'DELETE' });
+      if (res.ok) {
+        const raw = await res.json();
+        if (!parseAPIResponse(successResponseSchema, raw, 'DELETE /api/goals/:id')) {
+          setError("Données incohérentes reçues du serveur.");
+        }
+      }
+      fetchData();
     } catch (err) { console.error(err); }
   };
 
   // 🔹 Gérer les Décisions d'achat
   const addDecision = async (decision: DecisionInput) => {
-      try {
-          await fetch('/api/decisions', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(decision),
-          });
-          fetchData();
-      } catch (err) { console.error(err); }
+    try {
+      const res = await fetch('/api/decisions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(decision),
+      });
+      if (res.ok) {
+        const raw = await res.json();
+        if (!parseAPIResponse(purchaseDecisionResponseSchema, raw, 'POST /api/decisions')) {
+          setError("Données incohérentes reçues du serveur.");
+        }
+      }
+      fetchData();
+    } catch (err) { console.error(err); }
   };
 
   const deleteDecision = async (id: string) => {
     try {
-        await fetch(`/api/decisions/${id}`, { method: 'DELETE' });
-        fetchData();
+      const res = await fetch(`/api/decisions/${id}`, { method: 'DELETE' });
+      if (res.ok) {
+        const raw = await res.json();
+        if (!parseAPIResponse(successResponseSchema, raw, 'DELETE /api/decisions/:id')) {
+          setError("Données incohérentes reçues du serveur.");
+        }
+      }
+      fetchData();
     } catch (err) { console.error(err); }
   };
 

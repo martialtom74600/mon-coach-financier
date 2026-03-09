@@ -78,6 +78,7 @@ export const ASSET_TYPES = [
   
   // Épargne sécurisée
   { id: AssetType.LIVRET,      label: 'Livret A / LDDS',     category: 'CASH',      color: 'text-rose-600',    bg: 'bg-rose-50',    border: 'border-rose-200' },
+  { id: AssetType.LDDS,       label: 'LDDS',                category: 'CASH',      color: 'text-rose-600',    bg: 'bg-rose-50',    border: 'border-rose-200' },
   { id: AssetType.LEP,         label: 'LEP (Épargne Pop.)',  category: 'CASH',      color: 'text-pink-600',    bg: 'bg-pink-50',    border: 'border-pink-200' },
   { id: AssetType.PEL,         label: 'PEL / CEL',           category: 'CASH',      color: 'text-slate-600',   bg: 'bg-slate-100',  border: 'border-slate-300' },
   { id: AssetType.PEE,         label: 'Épargne Salariale',   category: 'CASH',      color: 'text-indigo-600',  bg: 'bg-indigo-50',  border: 'border-indigo-200' },
@@ -440,7 +441,7 @@ export const INITIAL_PROFILE: Profile = {
 
 export const generateId = (): string => Math.random().toString(36).substr(2, 9);
 
-export const safeFloat = (val: any): number => {
+export const safeFloat = (val: unknown): number => {
   if (val === null || val === undefined || val === '') return 0;
   if (typeof val === 'number') return isNaN(val) ? 0 : val;
   if (val instanceof Prisma.Decimal) return val.toNumber();

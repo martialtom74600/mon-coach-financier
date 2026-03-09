@@ -18,14 +18,14 @@ export interface FinancialItem {
   amount: number | string;
   dayOfMonth?: number;
   frequency?: string;
-  [key: string]: any; 
+  [key: string]: unknown;
 }
 
 interface AccordionSectionProps {
   title: string;
   icon?: LucideIcon;
   items: FinancialItem[];
-  onItemChange: (id: string, field: keyof FinancialItem, value: any) => void;
+  onItemChange: (id: string, field: keyof FinancialItem, value: string | number) => void;
   onItemAdd: () => void;
   onItemRemove: (id: string) => void;
   type?: 'standard' | 'simple';

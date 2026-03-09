@@ -191,7 +191,7 @@ const mapFormToEngineProfile = (formData: FormProfile): Profile => {
     formData.assetsUi.forEach(a => {
         const t = a.type.toUpperCase();
         if (t === 'CC') totalCash += a.stock;
-        else if (['LIVRET', 'LEP', 'PEL'].includes(t)) totalSavings += a.stock;
+        else if (['LIVRET', 'LDDS', 'LEP', 'PEL', 'PEE'].includes(t)) totalSavings += a.stock;
         else totalInvested += a.stock;
     });
 

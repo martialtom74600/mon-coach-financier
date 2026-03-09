@@ -432,6 +432,29 @@ describe('computeFinancialPlan — Invariants métier', () => {
     expect(result.budget.totalWealth).toBe(expectedTotalWealth);
   });
 
+  it('LDDS, LEP, PEL, PEE comptent dans matelas (cohérence definitions.ts ASSET_TYPES)', () => {
+    const ldds = 8000;
+    const lep = 5000;
+    const pel = 3000;
+    const pee = 2000;
+    const expectedMatelas = ldds + lep + pel + pee;
+
+    const profile = makeProfile({
+      incomes: [makeItem({ amount: 3000, category: ItemCategory.INCOME })],
+      assets: [
+        makeAsset({ type: AssetType.LDDS, currentValue: ldds }),
+        makeAsset({ type: AssetType.LEP, currentValue: lep }),
+        makeAsset({ type: AssetType.PEL, currentValue: pel }),
+        makeAsset({ type: AssetType.PEE, currentValue: pee }),
+      ],
+    });
+
+    const result = computeFinancialPlan(profile);
+
+    expect(result.budget.matelas).toBe(expectedMatelas);
+    expect(result.budget.investments).toBe(0);
+  });
+
   it('safetyMonths = matelas / burnRate (calcul théorique)', () => {
     const matelas = 6000;
     const fixed = 1000;

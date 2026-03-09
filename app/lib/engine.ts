@@ -185,7 +185,7 @@ const hasAsset = (profile: Profile, typeKeys: string[]): boolean => {
     if (typeKeys.includes(asset.type.toLowerCase())) return true;
     
     // 2. Mapping "catégorie" vers Enum
-    if (typeKeys.includes('livret') && (asset.type === AssetType.LIVRET || asset.type === AssetType.OTHER)) return true;
+    if (typeKeys.includes('livret') && (asset.type === AssetType.LIVRET || asset.type === AssetType.LDDS || asset.type === AssetType.OTHER)) return true;
     if (typeKeys.includes('pea') && asset.type === AssetType.PEA) return true;
     if (typeKeys.includes('av') && asset.type === AssetType.AV) return true;
     if (typeKeys.includes('crypto') && asset.type === AssetType.CRYPTO) return true;
@@ -290,9 +290,9 @@ export const computeFinancialPlan = (profile: Profile, customRates?: Partial<Sim
   if (profile.assets) {
       profile.assets.forEach(asset => {
           const val = safeFloat(asset.currentValue);
-          // ✅ Correction Enum AssetType
+          // ✅ CASH = matelas (LIVRET, LDDS, LEP, PEL, PEE — cohérent avec definitions.ts ASSET_TYPES)
           if (asset.type === AssetType.CC) currentBalance += val;
-          else if (asset.type === AssetType.LIVRET || asset.type === AssetType.PEE) matelas += val;
+          else if (asset.type === AssetType.LIVRET || asset.type === AssetType.LDDS || asset.type === AssetType.LEP || asset.type === AssetType.PEL || asset.type === AssetType.PEE) matelas += val;
           else investedStock += val;
       });
   }
@@ -433,7 +433,7 @@ export const analyzeProfileHealth = (
       guide: ACTION_GUIDES.LIVRET_OPEN 
     });
   } else if (savings < idealSafety) {
-    if (hasAsset(profile, ['livret', 'ldd', 'lep'])) {
+    if (hasAsset(profile, ['livret', 'ldd', 'ldds', 'lep'])) {
       opps.push({
         id: 'safety_boost', type: 'SAVINGS', level: isFreelance ? 'CRITICAL' : 'WARNING',
         title: 'Sécurité Fragile', message: `Renforcez vos livrets pour atteindre ${targetMonths} mois (${formatCurrency(idealSafety)}).`,

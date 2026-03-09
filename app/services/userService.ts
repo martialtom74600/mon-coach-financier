@@ -106,11 +106,11 @@ export async function getFullUserProfile(userId: string) {
     .reduce((sum, a) => sum + (Number(a.currentValue) || 0), 0);
 
   const savings = assets
-    .filter((a) => ['LIVRET', 'LEP', 'PEL', 'PEE'].includes(a.type))
+    .filter((a) => ['LIVRET', 'LDDS', 'LEP', 'PEL', 'PEE'].includes(a.type))
     .reduce((sum, a) => sum + (Number(a.currentValue) || 0), 0);
 
   const investedAmount = assets
-    .filter((a) => !['CC', 'LIVRET', 'LEP', 'PEL', 'PEE'].includes(a.type))
+    .filter((a) => !['CC', 'LIVRET', 'LDDS', 'LEP', 'PEL', 'PEE'].includes(a.type))
     .reduce((sum, a) => sum + (Number(a.currentValue) || 0), 0);
 
   return serializeDecimals({

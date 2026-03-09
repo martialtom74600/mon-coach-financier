@@ -2,6 +2,7 @@
  * validations.test.ts — Tests adverses Zod (Protocole Blind & Logic)
  *
  * Envoyer des objets corrompus pour forcer l'échec de validation.
+ * Tests du Bouclier Zod : Response schemas interceptent les données corrompues.
  */
 
 import { describe, it, expect } from 'vitest';
@@ -11,6 +12,14 @@ import {
   createGoalSchema,
   createDecisionSchema,
   updateProfileSchema,
+  financialItemResponseSchema,
+  assetResponseSchema,
+  financialGoalResponseSchema,
+  purchaseDecisionResponseSchema,
+  profilePatchResponseSchema,
+  successResponseSchema,
+  profileAPIResponseSchema,
+  parseAPIResponse,
 } from '@/app/lib/validations';
 
 // ============================================================================
@@ -166,6 +175,164 @@ describe('updateProfileSchema — Tests adverses', () => {
     const result = updateProfileSchema.safeParse({
       persona: 'PERSONA_INVENTE',
     });
+    expect(result.success).toBe(false);
+  });
+});
+
+// ============================================================================
+// BOUCLIER ZOD — Response Schemas : données corrompues interceptées
+// ============================================================================
+
+describe('financialItemResponseSchema — Bouclier (amount string au lieu de number)', () => {
+  it('rejette amount sous forme de string', () => {
+    const corrupted = {
+      id: 'item_1',
+      profileId: 'prof_1',
+      name: 'Salaire',
+      amount: '2500',
+      category: 'INCOME',
+      frequency: 'MONTHLY',
+      dayOfMonth: 1,
+      createdAt: '2026-03-09T12:00:00.000Z',
+    };
+    const result = financialItemResponseSchema.safeParse(corrupted);
+    expect(result.success).toBe(false);
+  });
+
+  it('parseAPIResponse retourne null pour amount string', () => {
+    const corrupted = { id: 'x', profileId: 'p', name: 'X', amount: '100', category: 'INCOME', frequency: 'MONTHLY', dayOfMonth: 1, createdAt: '2026-01-01' };
+    const validated = parseAPIResponse(financialItemResponseSchema, corrupted, 'TEST');
+    expect(validated).toBeNull();
+  });
+
+  it('accepte objet valide (amount number)', () => {
+    const valid = { id: 'x', profileId: 'p', name: 'X', amount: 100, category: 'INCOME', frequency: 'MONTHLY', dayOfMonth: 1, createdAt: '2026-01-01' };
+    const validated = parseAPIResponse(financialItemResponseSchema, valid, 'TEST');
+    expect(validated).not.toBeNull();
+    expect(validated!.amount).toBe(100);
+  });
+});
+
+describe('assetResponseSchema — Bouclier (currentValue string)', () => {
+  it('rejette currentValue string', () => {
+    const corrupted = {
+      id: 'a1',
+      profileId: 'p1',
+      name: 'Livret',
+      type: 'LIVRET',
+      currentValue: '5000',
+      monthlyFlow: 0,
+      transferDay: 1,
+      createdAt: '2026-01-01',
+      updatedAt: '2026-01-01',
+    };
+    const result = assetResponseSchema.safeParse(corrupted);
+    expect(result.success).toBe(false);
+  });
+
+  it('parseAPIResponse retourne null pour type invalide', () => {
+    const corrupted = { id: 'a1', profileId: 'p1', name: 'X', type: 'INVENTE', currentValue: 1000, monthlyFlow: 0, transferDay: 1, createdAt: '2026-01-01', updatedAt: '2026-01-01' };
+    expect(parseAPIResponse(assetResponseSchema, corrupted, 'TEST')).toBeNull();
+  });
+});
+
+describe('financialGoalResponseSchema — Bouclier (targetAmount string)', () => {
+  it('rejette targetAmount string', () => {
+    const corrupted = {
+      id: 'g1',
+      profileId: 'p1',
+      name: 'Voyage',
+      category: 'TRAVEL',
+      targetAmount: '3000',
+      currentSaved: 0,
+      monthlyContribution: 0,
+      deadline: '2028-01-01',
+      projectedYield: 0,
+      transferDay: null,
+      createdAt: '2026-01-01',
+      updatedAt: '2026-01-01',
+    };
+    const result = financialGoalResponseSchema.safeParse(corrupted);
+    expect(result.success).toBe(false);
+  });
+});
+
+describe('purchaseDecisionResponseSchema — Bouclier (amount string)', () => {
+  it('rejette amount string', () => {
+    const corrupted = {
+      id: 'd1',
+      profileId: 'p1',
+      name: 'Achat',
+      amount: '500',
+      date: '2026-04-01',
+      type: 'NEED',
+      paymentMode: 'CASH_CURRENT',
+      isPro: false,
+      isReimbursable: false,
+      reimbursedAt: null,
+      duration: null,
+      rate: null,
+      createdAt: '2026-01-01',
+    };
+    const result = purchaseDecisionResponseSchema.safeParse(corrupted);
+    expect(result.success).toBe(false);
+  });
+});
+
+describe('profilePatchResponseSchema — Bouclier', () => {
+  it('rejette housingCost string', () => {
+    const corrupted = {
+      id: 'prof1',
+      userId: 'u1',
+      age: 30,
+      persona: 'SALARIED',
+      housingStatus: 'TENANT',
+      housingCost: '800',
+      housingPaymentDay: 5,
+      adults: 1,
+      children: 0,
+      funBudget: 200,
+      updatedAt: '2026-03-09T12:00:00.000Z',
+    };
+    const result = profilePatchResponseSchema.safeParse(corrupted);
+    expect(result.success).toBe(false);
+  });
+});
+
+describe('successResponseSchema — Bouclier (DELETE)', () => {
+  it('rejette success: false', () => {
+    const result = successResponseSchema.safeParse({ success: false });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejette objet vide', () => {
+    const result = successResponseSchema.safeParse({});
+    expect(result.success).toBe(false);
+  });
+
+  it('accepte success: true', () => {
+    const validated = parseAPIResponse(successResponseSchema, { success: true }, 'DELETE');
+    expect(validated).toBeTruthy();
+    expect(validated!.success).toBe(true);
+  });
+});
+
+describe('profileAPIResponseSchema — Bouclier (assets array corrompue)', () => {
+  it('rejette assets avec amount string', () => {
+    const corrupted = {
+      id: 'u1',
+      firstName: 'Test',
+      assets: [{ id: 'a1', profileId: 'p1', name: 'X', type: 'LIVRET', currentValue: '5000', monthlyFlow: 0, transferDay: 1, createdAt: '2026-01-01', updatedAt: '2026-01-01' }],
+      goals: [],
+      decisions: [],
+      incomes: [],
+      fixedCosts: [],
+      variableCosts: [],
+      credits: [],
+      subscriptions: [],
+      annualExpenses: [],
+    };
+    const result = profileAPIResponseSchema.safeParse(corrupted);
     expect(result.success).toBe(false);
   });
 });

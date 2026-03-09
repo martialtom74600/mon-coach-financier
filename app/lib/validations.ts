@@ -274,6 +274,26 @@ export const purchaseDecisionResponseSchema = z.object({
   createdAt: z.string(),
 });
 
+/** Schéma pour les réponses DELETE (success: true) */
+export const successResponseSchema = z.object({
+  success: z.literal(true),
+});
+
+/** Schéma pour PATCH /api/profile — FinancialProfile sérialisé */
+export const profilePatchResponseSchema = z.object({
+  id: z.string(),
+  userId: z.string(),
+  age: z.number().nullable(),
+  persona: UserPersonaEnum.nullable(),
+  housingStatus: HousingStatusEnum.nullable(),
+  housingCost: z.number(),
+  housingPaymentDay: z.number().nullable(),
+  adults: z.number(),
+  children: z.number(),
+  funBudget: z.number(),
+  updatedAt: z.string(),
+});
+
 const savingsContributionResponseSchema = z.object({
   id: z.string(),
   name: z.string(),

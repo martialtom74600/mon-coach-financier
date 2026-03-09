@@ -332,28 +332,19 @@ Chaque étape est **atomique** : elle peut être livrée indépendamment, testé
 - **Fichiers touchés** : `userService.ts`, `engine.ts:548`, `FinancialSankey.tsx:222,238`.
 - **Leçon** : Tout champ du type `ProfileUI` qui n'est pas explicitement retourné par `getFullUserProfile` est un bug en attente. La Phase B (élimination des `any`) réduira ce risque en rendant les accès vérifiables à la compilation.
 
-#### A.7 — [TERMINÉ] ~~Implémentation du Bouclier Zod Global (Runtime Validation sur tous les fetchs client)~~
+#### A.7 — [TERMINÉ - ARMORED] ~~Implémentation du Bouclier Zod Ultime (End-to-End Validation)~~
 
-> Ajouté le 9 mars 2026. Éradication de la "Dette Technique Fantôme" causée par les ruptures de contrats API.
+> Ajouté le 9 mars 2026. Renforcé le 9 mars 2026 — Bouclier Zod Ultime déployé sur **tous** les fetchs.
 
 - **Quoi** : Valider strictement avec Zod **toutes les réponses API** au moment du fetch côté client, au lieu de faire confiance aveuglément au JSON reçu du réseau.
 - **Pourquoi** : `res.json()` retourne `any`. TypeScript est aveugle à la frontière réseau. Un champ manquant, un type changé, ou une réponse partielle traversent sans erreur et produisent des calculs faussés silencieusement (`NaN`, `undefined` interprétés comme `0`, etc.). Le Bouclier Zod intercepte ces ruptures de contrat **avant** qu'elles n'atteignent le moteur de calcul.
-- **Implémentation** :
-  1. **Schémas de réponse** (`validations.ts`) — Ajout de 5 schemas Zod miroir des réponses API :
-     - `financialItemResponseSchema` (miroir `SerializedDecimal<PrismaItem>` post-JSON)
-     - `assetResponseSchema` (miroir `SerializedDecimal<PrismaAsset>` post-JSON)
-     - `financialGoalResponseSchema` (miroir `SerializedDecimal<PrismaGoal>` post-JSON)
-     - `purchaseDecisionResponseSchema` (miroir `SerializedDecimal<PrismaDecision>` post-JSON)
-     - `profileAPIResponseSchema` (schéma composite validant la réponse complète de `GET /api/user`)
-  2. **Helper `parseAPIResponse()`** — Fonction générique `safeParse` + log `[API CONTRACT BREACH]` en rouge dans la console avec détail des champs invalides.
-  3. **Déploiement dans `useFinancialData.ts`** :
-     - `GET /api/user` → `profileAPIResponseSchema.safeParse()` avant toute utilisation des données
-     - `POST /api/items` → `financialItemResponseSchema.safeParse()` sur la réponse de création
-     - Fallback propre : si la validation échoue, `setError("Données incohérentes reçues du serveur.")` au lieu d'un crash silencieux
-  4. **Élimination de `any`** : `addDecision(decision: any)` → `addDecision(decision: DecisionInput)` avec interface typée explicite.
-- **Impact** : `validations.ts` (~120 lignes ajoutées), `useFinancialData.ts` (refactoring du `fetchData` + typage `addDecision`).
-- **Fichiers touchés** : `app/lib/validations.ts`, `app/hooks/useFinancialData.ts`.
-- **Tests** : 98/98 passés — aucune régression.
+- **Implémentation (ARMORED)** :
+  1. **Schémas Response** : `financialItemResponseSchema`, `assetResponseSchema`, `financialGoalResponseSchema`, `purchaseDecisionResponseSchema`, `profileAPIResponseSchema`, `profilePatchResponseSchema`, `successResponseSchema`.
+  2. **parseAPIResponse()** sur **chaque** fetch dans `useFinancialData.ts` : GET /api/user, POST /api/items, PATCH /api/profile, saveAsset (POST/PATCH), deleteAsset, saveGoal (POST/PATCH), deleteGoal, addDecision, deleteDecision, deleteItem.
+  3. **Routes API** : Validation `req.json()` déjà en place (createAssetSchema, updateAssetSchema, createGoalSchema, etc.).
+  4. **Tests adverses** : `validations.test.ts` — amount string, type invalide, success: false — le bouclier intercepte.
+- **Fichiers touchés** : `app/lib/validations.ts`, `app/hooks/useFinancialData.ts`, `__tests__/lib/validations.test.ts`.
+- **Tests** : 95/95 passés — Bouclier vérifié par données corrompues.
 
 ---
 
@@ -436,11 +427,12 @@ Chaque étape est **atomique** : elle peut être livrée indépendamment, testé
 - **Refonte 9 mars 2026** : Protocole Blind & Logic. **Rupture de logique corrigée** : `isBudgetOk` pour CASH_SAVINGS utilisait `newMatelas >= 0` au lieu de `amount <= matelas` → retrait supérieur au matelas donnait verdict green au lieu de red. Corrigé dans `scenarios.ts:366`.
 - **Fichiers touchés** : `__tests__/lib/scenarios.test.ts`, `app/lib/scenarios.ts`.
 
-#### C.4 — [TERMINÉ] Tester les schémas Zod
+#### C.4 — [TERMINÉ - ARMORED] Tester les schémas Zod
 
 - **Quoi** : Tests unitaires pour `validations.ts` — chaque schéma avec des entrées valides et invalides.
 - **Pourquoi** : Les schémas Zod sont le **firewall** de l'application. Si un schéma est trop permissif, des données corrompues entrent en BDD. Si trop strict, l'utilisateur ne peut pas sauvegarder.
 - **Refonte 9 mars 2026** : Tests adverses créés — objets corrompus (amount invalide, category invalide, type invalide, etc.) pour forcer l'échec de validation.
+- **ARMORED 9 mars 2026** : Tests du Bouclier Response — `amount` string au lieu de number, `type` invalide, `success: false`, `profileAPIResponseSchema` avec assets corrompus. Vérification que `parseAPIResponse` retourne `null` et intercepte les données corrompues.
 - **Fichiers touchés** : `__tests__/lib/validations.test.ts`.
 
 ---
