@@ -34,7 +34,7 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
       </div>
       {/* Colonne droite — Formulaire */}
       <div className="flex-1 flex flex-col items-center justify-center p-6 md:p-12">
-        <div className="w-full max-w-sm space-y-8 animate-in fade-in slide-in-from-bottom-8 duration-700">
+        <div className="w-full max-w-sm space-y-8">
           <div className="md:hidden text-center mb-8">
             <h1 className="text-3xl font-black text-slate-900">Finance OS</h1>
           </div>
