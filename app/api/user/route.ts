@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { revalidateTag } from 'next/cache';
 import { auth, currentUser } from '@clerk/nextjs/server';
 import { saveUserSchema, validationError } from '@/app/lib/validations';
+import { logger } from '@/app/lib/logger';
 import { userService, ServiceError } from '@/app/services';
 
 export const dynamic = 'force-dynamic';
@@ -17,7 +18,7 @@ export async function GET() {
     if (error instanceof ServiceError) {
       return new NextResponse(error.message, { status: error.status });
     }
-    console.error("[API_GET_USER]", error);
+    logger.error("API_GET_USER", { userId }, error);
     return new NextResponse("Erreur interne", { status: 500 });
   }
 }
@@ -50,7 +51,7 @@ export async function POST(req: Request) {
     if (error instanceof ServiceError) {
       return new NextResponse(error.message, { status: error.status });
     }
-    console.error("[API_POST_USER]", error);
+    logger.error("API_POST_USER", { userId }, error);
     return new NextResponse("Erreur interne lors de la sauvegarde", { status: 500 });
   }
 }

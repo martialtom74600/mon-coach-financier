@@ -215,7 +215,7 @@ Le modèle `AssetHistory` avec son index composite `[assetId, date]` est prêt p
 | `userService.getFullUserProfile` retourne null comme 200 | `services/userService.ts:12-91` | **FAIBLE** | Le client reçoit `null` avec un status 200 au lieu d'un 404 structuré. Pas une faille de sécurité mais un contrat d'API cassé. |
 | `any` dans le moteur critique | `scenarios.ts:60,107,285` | **MOYENNE** | `getSimulatedEvents` retourne `any[]`, `generateTimeline` accepte `history: any[]`, `analyzePurchaseImpact` accepte `currentStats: any`. Toute valeur peut entrer sans validation dans le moteur de projection. |
 | Pas de headers de sécurité | `next.config.js` | **MOYENNE** | Aucun `Content-Security-Policy`, `X-Frame-Options`, `Strict-Transport-Security` configuré. Le PWA est vulnérable au clickjacking et à l'injection de scripts tiers. |
-| Pas de monitoring | Production | **ÉLEVÉE** | Aucun Sentry, aucun structured logging. En production, les erreurs sont invisibles. Les `console.error` dans les routes API ne persistent nulle part. |
+| ~~Pas de monitoring~~ | Production | ~~**ÉLEVÉE**~~ | ~~Aucun Sentry, aucun structured logging~~ [TERMINÉ E.5] |
 
 ### 4.4 Architecture Frontend
 
@@ -526,12 +526,13 @@ Chaque étape est **atomique** : elle peut être livrée indépendamment, testé
 - **Impact** : `app/api/user/route.ts:36`.
 - **Fichiers touchés** : `app/api/user/route.ts`.
 
-#### E.5 — Ajouter Sentry + structured logging
+#### E.5 — [TERMINÉ] Ajouter Sentry + structured logging
 
 - **Quoi** : Intégrer `@sentry/nextjs` pour le monitoring d'erreurs et remplacer les `console.error` par un logger structuré.
 - **Pourquoi** : En production, les erreurs sont actuellement invisibles. Le `console.error` dans les routes API ne persiste nulle part.
+- **Implémentation réalisée** : `@sentry/nextjs` installé ; `sentry.client.config.ts`, `sentry.server.config.ts`, `sentry.edge.config.ts`, `instrumentation.ts` ; `app/lib/logger.ts` (logger structuré JSON + capture Sentry) ; `console.error` remplacé par `logger.error` dans toutes les routes API ; `Sentry.captureException` dans `global-error.tsx` et `error.tsx` ; `logger.warn` dans `parseAPIResponse` (validations.ts).
 - **Impact** : Nouveau `sentry.client.config.ts`, `sentry.server.config.ts`, `sentry.edge.config.ts`, modification de `next.config.js`.
-- **Fichiers touchés** : `next.config.js`, nouvelles configs Sentry, potentiellement tous les fichiers avec `console.error`.
+- **Fichiers touchés** : `next.config.js`, `sentry.client.config.ts`, `sentry.server.config.ts`, `sentry.edge.config.ts`, `instrumentation.ts`, `app/lib/logger.ts`, `app/lib/validations.ts`, `app/global-error.tsx`, `app/error.tsx`, toutes les routes `app/api/**/route.ts`.
 
 #### E.6 — Créer `.env.example`
 

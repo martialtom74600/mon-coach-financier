@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { NextResponse } from 'next/server';
+import { logger } from '@/app/lib/logger';
 
 // ============================================================================
 // ENUMS (miroir exact du schema Prisma)
@@ -376,12 +377,7 @@ export function parseAPIResponse<T extends z.ZodTypeAny>(
     (i) => `${i.path.join('.')}: ${i.message} (got ${i.code})`,
   );
 
-  console.error(
-    `%c[API CONTRACT BREACH]%c ${endpoint}\n` +
-      `Champs invalides :\n  • ${fields.join('\n  • ')}`,
-    'color: #ff4444; font-weight: bold; font-size: 14px',
-    'color: #ff8800; font-weight: bold',
-  );
+  logger.warn('API_CONTRACT_BREACH', { endpoint, fields: fields.join('; ') });
 
   return null;
 }

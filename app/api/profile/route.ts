@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { revalidateTag } from 'next/cache';
 import { auth } from '@clerk/nextjs/server';
 import { updateProfileSchema, validationError } from '@/app/lib/validations';
+import { logger } from '@/app/lib/logger';
 import { profileService, ServiceError } from '@/app/services';
 
 export async function PATCH(req: Request) {
@@ -21,7 +22,7 @@ export async function PATCH(req: Request) {
     if (error instanceof ServiceError) {
       return new NextResponse(error.message, { status: error.status });
     }
-    console.error("[API_PATCH_PROFILE]", error);
+    logger.error("API_PATCH_PROFILE", { userId }, error);
     return new NextResponse("Erreur interne", { status: 500 });
   }
 }

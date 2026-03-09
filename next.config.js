@@ -1,4 +1,5 @@
 /** @type {import('next').NextConfig} */
+const { withSentryConfig } = require('@sentry/nextjs');
 
 // Configuration de base propre
 const nextConfig = {
@@ -38,4 +39,11 @@ const withPWA = require("@ducanh2912/next-pwa").default({
   skipWaiting: true,
 });
 
-module.exports = withPWA(nextConfig);
+// E.5 — Sentry : wrap après PWA pour instrumenter le build final
+const configWithPWA = withPWA(nextConfig);
+module.exports = withSentryConfig(configWithPWA, {
+  org: process.env.SENTRY_ORG ?? 'mon-coach-financier',
+  project: process.env.SENTRY_PROJECT ?? 'mon-coach-financier',
+  silent: !process.env.CI,
+  authToken: process.env.SENTRY_AUTH_TOKEN,
+});

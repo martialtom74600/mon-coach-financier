@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { revalidateTag } from 'next/cache';
 import { auth } from '@clerk/nextjs/server';
 import { updateDecisionSchema, validationError, validateId } from '@/app/lib/validations';
+import { logger } from '@/app/lib/logger';
 import { decisionService, ServiceError } from '@/app/services';
 
 export async function PATCH(req: Request, { params }: { params: { id: string } }) {
@@ -23,7 +24,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     if (error instanceof ServiceError) {
       return new NextResponse(error.message, { status: error.status });
     }
-    console.error("[API_PATCH_DECISION]", error);
+    logger.error("API_PATCH_DECISION", { userId, decisionId: params.id }, error);
     return new NextResponse("Erreur interne", { status: 500 });
   }
 }
@@ -43,7 +44,7 @@ export async function DELETE(req: Request, { params }: { params: { id: string } 
     if (error instanceof ServiceError) {
       return new NextResponse(error.message, { status: error.status });
     }
-    console.error("[API_DELETE_DECISION]", error);
+    logger.error("API_DELETE_DECISION", { userId, decisionId: params.id }, error);
     return new NextResponse("Erreur interne", { status: 500 });
   }
 }

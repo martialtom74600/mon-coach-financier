@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { revalidateTag } from 'next/cache';
 import { auth } from '@clerk/nextjs/server';
 import { createGoalSchema, validationError } from '@/app/lib/validations';
+import { logger } from '@/app/lib/logger';
 import { goalService, ServiceError } from '@/app/services';
 
 export async function POST(req: Request) {
@@ -21,7 +22,7 @@ export async function POST(req: Request) {
     if (error instanceof ServiceError) {
       return new NextResponse(error.message, { status: error.status });
     }
-    console.error("[API_POST_GOAL]", error);
+    logger.error("API_POST_GOAL", { userId }, error);
     return new NextResponse("Erreur interne", { status: 500 });
   }
 }
