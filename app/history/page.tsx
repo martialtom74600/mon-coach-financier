@@ -26,7 +26,7 @@ import CalendarView from '@/app/components/CalendarView';
 export default function HistoryPage() {
   const router = useRouter();
   const { profile, isLoaded, deleteDecision } = useFinancialData();
-  const history = profile?.decisions || [];
+  const history = useMemo(() => profile?.decisions || [], [profile?.decisions]);
   
   const [viewMode, setViewMode] = useState<'list' | 'calendar'>('calendar');
   const [isDeleting, setIsDeleting] = useState<string | null>(null);

@@ -229,7 +229,7 @@ export default function GoalsPage() {
         isInvested: isInvested,
       };
       return simulateGoalScenario(input, profile, stats);
-  }, [inputStep, newGoal, profile, stats]);
+  }, [inputStep, newGoal, profile, stats, isInvested]);
 
   const displayedGoalsEffort = (inputStep === 'check' && simulation) 
       ? stats.totalGoalsEffort + simulation.monthlyEffort 
@@ -409,7 +409,7 @@ export default function GoalsPage() {
                                 </div>
                                 {simulation.projectionData.summary.totalInterests > 0 && (
                                     <div className="text-xs text-emerald-600 font-medium">
-                                        Dont {formatCurrency(simulation.projectionData.summary.totalInterests)} d'intérêts
+                                        Dont {formatCurrency(simulation.projectionData.summary.totalInterests)} d&apos;intérêts
                                     </div>
                                 )}
                             </div>
@@ -520,7 +520,7 @@ export default function GoalsPage() {
             <div className="p-3 bg-emerald-50 border border-emerald-100 rounded-lg space-y-2">
                 <div className="flex justify-between items-center">
                     <div>
-                        <span className="text-emerald-900 text-sm font-bold block">Capacité d'épargne</span>
+                        <span className="text-emerald-900 text-sm font-bold block">Capacité d&apos;épargne</span>
                         <span className="text-[10px] text-emerald-600/70 uppercase font-bold tracking-wider">Le carburant</span>
                     </div>
                     <span className="font-bold text-emerald-700 text-xl">{formatCurrency(stats.capacityToSave)}</span>

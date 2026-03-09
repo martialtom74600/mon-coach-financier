@@ -379,7 +379,7 @@ interface StepProps {
 
 const StepIdentite = ({ formData, updateForm, onNext, error }: StepProps) => (
     <WizardLayout title="Qui êtes-vous ?" subtitle="Ces infos calibrent nos projections." icon={User} error={error}
-        footer={<Button onClick={onNext} className="w-full" size="lg">C'est parti <ArrowRight className="ml-2" size={18}/></Button>}>
+        footer={<Button onClick={onNext} className="w-full" size="lg">C&apos;est parti <ArrowRight className="ml-2" size={18}/></Button>}>
         <div className="space-y-6">
             <InputGroup label="Votre Prénom" placeholder="Ex: Thomas" value={formData.firstName || ''} onChange={(val: string) => updateForm({...formData, firstName: val})} />
             <div className={`transition-opacity duration-500 ${formData.firstName ? 'opacity-100' : 'opacity-30'}`}>
@@ -458,7 +458,7 @@ const StepDailyLife = ({ formData, updateForm, addItem, removeItem, updateItem, 
                 <AlertCircle className="shrink-0 mt-0.5" size={18} />
                 <div>
                     <span className="font-bold block mb-1">Pas de date nécessaire</span>
-                    Ces dépenses seront "lissées" sur tout le mois par notre algorithme (divisées par 30j) pour simuler une consommation réaliste.
+                    Ces dépenses seront &quot;lissées&quot; sur tout le mois par notre algorithme (divisées par 30j) pour simuler une consommation réaliste.
                 </div>
             </div>
             
@@ -526,12 +526,12 @@ const StepAssets = ({ formData, updateForm, addItem, removeItem, updateItem, onN
     const totalAssets = formData.assetsUi.reduce((acc, item) => acc + (item.stock || 0), 0);
 
     return (
-      <WizardLayout title="Votre Patrimoine" subtitle="Faisons l'inventaire complet (Comptes & Investissements)." icon={ShieldCheck} error={error}
+      <WizardLayout title="Votre Patrimoine" subtitle="Faisons l&apos;inventaire complet (Comptes & Investissements)." icon={ShieldCheck} error={error}
         footer={<><Button variant="ghost" onClick={onPrev}>Retour</Button><Button onClick={onNext} className="w-full sm:w-auto" size="lg">Découvrir mon verdict <ArrowRight className="ml-2" size={18}/></Button></>}>
         
         <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2">
             <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase mb-3">Qu'est-ce que vous possédez ?</label>
+              <label className="block text-xs font-bold text-slate-500 uppercase mb-3">Qu&apos;est-ce que vous possédez ?</label>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                   {ASSET_TYPES.map((type) => {
                       const isSelected = hasAsset(type.label);
@@ -624,20 +624,20 @@ const StepStrategy = ({ formData, onConfirm, isSaving, onPrev, stats }: StepProp
 
     useEffect(() => {
         if (formData.funBudget) setLifestyleInput(formData.funBudget);
-    }, []);
+    }, [formData.funBudget]);
 
     const theoreticalRest = stats ? Math.round(stats.remaining) : 0;
     const userLifestyle = parseNumber(lifestyleInput);
     const cashSavingsCapacity = theoreticalRest - userLifestyle;
 
     return (
-        <WizardLayout title="Le Verdict" subtitle="C'est le moment de vérité." icon={Flag}
+        <WizardLayout title="Le Verdict" subtitle="C&apos;est le moment de vérité." icon={Flag}
             footer={<><Button variant="ghost" onClick={onPrev}>Retour</Button><Button onClick={() => onConfirm!(userLifestyle, cashSavingsCapacity)} className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 text-white" size="lg">{isSaving ? <Loader2 className="animate-spin" /> : "Valider ma stratégie"}</Button></>}>
             <div className="space-y-8 animate-in zoom-in-95 duration-500">
                 <div className="text-center p-6 bg-slate-900 rounded-2xl text-white shadow-xl shadow-slate-200">
                     <p className="text-sm font-medium text-slate-400 uppercase tracking-widest mb-2">Disponible après TOUTES charges</p>
                     <div className="text-4xl md:text-5xl font-black text-white tracking-tight">{formatCurrency(theoreticalRest)}</div>
-                    <p className="text-xs text-slate-500 mt-2">C'est votre argent pour le "Plaisir".</p>
+                    <p className="text-xs text-slate-500 mt-2">C&apos;est votre argent pour le &quot;Plaisir&quot;.</p>
                 </div>
                 <div className="relative"><div className="absolute inset-0 flex items-center" aria-hidden="true"><div className="w-full border-t border-slate-200"></div></div><div className="relative flex justify-center"><span className="bg-white px-2 text-sm text-slate-500 font-medium">Répartition</span></div></div>
                 <div className="bg-white border-2 border-slate-100 rounded-2xl p-6 hover:border-indigo-200 transition-colors duration-300">
@@ -683,7 +683,7 @@ export default function ProfilePage() {
              setFormData(cleanForm);
         }
     }
-  }, [isLoaded, profile]);
+  }, [isLoaded, profile, formData]);
 
   // 2. Simulation Live
   const simulation = useMemo(() => {

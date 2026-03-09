@@ -6,9 +6,10 @@ import {
   Loader2, AlertCircle, X, CreditCard, ShoppingBag 
 } from 'lucide-react';
 import { formatCurrency } from '@/app/lib/logic';
+import { MonthData, TimelineDay } from '@/app/lib/scenarios';
 
 // --- COMPOSANT MODAL (Détail du jour) ---
-const DayDetailModal = ({ day, onClose }: { day: any, onClose: () => void }) => {
+const DayDetailModal = ({ day, onClose }: { day: TimelineDay, onClose: () => void }) => {
   if (!day) return null;
 
   return (
@@ -21,8 +22,8 @@ const DayDetailModal = ({ day, onClose }: { day: any, onClose: () => void }) => 
             <h3 className="font-bold text-slate-800 text-lg">
               {new Date(day.date).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })}
             </h3>
-            <div className={`text-sm font-bold ${day.balance < 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
-              Solde : {formatCurrency(day.balance)}
+            <div className={`text-sm font-bold ${(day.balance ?? 0) < 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
+              Solde : {formatCurrency(day.balance ?? 0)}
             </div>
           </div>
           <button onClick={onClose} className="p-2 bg-white rounded-full hover:bg-slate-200 transition-colors text-slate-500">
@@ -35,7 +36,7 @@ const DayDetailModal = ({ day, onClose }: { day: any, onClose: () => void }) => 
           {day.events.length === 0 ? (
             <p className="text-center text-slate-400 text-sm py-4 italic">Aucune opération ce jour-là.</p>
           ) : (
-            day.events.map((e: any) => (
+            day.events.map((e) => (
               <div key={e.id} className="flex items-center justify-between p-3 rounded-xl border border-slate-100 hover:border-indigo-100 hover:bg-indigo-50/30 transition-colors">
                 <div className="flex items-center gap-3 overflow-hidden">
                   <div className={`p-2 rounded-lg shrink-0 ${e.amount < 0 ? 'bg-rose-50 text-rose-500' : 'bg-emerald-50 text-emerald-500'}`}>
@@ -56,9 +57,9 @@ const DayDetailModal = ({ day, onClose }: { day: any, onClose: () => void }) => 
 };
 
 // --- COMPOSANT PRINCIPAL ---
-const CalendarView = ({ timeline }: { timeline: any[] }) => {
+const CalendarView = ({ timeline }: { timeline: MonthData[] }) => {
   const [currentMonthIndex, setCurrentMonthIndex] = useState(0);
-  const [selectedDay, setSelectedDay] = useState<any>(null); // État pour la popup
+  const [selectedDay, setSelectedDay] = useState<TimelineDay | null>(null);
 
   useEffect(() => { setCurrentMonthIndex(0); }, [timeline]);
 
@@ -107,7 +108,7 @@ const CalendarView = ({ timeline }: { timeline: any[] }) => {
 
         {/* VUE MOBILE (Liste) */}
         <div className="block md:hidden bg-slate-50">
-          {currentMonth.days.map((day: any) => {
+          {currentMonth.days.map((day) => {
              const isToday = new Date().toDateString() === new Date(day.date).toDateString();
              if (day.events.length === 0 && !isToday) return null; 
 
@@ -120,15 +121,15 @@ const CalendarView = ({ timeline }: { timeline: any[] }) => {
                               <span className="text-lg font-black leading-none">{day.dayOfMonth}</span>
                           </div>
                           <div>
-                              {isToday && <span className="text-[10px] font-bold text-indigo-600 uppercase tracking-wider">Aujourd'hui</span>}
+                              {isToday && <span className="text-[10px] font-bold text-indigo-600 uppercase tracking-wider">Aujourd&apos;hui</span>}
                           </div>
                       </div>
-                      <div className={`text-lg font-black ${day.balance < 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
-                          {formatCurrency(day.balance)}
+                      <div className={`text-lg font-black ${day.balance !== null && day.balance < 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
+                          {formatCurrency(day.balance ?? 0)}
                       </div>
                   </div>
                   <div className="space-y-2 pl-[52px]">
-                      {day.events.map((e: any) => (
+                      {day.events.map((e) => (
                           <div key={e.id} className="flex justify-between items-center text-sm">
                               <span className="text-slate-600 truncate pr-2">{e.name}</span>
                               <span className={`font-bold whitespace-nowrap ${e.amount < 0 ? 'text-slate-800' : 'text-emerald-600'}`}>
@@ -153,17 +154,16 @@ const CalendarView = ({ timeline }: { timeline: any[] }) => {
           <div className="grid grid-cols-7 auto-rows-fr bg-white">
               {blanks.map((_, i) => <div key={`blank-${i}`} className="h-32 bg-slate-50/30 border-b border-r border-slate-50"></div>)}
 
-              {currentMonth.days.map((day: any) => {
-                  const isNegative = day.balance < 0;
+              {currentMonth.days.map((day) => {
+                  const isNegative = day.balance !== null && day.balance < 0;
                   const isToday = new Date().toDateString() === new Date(day.date).toDateString();
-                  // On limite à 2 événements max pour garder la hauteur fixe
                   const visibleEvents = day.events.slice(0, 2);
                   const hiddenCount = Math.max(0, day.events.length - 2);
                   
                   return (
                       <div 
                         key={day.date} 
-                        onClick={() => setSelectedDay(day)} // Clic pour ouvrir la popup
+                        onClick={() => setSelectedDay(day)}
                         className={`h-32 border-b border-r border-slate-100 p-2 relative group hover:bg-indigo-50/50 transition-colors flex flex-col cursor-pointer ${isToday ? 'bg-indigo-50/20 ring-1 ring-inset ring-indigo-100' : ''}`}
                       >
                           {/* Date & Solde */}
@@ -180,7 +180,7 @@ const CalendarView = ({ timeline }: { timeline: any[] }) => {
 
                           {/* Événements (Limités à 2) */}
                           <div className="space-y-1 flex-1 overflow-hidden">
-                              {visibleEvents.map((e: any) => (
+                              {visibleEvents.map((e) => (
                                   <div key={e.id} className={`text-[9px] px-1.5 py-1 rounded-sm flex justify-between items-center ${e.amount < 0 ? 'bg-slate-100 text-slate-600' : 'bg-emerald-50 text-emerald-700'}`}>
                                       <span className="truncate font-medium max-w-[60%]">{e.name}</span>
                                       <span className="font-bold opacity-80">{Math.round(Math.abs(e.amount))}</span>

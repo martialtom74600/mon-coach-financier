@@ -7,7 +7,8 @@ import { useFinancialData } from '@/app/hooks/useFinancialData';
 // ✅ MISE À JOUR DES IMPORTS LOGIQUE
 import {
   formatCurrency,
-  computeFinancialPlan, // Nouveau moteur
+  computeFinancialPlan,
+  EMPTY_BUDGET_RESULT,
 } from '@/app/lib/logic';
 
 // ✅ IMPORT DU SCÉNARIO D'ACHAT (Déplacé ici)
@@ -23,6 +24,7 @@ import {
   AnalysisResult,
   AnalysisTip,
   AnalysisIssue,
+  BudgetResult,
 } from '@/app/lib/definitions';
 
 import {
@@ -185,10 +187,10 @@ export default function SimulatorPage() {
   const { profile, isLoaded, addDecision } = useFinancialData();
   
   // ✅ ADAPTATION NOUVEAU MOTEUR (computeFinancialPlan)
-  const stats = useMemo(() => {
-      if (!profile) return { monthlyIncome: 0, matelas: 0, remainingToLive: 0, totalGoalsEffort: 0 };
+  const stats = useMemo((): BudgetResult => {
+      if (!profile) return EMPTY_BUDGET_RESULT;
       const plan = computeFinancialPlan(profile);
-      return plan.budget; 
+      return plan.budget;
   }, [profile]);
 
   const isProfileEmpty = stats.monthlyIncome === 0 && stats.matelas === 0;
@@ -287,7 +289,7 @@ export default function SimulatorPage() {
         {step === 'input' && (
               <div className="mb-2">
                   <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-                      <ShoppingBag className="text-indigo-600"/> Simulateur d'Achat
+                      <ShoppingBag className="text-indigo-600"/> Simulateur d&apos;Achat
                   </h1>
                   <p className="text-slate-500 text-sm mt-1">Est-ce que cet achat rentre dans ton budget sans casser tes objectifs ?</p>
               </div>
@@ -297,7 +299,7 @@ export default function SimulatorPage() {
         {step === 'input' && (
           <Card className="p-6 md:p-8">
             <div className="space-y-6">
-              <InputGroup label="C'est quoi ?" placeholder="iPhone, Réparation..." value={purchase.name} onChange={(v: string) => setPurchase({ ...purchase, name: v })} />
+              <InputGroup label="C&apos;est quoi ?" placeholder="iPhone, Réparation..." value={purchase.name} onChange={(v: string) => setPurchase({ ...purchase, name: v })} />
               
               <div>
                 <label className="block text-sm font-medium text-slate-600 mb-2">Quel type d&apos;achat ?</label>

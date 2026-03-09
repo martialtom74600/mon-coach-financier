@@ -1,3 +1,4 @@
+import { Prisma } from '@prisma/client';
 import { prisma } from '@/app/lib/prisma';
 import { serializeDecimals } from '@/app/lib/definitions';
 import { getProfileId } from './profileService';
@@ -5,7 +6,7 @@ import { ServiceError } from './errors';
 
 export async function createAsset(
   userId: string,
-  data: { currentValue: number; [key: string]: unknown },
+  data: Omit<Prisma.AssetUncheckedCreateInput, 'profileId' | 'profile'> & { currentValue: number },
 ) {
   const profileId = await getProfileId(userId);
   const asset = await prisma.asset.create({

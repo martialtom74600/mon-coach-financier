@@ -213,3 +213,139 @@ export function validationError(error: z.ZodError) {
     { status: 400 },
   );
 }
+
+// ============================================================================
+// RESPONSE SCHEMAS — Bouclier Zod : Validation Runtime des réponses API
+// Miroir exact de ce que getFullUserProfile() retourne après serializeDecimals()
+// puis JSON.stringify(). Les Decimal → number, les Date → string ISO.
+// ============================================================================
+
+export const financialItemResponseSchema = z.object({
+  id: z.string(),
+  profileId: z.string(),
+  name: z.string(),
+  amount: z.number(),
+  category: ItemCategoryEnum,
+  frequency: FrequencyEnum,
+  dayOfMonth: z.number().nullable(),
+  createdAt: z.string(),
+});
+
+export const assetResponseSchema = z.object({
+  id: z.string(),
+  profileId: z.string(),
+  name: z.string(),
+  type: AssetTypeEnum,
+  currentValue: z.number(),
+  monthlyFlow: z.number(),
+  transferDay: z.number(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+
+export const financialGoalResponseSchema = z.object({
+  id: z.string(),
+  profileId: z.string(),
+  name: z.string(),
+  category: GoalCategoryEnum,
+  targetAmount: z.number(),
+  currentSaved: z.number(),
+  monthlyContribution: z.number(),
+  deadline: z.string(),
+  projectedYield: z.number(),
+  transferDay: z.number().nullable(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+
+export const purchaseDecisionResponseSchema = z.object({
+  id: z.string(),
+  profileId: z.string(),
+  name: z.string(),
+  amount: z.number(),
+  date: z.string(),
+  type: PurchaseTypeEnum,
+  paymentMode: PaymentModeEnum,
+  isPro: z.boolean(),
+  isReimbursable: z.boolean(),
+  reimbursedAt: z.string().nullable(),
+  duration: z.number().nullable(),
+  rate: z.number().nullable(),
+  createdAt: z.string(),
+});
+
+const savingsContributionResponseSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  amount: z.number(),
+  dayOfMonth: z.number(),
+});
+
+const householdResponseSchema = z.object({
+  adults: z.number(),
+  children: z.number(),
+});
+
+const housingResponseSchema = z.object({
+  status: HousingStatusEnum.nullable(),
+  monthlyCost: z.number(),
+  paymentDay: z.number().nullable(),
+});
+
+export const profileAPIResponseSchema = z.object({
+  id: z.string().optional(),
+  email: z.string().optional(),
+  firstName: z.string().nullable().optional(),
+
+  age: z.number().nullable().optional(),
+  persona: UserPersonaEnum.nullable().optional(),
+  household: householdResponseSchema.optional(),
+  funBudget: z.number().optional(),
+  housing: housingResponseSchema.optional(),
+
+  incomes: z.array(financialItemResponseSchema).default([]),
+  fixedCosts: z.array(financialItemResponseSchema).default([]),
+  variableCosts: z.array(financialItemResponseSchema).default([]),
+  credits: z.array(financialItemResponseSchema).default([]),
+  subscriptions: z.array(financialItemResponseSchema).default([]),
+  annualExpenses: z.array(financialItemResponseSchema).default([]),
+
+  assets: z.array(assetResponseSchema).default([]),
+  currentBalance: z.number().optional(),
+  savings: z.number().optional(),
+  investedAmount: z.number().optional(),
+  investments: z.array(assetResponseSchema).default([]),
+  savingsContributions: z.array(savingsContributionResponseSchema).default([]),
+
+  goals: z.array(financialGoalResponseSchema).default([]),
+  decisions: z.array(purchaseDecisionResponseSchema).default([]),
+
+  createdAt: z.string().optional(),
+  updatedAt: z.string().optional(),
+});
+
+// ============================================================================
+// HELPER CLIENT — Validation runtime avec log [API CONTRACT BREACH]
+// ============================================================================
+
+export function parseAPIResponse<T extends z.ZodTypeAny>(
+  schema: T,
+  data: unknown,
+  endpoint: string,
+): z.infer<T> | null {
+  const result = schema.safeParse(data);
+  if (result.success) return result.data;
+
+  const fields = result.error.issues.map(
+    (i) => `${i.path.join('.')}: ${i.message} (got ${i.code})`,
+  );
+
+  console.error(
+    `%c[API CONTRACT BREACH]%c ${endpoint}\n` +
+      `Champs invalides :\n  • ${fields.join('\n  • ')}`,
+    'color: #ff4444; font-weight: bold; font-size: 14px',
+    'color: #ff8800; font-weight: bold',
+  );
+
+  return null;
+}

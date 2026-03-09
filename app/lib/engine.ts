@@ -2,7 +2,7 @@ import { differenceInMonths, addMonths } from 'date-fns';
 import { 
   Profile, Goal, SimulationResult, GoalDiagnosis, GoalStrategy, 
   DeepAnalysis, OptimizationOpportunity, ActionGuide,
-  GoalScenarioInput, GoalScenarioContext, GoalScenarioResult,
+  GoalScenarioInput, GoalScenarioContext, GoalScenarioResult, GoalProjectionPoint,
   safeFloat, calculateListTotal, formatCurrency, 
   CONSTANTS, GOAL_CATEGORIES, PERSONA_PRESETS,
   AssetType,
@@ -312,13 +312,19 @@ export const computeFinancialPlan = (profile: Profile, customRates?: Partial<Sim
   // ✅ Correction PERSONA_PRESETS (Accès sécurisé par Enum)
   const defaultRules = PERSONA_PRESETS[UserPersona.SALARIED]?.rules || { safetyMonths: 3, maxDebt: 35, minLiving: 300 };
 
+  // KPIs de sécurité & projets (A.2)
+  const targetSafetyMonths = profile.persona === UserPersona.FREELANCE ? 6 : 3;
+  const idealSafety = burnRate * targetSafetyMonths;
+  const securityBuffer = matelas - idealSafety;
+  const availableForProjects = Math.max(0, netCashflow - totalAllocated);
+
   return {
     budget: { 
       income, fixed, variable, variableExpenses: variable, monthlyIncome: income, mandatoryExpenses: fixed, discretionaryExpenses: funBudget,
       capacityToSave: totalSavingsCapacity, rawCapacity, endOfMonthBalance, profitableExpenses: manualSavings + totalAllocated, 
       totalRecurring: fixed + variable + manualSavings, remainingToLive: Math.max(0, income - mandatoryAndVital - manualSavings), 
       realCashflow: netCashflow, matelas, investments: investedStock, totalWealth, safetyMonths, engagementRate: debtRatio,
-      rules: defaultRules, securityBuffer: 0, availableForProjects: 0, currentBalance, capacity: totalSavingsCapacity, totalGoalsEffort: totalAllocated
+      rules: defaultRules, securityBuffer, availableForProjects, currentBalance, capacity: totalSavingsCapacity, totalGoalsEffort: totalAllocated
     },
     allocations, freeCashFlow: netCashflow, usedRates: RATES
   };
@@ -337,7 +343,45 @@ export const simulateGoalScenario = (
         tempGoal as Goal, effort, context.availableForProjects, 
         context.monthlyIncome, context.matelas, RATES
     );
-    return { tempGoal, monthlyEffort: effort, projectionData: { projection: [], summary: { finalAmount: 0, totalInterests: 0, totalPocket: 0 } }, diagnosis };
+
+    const currentSaved = safeFloat(goalInput.currentSaved);
+    const months = goalInput.deadline
+        ? Math.max(1, differenceInMonths(new Date(goalInput.deadline), new Date()))
+        : 0;
+    const monthlyRate = goalInput.isInvested
+        ? ((safeFloat(goalInput.projectedYield) || 7) / 100) / 12
+        : 0;
+
+    const projection: GoalProjectionPoint[] = [];
+    let balance = currentSaved;
+    let contributed = currentSaved;
+
+    for (let m = 0; m <= months; m++) {
+        const date = addMonths(new Date(), m);
+        projection.push({
+            date: date.toISOString().slice(0, 7),
+            balance: Math.round(balance * 100) / 100,
+            contributed: Math.round(contributed * 100) / 100,
+        });
+        if (m < months) {
+            balance = balance * (1 + monthlyRate) + effort;
+            contributed += effort;
+        }
+    }
+
+    const finalAmount = Math.round(balance * 100) / 100;
+    const totalPocket = Math.round(contributed * 100) / 100;
+    const totalInterests = Math.round((finalAmount - totalPocket) * 100) / 100;
+
+    return {
+        tempGoal,
+        monthlyEffort: effort,
+        projectionData: {
+            projection,
+            summary: { finalAmount, totalInterests, totalPocket },
+        },
+        diagnosis,
+    };
 };
 
 // ============================================================================
@@ -501,7 +545,7 @@ export const analyzeProfileHealth = (
           });
       }
 
-      if (!hasAsset(profile, ['scpi', 'immo']) && !profile.housing?.status.includes('OWNER')) {
+      if (!hasAsset(profile, ['scpi', 'immo']) && !profile.housing?.status?.includes('OWNER')) {
           opps.push({
               id: 'div_scpi', type: 'INVESTMENT', level: 'INFO',
               title: 'Immobilier Papier', message: 'Ajoutez de la pierre à votre patrimoine sans gestion.',
@@ -527,11 +571,31 @@ export const analyzeProfileHealth = (
   const wealth10y = simulateFutureWealth(totalWealth, context.capacityToSave, 10, RATES.MARKET_AVG);
   const wealth20y = simulateFutureWealth(totalWealth, context.capacityToSave, 20, RATES.MARKET_AVG);
 
+  // FIRE: années avant indépendance financière (patrimoine couvre dépenses via SWR 4%)
+  const annualExpenses = (needsTotal + context.discretionaryExpenses) * 12;
+  const fireTarget = annualExpenses / RATES.SAFE_WITHDRAWAL;
+  const annualSavings = context.capacityToSave * 12;
+  const r = RATES.MARKET_AVG;
+
+  let fireYear = 99;
+  if (totalWealth >= fireTarget) {
+    fireYear = 0;
+  } else if (annualSavings > 0 && r > 0) {
+    const denom = totalWealth + annualSavings / r;
+    if (denom > 0) {
+      const x = (fireTarget + annualSavings / r) / denom;
+      const years = Math.log(x) / Math.log(1 + r);
+      if (isFinite(years) && years >= 0 && years < 99) {
+        fireYear = Math.round(years);
+      }
+    }
+  }
+
   return {
     globalScore: Math.max(0, Math.min(100, Math.round(score))),
     tags: [...new Set(tags)],
     ratios: { needs: needsRatio, wants: wantsRatio, savings: savingsRatio },
-    projections: { wealth10y, wealth20y, fireYear: 99 },
+    projections: { wealth10y, wealth20y, fireYear },
     opportunities: opps.sort((a, b) => {
         const levels: Record<string, number> = { 'CRITICAL': 0, 'WARNING': 1, 'SUCCESS': 2, 'INFO': 3 };
         return levels[a.level] - levels[b.level];

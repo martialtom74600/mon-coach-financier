@@ -27,7 +27,7 @@ export default function GlobalError({
               Oups, quelque chose a planté
             </h1>
             <p className="text-slate-500 mt-2 leading-relaxed">
-              Une erreur inattendue s'est produite. Vos données sont en sécurité — rien n'a été perdu.
+              Une erreur inattendue s&apos;est produite. Vos données sont en sécurité — rien n&apos;a été perdu.
             </p>
           </div>
           {error.digest && (

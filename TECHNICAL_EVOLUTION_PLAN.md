@@ -240,7 +240,32 @@ Chaque étape est **atomique** : elle peut être livrée indépendamment, testé
 
 > Priorité : **CRITIQUE**. Le moteur affiche des chiffres faux à l'utilisateur.
 
-#### A.1 — Corriger la formule de crédit
+#### A.0 — [TERMINÉ] ~~[CRITIQUE] Fixer le mapping `savingsContributions` (Bug silencieux)~~
+
+> Ajouté par l'audit de révision du 9 mars 2026. Bug non détecté lors de l'audit initial.
+
+- **Quoi** : Corriger le mapping de champs entre `Asset` (Prisma) et `savingsContributions` (ProfileUI) dans `userService.ts:85`.
+- **Pourquoi** : `getFullUserProfile` injecte des objets `Asset` bruts (champs `monthlyFlow`, `transferDay`) dans `savingsContributions`, mais le type `ProfileUI` et **tout le moteur** attendent `{ amount, dayOfMonth }`. Résultat : `safeFloat(item.amount)` reçoit `undefined` → retourne `0` → **toute l'épargne programmée est invisible**.
+- **Conséquence** : `manualSavings = 0` toujours. En cascade :
+  - `endOfMonthBalance` et `netCashflow` sont **surévalués** du montant total des virements automatiques.
+  - `remainingToLive` est surévalué (l'utilisateur croit avoir plus d'argent qu'en réalité).
+  - La timeline (`scenarios.ts:150-157`) ne génère **aucun événement** d'épargne (le `if(amount > 0)` ne passe jamais).
+  - Toutes les recommandations et diagnostics d'objectifs sont faussés en aval.
+  - Le bug est **100% silencieux** : pas d'erreur, pas de `NaN`, pas de crash. TypeScript ne le détecte pas car la donnée transite via JSON (fetch API).
+- **Implémentation** :
+  ```typescript
+  // userService.ts:85 — Remplacer :
+  savingsContributions: assets.filter((a) => a.monthlyFlow > 0),
+  // Par :
+  savingsContributions: assets
+    .filter((a) => a.monthlyFlow > 0)
+    .map((a) => ({ id: a.id, name: a.name, amount: a.monthlyFlow, dayOfMonth: a.transferDay })),
+  ```
+- **Impact** : `userService.ts:85` (1 ligne). Corrige instantanément tous les calculs en aval sans toucher au moteur.
+- **Fichiers touchés** : `services/userService.ts`.
+- **Tests** : Ajouter un test vérifiant que `savingsContributions` retourne bien `{ amount, dayOfMonth }` et non `{ monthlyFlow, transferDay }`.
+
+#### A.1 — [TERMINÉ] ~~Corriger la formule de crédit~~
 
 - **Quoi** : Remplacer le calcul d'intérêts simples par la formule d'annuité constante dans `scenarios.ts:90` et `scenarios.ts:324`.
 - **Pourquoi** : L'erreur atteint +7% sur un crédit standard. L'utilisateur prend des décisions d'achat sur des données fausses. C'est la pire dette technique du projet car elle affecte la **confiance** dans le produit.
@@ -253,10 +278,10 @@ Chaque étape est **atomique** : elle peut être livrée indépendamment, testé
 - **Fichiers touchés** : `scenarios.ts:90`, `scenarios.ts:324`.
 - **Tests** : Ajouter un test vérifiant que 10 000€ à 5% sur 48 mois = ~10 908€ total (et non 11 666€).
 
-#### A.2 — Implémenter `securityBuffer` et `availableForProjects`
+#### A.2 — [TERMINÉ] ~~Implémenter `securityBuffer` et `availableForProjects`~~
 
 - **Quoi** : Calculer réellement ces deux KPIs dans `computeFinancialPlan` au lieu de les hardcoder à 0.
-- **Pourquoi** : `simulateGoalScenario` (engine.ts:337-338) utilise `context.availableForProjects` pour le diagnostic. Avec 0, tous les objectifs sont diagnostiqués comme IMPOSSIBLE dès que `netCashflow > 0`. Le diagnostic est faussé.
+- **Pourquoi** : `simulateGoalScenario` (engine.ts:337-338) utilise `context.availableForProjects` comme `capacity` dans `analyzeGoalStrategies`. Avec `capacity = 0`, `gap = effort - 0 = effort`, donc tous les objectifs sont diagnostiqués comme **HARD** (pas IMPOSSIBLE — cette condition nécessite `effort > income`). Concrètement, chaque objectif affiche "Manque X€/mois" où X = 100% de l'effort requis, rendant tous les diagnostics artificiellement pessimistes.
 - **Implémentation** :
   ```
   availableForProjects = Math.max(0, netCashflow - totalAllocated)
@@ -265,7 +290,7 @@ Chaque étape est **atomique** : elle peut être livrée indépendamment, testé
 - **Impact** : `engine.ts:321` (2 champs), la page goals affichera des diagnostics plus réalistes.
 - **Fichiers touchés** : `engine.ts:321`.
 
-#### A.3 — Implémenter les projections dans `simulateGoalScenario`
+#### A.3 — [TERMINÉ] ~~Implémenter les projections dans `simulateGoalScenario`~~
 
 - **Quoi** : Calculer la courbe de projection `GoalProjectionPoint[]` au lieu de retourner un tableau vide.
 - **Pourquoi** : Le type promet des données de projection. La page goals a déjà le code pour afficher un graphique Recharts. La donnée manque.
@@ -273,7 +298,7 @@ Chaque étape est **atomique** : elle peut être livrée indépendamment, testé
 - **Impact** : `engine.ts:340`, `definitions.ts:179-183` (types déjà corrects). La page goals affichera une courbe de croissance.
 - **Fichiers touchés** : `engine.ts:327-341`.
 
-#### A.4 — Implémenter `issues` et `tips` dans `analyzePurchaseImpact`
+#### A.4 — [TERMINÉ] ~~Implémenter `issues` et `tips` dans `analyzePurchaseImpact`~~
 
 - **Quoi** : Générer des alertes et conseils contextuels dans le simulateur d'achat.
 - **Pourquoi** : Les types `AnalysisIssue` et `AnalysisTip` existent (definitions.ts:211-218) mais ne sont jamais peuplés. Le simulateur affiche un verdict binaire (vert/orange/rouge) sans explication.
@@ -285,7 +310,7 @@ Chaque étape est **atomique** : elle peut être livrée indépendamment, testé
 - **Impact** : `scenarios.ts:368-384`. Le simulateur deviendra réellement pédagogique.
 - **Fichiers touchés** : `scenarios.ts`.
 
-#### A.5 — Calculer `fireYear`
+#### A.5 — [TERMINÉ] ~~Calculer `fireYear`~~
 
 - **Quoi** : Remplacer `fireYear: 99` par le calcul réel du nombre d'années avant l'indépendance financière.
 - **Pourquoi** : C'est un KPI motivationnel puissant. Toutes les données sont disponibles.
@@ -293,34 +318,71 @@ Chaque étape est **atomique** : elle peut être livrée indépendamment, testé
 - **Impact** : `engine.ts:534`. Le dashboard pourra afficher "Indépendance financière dans X ans".
 - **Fichiers touchés** : `engine.ts:530-534`.
 
+#### A.6 — [TERMINÉ] ~~Fixer les ruptures de contrat API (Sankey, Savings, Housing, Timeline)~~
+
+> Ajouté par l'audit de ruptures de contrat du 9 mars 2026.
+
+- **Quoi** : Corriger 4 bugs de rupture de contrat entre le type `ProfileUI` et les données réellement retournées par `getFullUserProfile`.
+- **Pourquoi** : TypeScript perd son pouvoir à la frontière JSON (`fetch → any`). Le type `ProfileUI` promet des champs que l'API ne remplissait jamais. Ces bugs sont **100% silencieux** (pas de crash, pas de NaN — juste des `0` ou `undefined` interprétés comme valeurs valides).
+- **Bugs corrigés** :
+  1. **`FinancialSankey.tsx:222,238`** — Utilisait `cred.monthlyPayment` (inexistant) au lieu de `cred.amount`. Les crédits étaient **invisibles** dans le diagramme Sankey. → Remplacé par `cred.amount`.
+  2. **`useGoalManager.ts:24`** — Lisait `profile.savings` (jamais calculé par l'API) pour la stratégie "Apport". `safeFloat(undefined)` = 0, puis `updateProfileInfo({ savings: 0 })` **écrasait l'épargne à 0** en BDD. → Ajouté le calcul de `savings` et `investedAmount` dans `userService.ts`.
+  3. **`engine.ts:548`** — `profile.housing?.status.includes('OWNER')` crashait si `status` était `null` (profil incomplet). → Ajouté un optional chaining : `status?.includes(...)`.
+  4. **`userService.ts:98`** — Retournait `user.updatedAt` (record User Prisma) au lieu de `p.updatedAt` (profil financier). L'ancre de la timeline pouvait être décalée si Clerk mettait à jour le User sans changement financier. → Corrigé vers `p.updatedAt`.
+- **Fichiers touchés** : `userService.ts`, `engine.ts:548`, `FinancialSankey.tsx:222,238`.
+- **Leçon** : Tout champ du type `ProfileUI` qui n'est pas explicitement retourné par `getFullUserProfile` est un bug en attente. La Phase B (élimination des `any`) réduira ce risque en rendant les accès vérifiables à la compilation.
+
+#### A.7 — [TERMINÉ] ~~Implémentation du Bouclier Zod Global (Runtime Validation sur tous les fetchs client)~~
+
+> Ajouté le 9 mars 2026. Éradication de la "Dette Technique Fantôme" causée par les ruptures de contrats API.
+
+- **Quoi** : Valider strictement avec Zod **toutes les réponses API** au moment du fetch côté client, au lieu de faire confiance aveuglément au JSON reçu du réseau.
+- **Pourquoi** : `res.json()` retourne `any`. TypeScript est aveugle à la frontière réseau. Un champ manquant, un type changé, ou une réponse partielle traversent sans erreur et produisent des calculs faussés silencieusement (`NaN`, `undefined` interprétés comme `0`, etc.). Le Bouclier Zod intercepte ces ruptures de contrat **avant** qu'elles n'atteignent le moteur de calcul.
+- **Implémentation** :
+  1. **Schémas de réponse** (`validations.ts`) — Ajout de 5 schemas Zod miroir des réponses API :
+     - `financialItemResponseSchema` (miroir `SerializedDecimal<PrismaItem>` post-JSON)
+     - `assetResponseSchema` (miroir `SerializedDecimal<PrismaAsset>` post-JSON)
+     - `financialGoalResponseSchema` (miroir `SerializedDecimal<PrismaGoal>` post-JSON)
+     - `purchaseDecisionResponseSchema` (miroir `SerializedDecimal<PrismaDecision>` post-JSON)
+     - `profileAPIResponseSchema` (schéma composite validant la réponse complète de `GET /api/user`)
+  2. **Helper `parseAPIResponse()`** — Fonction générique `safeParse` + log `[API CONTRACT BREACH]` en rouge dans la console avec détail des champs invalides.
+  3. **Déploiement dans `useFinancialData.ts`** :
+     - `GET /api/user` → `profileAPIResponseSchema.safeParse()` avant toute utilisation des données
+     - `POST /api/items` → `financialItemResponseSchema.safeParse()` sur la réponse de création
+     - Fallback propre : si la validation échoue, `setError("Données incohérentes reçues du serveur.")` au lieu d'un crash silencieux
+  4. **Élimination de `any`** : `addDecision(decision: any)` → `addDecision(decision: DecisionInput)` avec interface typée explicite.
+- **Impact** : `validations.ts` (~120 lignes ajoutées), `useFinancialData.ts` (refactoring du `fetchData` + typage `addDecision`).
+- **Fichiers touchés** : `app/lib/validations.ts`, `app/hooks/useFinancialData.ts`.
+- **Tests** : 98/98 passés — aucune régression.
+
 ---
 
 ### PHASE B — Éliminer les `any` du Moteur de Projection
 
 > Priorité : **HAUTE**. Les fonctions les plus critiques pour l'utilisateur acceptent n'importe quoi.
 
-#### B.1 — Typer `getSimulatedEvents`
+#### B.1 — [TERMINÉ] ~~Typer `getSimulatedEvents`~~
 
 - **Quoi** : Remplacer `const events: any[]` par `TimelineEvent[]` dans `scenarios.ts:60`.
 - **Pourquoi** : Cette fonction génère les événements de crédit/split/achat qui alimentent la timeline. Le `any` permet de pousser des objets incomplets sans erreur de compilation.
 - **Impact** : `scenarios.ts:60-99`. Nécessite de vérifier que tous les `events.push()` produisent des objets conformes à `TimelineEvent`.
 - **Fichiers touchés** : `scenarios.ts`.
 
-#### B.2 — Typer `generateTimeline`
+#### B.2 — [TERMINÉ] ~~Typer `generateTimeline`~~
 
 - **Quoi** : Remplacer `history: any[]` par `PurchaseDecision[]` et `simulatedEvents: any[]` par `TimelineEvent[]` dans `scenarios.ts:106-109`.
 - **Pourquoi** : La timeline est le cœur visuel de l'application (calendrier, projection). Des données malformées produisent des balances incohérentes sans erreur visible.
 - **Impact** : `scenarios.ts:106-109`, `scenarios.ts:129,160`. Les `any` internes (`recurringByDay`, `oneOffEventsMap`) doivent aussi être typés.
 - **Fichiers touchés** : `scenarios.ts`, potentiellement `hooks/useFinancialData.ts` (passage d'arguments).
 
-#### B.3 — Typer `analyzePurchaseImpact`
+#### B.3 — [TERMINÉ] ~~Typer `analyzePurchaseImpact`~~
 
 - **Quoi** : Remplacer `currentStats: any` par `BudgetResult` dans `scenarios.ts:285`.
 - **Pourquoi** : C'est la fonction qui dit à l'utilisateur "achète" ou "n'achète pas". Elle accède à `currentStats.matelas`, `currentStats.remainingToLive`, `currentStats.rules` — tous non vérifiés à la compilation.
 - **Impact** : `scenarios.ts:285`. Le type `BudgetResult` existe déjà dans `definitions.ts:348-374`. Renommage du paramètre et ajout de l'import.
 - **Fichiers touchés** : `scenarios.ts`, `simulator/page.tsx` (vérifier que l'appel passe le bon type).
 
-#### B.4 — Typer les `any` restants dans les composants
+#### B.4 — [TERMINÉ] ~~Typer les `any` restants dans les composants~~
 
 - **Quoi** : Éliminer les `any` dans `FinancialSankey.tsx` (`profile: any`), `CalendarView.tsx` (`timeline: any[]`, `day: any`), `Header.tsx` (`pageContent: any`), `useFinancialData.ts` (`addDecision(decision: any)`).
 - **Pourquoi** : Ces composants affichent des données financières. Un `any` qui change de shape silencieusement produit un `NaN` affiché à l'utilisateur.
@@ -333,7 +395,9 @@ Chaque étape est **atomique** : elle peut être livrée indépendamment, testé
 
 > Priorité : **HAUTE**. `scenarios.ts` (385 lignes) est le fichier le plus complexe et n'a **aucun test**.
 
-#### C.1 — Tester `getSimulatedEvents`
+> **Audit QA 9 mars 2026** : Refonte intégrale selon le protocole "Blind & Logic". Tous les tests calculent la valeur attendue manuellement AVANT d'appeler la fonction. Invariants vérifiés : conservation de la masse, réalité du crédit (totalPaid = capital + intérêts), priorisation Urgence > Loisirs, zéro fuite (netCashflow = revenus - charges). Tests adverses : scénarios catastrophe, dates limites (1 mois, 360 mois, année bissextile), objets Zod corrompus.
+
+#### C.1 — [TERMINÉ] [VÉRIFIÉ & ADVERSE] Tester `getSimulatedEvents`
 
 - **Quoi** : Tests unitaires pour les 4 modes de paiement (CASH_CURRENT, CASH_SAVINGS, SPLIT, CREDIT).
 - **Pourquoi** : Cette fonction génère les événements qui alimentent la projection de trésorerie. Un bug ici = des centaines de jours avec des balances fausses.
@@ -343,9 +407,10 @@ Chaque étape est **atomique** : elle peut être livrée indépendamment, testé
   - SPLIT 4x : 4 événements mensuels, somme = montant total
   - CREDIT 5% 48 mois : 48 événements, vérifier le total avec la formule correcte (après A.1)
   - CASH_SAVINGS : 0 événements (pas d'impact timeline)
-- **Fichiers touchés** : `__tests__/lib/scenarios.test.ts` (nouveau fichier).
+- **Refonte 9 mars 2026** : Protocole Blind & Logic appliqué. Invariant crédit (totalPaid = capital + intérêts). Edge cases : annuité 1 mois, crédit 360 mois.
+- **Fichiers touchés** : `__tests__/lib/scenarios.test.ts`.
 
-#### C.2 — Tester `generateTimeline`
+#### C.2 — [TERMINÉ] [VÉRIFIÉ & ADVERSE] Tester `generateTimeline`
 
 - **Quoi** : Tests de la boucle de projection jour par jour.
 - **Pourquoi** : La timeline est le composant visuel principal. Un décalage d'un jour dans les récurrences fausse toute la projection.
@@ -354,9 +419,10 @@ Chaque étape est **atomique** : elle peut être livrée indépendamment, testé
   - Fin de mois : événement le 31 dans un mois de 28 jours → doit tomber le 28
   - Pondération variable : les samedis doivent avoir une dépense 2.3x supérieure à un mardi
   - Anchor point : les jours avant l'ancre doivent avoir `balance: null`
+- **Refonte 9 mars 2026** : Protocole Blind & Logic. Edge case année bissextile (31 février → 28).
 - **Fichiers touchés** : `__tests__/lib/scenarios.test.ts`.
 
-#### C.3 — Tester `analyzePurchaseImpact`
+#### C.3 — [TERMINÉ] [VÉRIFIÉ & ADVERSE] Tester `analyzePurchaseImpact`
 
 - **Quoi** : Tests du verdict et des calculs de coûts.
 - **Pourquoi** : C'est la décision binaire "achète / n'achète pas". Doit être déterministe et correct.
@@ -367,13 +433,15 @@ Chaque étape est **atomique** : elle peut être livrée indépendamment, testé
   - Achat remboursable → `realCost = 0`, `opportunityCost = 0`
   - Achat passé → verdict green "Mise à jour"
   - Cashflow danger → verdict orange "Attends un peu"
-- **Fichiers touchés** : `__tests__/lib/scenarios.test.ts`.
+- **Refonte 9 mars 2026** : Protocole Blind & Logic. **Rupture de logique corrigée** : `isBudgetOk` pour CASH_SAVINGS utilisait `newMatelas >= 0` au lieu de `amount <= matelas` → retrait supérieur au matelas donnait verdict green au lieu de red. Corrigé dans `scenarios.ts:366`.
+- **Fichiers touchés** : `__tests__/lib/scenarios.test.ts`, `app/lib/scenarios.ts`.
 
-#### C.4 — Tester les schémas Zod
+#### C.4 — [TERMINÉ] Tester les schémas Zod
 
 - **Quoi** : Tests unitaires pour `validations.ts` — chaque schéma avec des entrées valides et invalides.
 - **Pourquoi** : Les schémas Zod sont le **firewall** de l'application. Si un schéma est trop permissif, des données corrompues entrent en BDD. Si trop strict, l'utilisateur ne peut pas sauvegarder.
-- **Fichiers touchés** : `__tests__/lib/validations.test.ts` (nouveau fichier).
+- **Refonte 9 mars 2026** : Tests adverses créés — objets corrompus (amount invalide, category invalide, type invalide, etc.) pour forcer l'échec de validation.
+- **Fichiers touchés** : `__tests__/lib/validations.test.ts`.
 
 ---
 
@@ -381,7 +449,7 @@ Chaque étape est **atomique** : elle peut être livrée indépendamment, testé
 
 > Priorité : **MOYENNE-HAUTE**. Impact direct sur la performance perçue.
 
-#### D.1 — Passer le dashboard en Server Component + Client Islands
+#### D.1 — [TERMINÉ] Passer le dashboard en Server Component + Client Islands
 
 - **Quoi** : Extraire les données du profil côté serveur dans `app/page.tsx`. Passer `profile` comme prop aux îlots clients (graphiques, jauges).
 - **Pourquoi** : Le dashboard est la première page vue. En SSR, le HTML est généré côté serveur avec les données, envoyé au client en ~200ms. En CSR actuel, il faut ~1-3 secondes (download JS → fetch API → compute → render).
@@ -393,7 +461,7 @@ Chaque étape est **atomique** : elle peut être livrée indépendamment, testé
 - **Impact** : `app/page.tsx` (restructuration complète), `hooks/useFinancialData.ts` (le hook devient optionnel pour cette page).
 - **Fichiers touchés** : `app/page.tsx`, nouveau `components/DashboardClient.tsx`.
 
-#### D.2 — Ajouter React `cache()` sur le profil
+#### D.2 — [TERMINÉ] Ajouter React `cache()` sur le profil
 
 - **Quoi** : Wrapper `getFullUserProfile` avec `React.cache()` et `unstable_cache` de Next.js.
 - **Pourquoi** : Le profil est lu à chaque navigation. Avec le cache, un seul appel DB par requête serveur, révalidé à la mutation.
@@ -407,7 +475,7 @@ Chaque étape est **atomique** : elle peut être livrée indépendamment, testé
 - **Impact** : `services/userService.ts`, toutes les routes de mutation (ajout de `revalidateTag`).
 - **Fichiers touchés** : `services/userService.ts`, `api/*/route.ts`.
 
-#### D.3 — Supprimer le cache-busting `?t=${Date.now()}`
+#### D.3 — [TERMINÉ] Supprimer le cache-busting `?t=${Date.now()}`
 
 - **Quoi** : Retirer le query param aléatoire des fetch client.
 - **Pourquoi** : Avec le cache serveur en place (D.2), le cache-busting côté client devient inutile et contre-productif.
@@ -652,17 +720,22 @@ Chaque étape est **atomique** : elle peut être livrée indépendamment, testé
 
 | Fichier | Ligne(s) | Risque | Sévérité |
 |---------|----------|--------|----------|
+| `userService.ts` | 85 | Mapping `savingsContributions` cassé — `monthlyFlow`/`transferDay` vs `amount`/`dayOfMonth` → épargne programmée invisible (A.0) | 🔴🔴 |
 | `scenarios.ts` | 90, 324 | Formule de crédit inexacte (intérêts simples) | 🔴 |
 | `engine.ts` | 321 | `securityBuffer: 0, availableForProjects: 0` hardcodés | 🔴 |
-| `engine.ts` | 340 | Projection vide dans `simulateGoalScenario` | 🔴 |
-| `scenarios.ts` | 384 | `issues: [], tips: []` toujours vides | 🟠 |
-| `engine.ts` | 534 | `fireYear: 99` jamais calculé | 🟠 |
-| `scenarios.ts` | 60 | `const events: any[]` | 🟠 |
-| `scenarios.ts` | 107 | `history: any[]` | 🟠 |
-| `scenarios.ts` | 285 | `currentStats: any` | 🟠 |
+| `engine.ts` | 340 | ~~Projection vide dans `simulateGoalScenario`~~ [TERMINÉ] | ✅ |
+| `scenarios.ts` | 384 | ~~`issues: [], tips: []` toujours vides~~ [TERMINÉ] | ✅ |
+| `engine.ts` | 534 | ~~`fireYear: 99` jamais calculé~~ [TERMINÉ] | ✅ |
+| `FinancialSankey.tsx` | 222, 238 | ~~`cred.monthlyPayment` au lieu de `cred.amount` → crédits invisibles~~ [TERMINÉ] | ✅ |
+| `useGoalManager.ts` | 24 | ~~`profile.savings` jamais alimenté → épargne écrasée à 0~~ [TERMINÉ] | ✅ |
+| `engine.ts` | 548 | ~~`housing?.status.includes('OWNER')` crash si null~~ [TERMINÉ] | ✅ |
+| `userService.ts` | 98 | ~~`user.updatedAt` au lieu de `p.updatedAt` → ancre timeline décalée~~ [TERMINÉ] | ✅ |
+| `scenarios.ts` | 60 | ~~`const events: any[]`~~ [TERMINÉ] | ✅ |
+| `scenarios.ts` | 107 | ~~`history: any[]`~~ [TERMINÉ] | ✅ |
+| `scenarios.ts` | 285 | ~~`currentStats: any`~~ [TERMINÉ] | ✅ |
 | `userService.ts` | 34 | Fallback `"no-email"` → violation unique | 🟠 |
 | `profileService.ts` | 18-21 | Pas de check d'existence → 500 au lieu de 404 | 🟡 |
-| `useFinancialData.ts` | ~fetchData | Full refetch + cache-busting systématique | 🟡 |
+| `useFinancialData.ts` | ~fetchData | Full refetch (cache-busting supprimé D.3) | 🟡 |
 | `engine.ts` | 36-41 | `TAX_BRACKETS` définis mais jamais utilisés | 🟡 |
 | `next.config.js` | — | Aucun security header | 🟡 |
 | Toutes routes API | — | Aucun rate limiting | 🟠 |

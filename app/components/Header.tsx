@@ -11,8 +11,10 @@ export default function Header() {
   // Récupération sécurisée du prénom
   const userName = profile?.firstName ? ` ${profile.firstName}` : '';
 
+  type PageContent = { title: string; emoji: string; subtitle: string };
+
   // Configuration des textes par page
-  const pageContent: any = {
+  const pageContent: Record<string, PageContent> = {
     '/': {
       // C'est ici que la magie opère : Bonjour Thomas 👋
       title: `Bonjour${userName}`,

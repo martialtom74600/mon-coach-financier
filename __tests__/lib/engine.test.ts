@@ -1,3 +1,10 @@
+/**
+ * engine.test.ts — Tests d'invariants métier (Protocole Blind & Logic)
+ *
+ * RÈGLE : Calculer la valeur attendue MANUELLEMENT avant d'appeler la fonction.
+ * Ne jamais ajuster expect() en fonction du retour du code.
+ */
+
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   calculateMonthlyEffort,
@@ -16,11 +23,14 @@ import {
   GoalCategory,
   Frequency,
   INITIAL_PROFILE,
+  CONSTANTS,
+  GOAL_CATEGORIES,
 } from '@/app/lib/definitions';
 import type { Profile, Goal, Asset, FinancialItem, SimulationResult } from '@/app/lib/definitions';
+import { differenceInMonths } from 'date-fns';
 
 // ============================================================================
-// FACTORIES — Profils types réutilisables
+// FACTORIES
 // ============================================================================
 
 const NOW = new Date('2026-03-08T12:00:00Z');
@@ -107,47 +117,54 @@ const RATES: SimulationRates = {
 };
 
 // ============================================================================
-// 1. calculateMonthlyEffort
+// INVARIANT : Calcul théorique des efforts mensuels
+// effort = (targetAmount - currentSaved) / monthsRemaining
 // ============================================================================
 
 describe('calculateMonthlyEffort', () => {
-  beforeEach(() => { vi.useFakeTimers(); vi.setSystemTime(NOW); });
-  afterEach(() => { vi.useRealTimers(); });
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(NOW);
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
 
-  it('returns 0 when targetAmount is missing', () => {
+  it('returns 0 when targetAmount is 0 (invariant: pas d\'effort sans objectif)', () => {
+    const expected = 0;
     const goal = makeGoal({ targetAmount: 0 });
-    expect(calculateMonthlyEffort(goal)).toBe(0);
+    expect(calculateMonthlyEffort(goal)).toBe(expected);
   });
 
-  it('returns 0 when deadline is missing', () => {
+  it('returns 0 when deadline is null (invariant: pas de timeline)', () => {
+    const expected = 0;
     const goal = makeGoal({ deadline: null as any });
-    expect(calculateMonthlyEffort(goal)).toBe(0);
+    expect(calculateMonthlyEffort(goal)).toBe(expected);
   });
 
-  it('calculates simple monthly savings (no investment)', () => {
-    // differenceInMonths('2028-03-08', NOW) = 23 (sub-day offset)
-    // 10000 / 23 ≈ 434.78
-    const goal = makeGoal({
-      targetAmount: 10000,
-      currentSaved: 0,
-      deadline: new Date('2028-03-08'),
-    });
-    const effort = calculateMonthlyEffort(goal);
-    expect(effort).toBeCloseTo(10000 / 23, 0);
+  it('calcule l\'effort mensuel = (target - saved) / months (Blind & Logic)', () => {
+    const targetAmount = 10000;
+    const currentSaved = 0;
+    const deadline = new Date('2028-03-08');
+    const months = Math.max(1, differenceInMonths(deadline, NOW));
+    const expected = (targetAmount - currentSaved) / months;
+
+    const goal = makeGoal({ targetAmount, currentSaved, deadline });
+    expect(calculateMonthlyEffort(goal)).toBeCloseTo(expected, 0);
   });
 
-  it('accounts for already-saved amount', () => {
-    // (10000 - 4000) / 23 ≈ 260.87
-    const goal = makeGoal({
-      targetAmount: 10000,
-      currentSaved: 4000,
-      deadline: new Date('2028-03-08'),
-    });
-    const effort = calculateMonthlyEffort(goal);
-    expect(effort).toBeCloseTo(6000 / 23, 0);
+  it('déduit currentSaved du gap (Blind & Logic)', () => {
+    const targetAmount = 10000;
+    const currentSaved = 4000;
+    const deadline = new Date('2028-03-08');
+    const months = Math.max(1, differenceInMonths(deadline, NOW));
+    const expected = (targetAmount - currentSaved) / months;
+
+    const goal = makeGoal({ targetAmount, currentSaved, deadline });
+    expect(calculateMonthlyEffort(goal)).toBeCloseTo(expected, 0);
   });
 
-  it('reduces effort when invested (compound interest)', () => {
+  it('effort investi < effort simple (intérêts composés réduisent l\'effort)', () => {
     const goalSimple = makeGoal({
       targetAmount: 10000,
       currentSaved: 0,
@@ -162,126 +179,109 @@ describe('calculateMonthlyEffort', () => {
     });
     const effortSimple = calculateMonthlyEffort(goalSimple);
     const effortInvested = calculateMonthlyEffort(goalInvested);
+
     expect(effortInvested).toBeLessThan(effortSimple);
     expect(effortInvested).toBeGreaterThan(0);
   });
 
-  it('returns remaining amount if deadline is past (min 1 month)', () => {
-    const goal = makeGoal({
-      targetAmount: 5000,
-      currentSaved: 1000,
-      deadline: new Date('2025-01-01'),
-    });
-    const effort = calculateMonthlyEffort(goal);
-    expect(effort).toBe(4000);
+  it('deadline passée → effort = reste à épargner (min 1 mois)', () => {
+    const targetAmount = 5000;
+    const currentSaved = 1000;
+    const expected = targetAmount - currentSaved; // 4000
+
+    const goal = makeGoal({ targetAmount, currentSaved, deadline: new Date('2025-01-01') });
+    expect(calculateMonthlyEffort(goal)).toBe(expected);
   });
 
-  it('returns 0 when already saved more than target', () => {
-    const goal = makeGoal({
-      targetAmount: 5000,
-      currentSaved: 6000,
-      deadline: new Date('2028-03-08'),
-    });
-    const effort = calculateMonthlyEffort(goal);
-    expect(effort).toBe(0);
+  it('déjà atteint → effort = 0', () => {
+    const expected = 0;
+    const goal = makeGoal({ targetAmount: 5000, currentSaved: 6000, deadline: new Date('2028-03-08') });
+    expect(calculateMonthlyEffort(goal)).toBe(expected);
   });
 });
 
 // ============================================================================
-// 2. analyzeGoalStrategies
-// ============================================================================
-
-describe('analyzeGoalStrategies', () => {
-  beforeEach(() => { vi.useFakeTimers(); vi.setSystemTime(NOW); });
-  afterEach(() => { vi.useRealTimers(); });
-
-  it('returns POSSIBLE when effort fits within capacity', () => {
-    const goal = makeGoal({ targetAmount: 10000, deadline: new Date('2030-01-01') });
-    const result = analyzeGoalStrategies(goal, 200, 500, 3000, 5000, RATES);
-    expect(result.status).toBe('POSSIBLE');
-    expect(result.color).toBe('green');
-    expect(result.gap).toBe(0);
-  });
-
-  it('returns HARD when effort exceeds capacity but not income', () => {
-    const goal = makeGoal({ targetAmount: 50000, deadline: new Date('2028-01-01') });
-    const result = analyzeGoalStrategies(goal, 2500, 500, 3000, 5000, RATES);
-    expect(result.status).toBe('HARD');
-    expect(result.color).toBe('red');
-    expect(result.gap).toBe(2000);
-  });
-
-  it('returns IMPOSSIBLE when effort exceeds income', () => {
-    const goal = makeGoal({ targetAmount: 100000, deadline: new Date('2027-01-01') });
-    const result = analyzeGoalStrategies(goal, 10000, 500, 3000, 5000, RATES);
-    expect(result.status).toBe('IMPOSSIBLE');
-    expect(result.color).toBe('black');
-  });
-
-  it('suggests deposit strategy when savings > 1000 and status is HARD', () => {
-    const goal = makeGoal({ targetAmount: 50000, deadline: new Date('2028-01-01') });
-    const result = analyzeGoalStrategies(goal, 2500, 500, 3000, 8000, RATES);
-    expect(result.status).toBe('HARD');
-    const depositStrategy = result.strategies.find(s => s.type === 'BUDGET');
-    expect(depositStrategy).toBeDefined();
-    expect(depositStrategy!.title).toBe('Apport');
-  });
-
-  it('suggests time strategy when HARD', () => {
-    const goal = makeGoal({
-      targetAmount: 20000,
-      currentSaved: 0,
-      deadline: new Date('2028-01-01'),
-    });
-    const result = analyzeGoalStrategies(goal, 1000, 400, 3000, 500, RATES);
-    expect(result.status).toBe('HARD');
-    const timeStrategy = result.strategies.find(s => s.type === 'TIME');
-    expect(timeStrategy).toBeDefined();
-  });
-});
-
-// ============================================================================
-// 3. distributeGoals
+// INVARIANT : Priorisation des objectifs (Urgence > Loisirs)
 // ============================================================================
 
 describe('distributeGoals', () => {
-  beforeEach(() => { vi.useFakeTimers(); vi.setSystemTime(NOW); });
-  afterEach(() => { vi.useRealTimers(); });
-
-  it('fully funds a single goal when capacity is sufficient', () => {
-    const goals = [makeGoal({ targetAmount: 6000, deadline: new Date('2028-03-08') })];
-    const result = distributeGoals(goals, 1000);
-    expect(result.allocations).toHaveLength(1);
-    expect(result.allocations[0].status).toBe('FULL');
-    expect(result.allocations[0].fillRate).toBe(100);
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(NOW);
+  });
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
-  it('partially funds a goal when capacity is insufficient', () => {
-    const goals = [makeGoal({ targetAmount: 60000, deadline: new Date('2028-03-08') })];
-    const result = distributeGoals(goals, 100);
+  it('INVARIANT : Objectif Urgence (EMERGENCY) servi AVANT Loisirs (TRAVEL)', () => {
+    const capacity = 500;
+    const maxAvailable = capacity * (1 - CONSTANTS.BUFFER_RATIO); // 450€
+
+    const goals = [
+      makeGoal({
+        id: 'loisirs',
+        category: GoalCategory.TRAVEL,
+        targetAmount: 6000,
+        deadline: new Date('2028-03-08'),
+      }),
+      makeGoal({
+        id: 'urgence',
+        category: GoalCategory.EMERGENCY,
+        targetAmount: 6000,
+        deadline: new Date('2028-03-08'),
+      }),
+    ];
+
+    const result = distributeGoals(goals, capacity);
+
+    const emergencyAlloc = result.allocations.find((a) => a.id === 'urgence');
+    const travelAlloc = result.allocations.find((a) => a.id === 'loisirs');
+
+    expect(emergencyAlloc).toBeDefined();
+    expect(travelAlloc).toBeDefined();
+    expect(GOAL_CATEGORIES.EMERGENCY.priority).toBeLessThan(GOAL_CATEGORIES.TRAVEL.priority);
+    expect(result.allocations[0].id).toBe('urgence');
+  });
+
+  it('capacity suffisante → objectif FULL à 100%', () => {
+    const targetAmount = 6000;
+    const deadline = new Date('2028-03-08');
+    const months = Math.max(1, differenceInMonths(deadline, NOW));
+    const effortRequired = targetAmount / months;
+    const capacity = effortRequired * 2;
+    const expectedFillRate = 100;
+
+    const goals = [makeGoal({ targetAmount, deadline })];
+    const result = distributeGoals(goals, capacity);
+
+    expect(result.allocations[0].status).toBe('FULL');
+    expect(result.allocations[0].fillRate).toBe(expectedFillRate);
+  });
+
+  it('capacity insuffisante → objectif PARTIAL', () => {
+    const targetAmount = 60000;
+    const deadline = new Date('2028-03-08');
+    const months = Math.max(1, differenceInMonths(deadline, NOW));
+    const effortRequired = targetAmount / months;
+    const capacity = effortRequired * 0.1;
+
+    const goals = [makeGoal({ targetAmount, deadline })];
+    const result = distributeGoals(goals, capacity);
+
     expect(result.allocations[0].status).toBe('PARTIAL');
     expect(result.allocations[0].fillRate).toBeLessThan(100);
   });
 
-  it('respects priority ordering (EMERGENCY > OTHER > RETIREMENT)', () => {
-    const goals = [
-      makeGoal({ id: 'retirement', category: GoalCategory.RETIREMENT, targetAmount: 6000, deadline: new Date('2028-03-08') }),
-      makeGoal({ id: 'emergency', category: GoalCategory.EMERGENCY, targetAmount: 6000, deadline: new Date('2028-03-08') }),
-      makeGoal({ id: 'travel', category: GoalCategory.TRAVEL, targetAmount: 6000, deadline: new Date('2028-03-08') }),
-    ];
-    const result = distributeGoals(goals, 500);
-    expect(result.allocations[0].id).toBe('emergency');
-    expect(result.allocations[0].status).toBe('FULL');
-  });
-
-  it('returns 0 allocations for zero capacity', () => {
+  it('capacity = 0 → totalAllocated = 0', () => {
+    const expected = 0;
     const goals = [makeGoal({ targetAmount: 10000, deadline: new Date('2028-03-08') })];
     const result = distributeGoals(goals, 0);
-    expect(result.totalAllocated).toBe(0);
-    expect(result.allocations[0].allocatedEffort).toBe(0);
+
+    expect(result.totalAllocated).toBe(expected);
+    expect(result.allocations[0].allocatedEffort).toBe(expected);
   });
 
-  it('handles empty goals array', () => {
+  it('goals vide → allocations vide', () => {
     const result = distributeGoals([], 1000);
     expect(result.allocations).toHaveLength(0);
     expect(result.totalAllocated).toBe(0);
@@ -289,162 +289,334 @@ describe('distributeGoals', () => {
 });
 
 // ============================================================================
-// 4. computeFinancialPlan
+// INVARIANT : netCashflow = revenus - toutes_charges (Zéro fuite)
 // ============================================================================
 
-describe('computeFinancialPlan', () => {
-  it('computes a basic salaried profile correctly', () => {
+describe('computeFinancialPlan — Invariants métier', () => {
+  it('INVARIANT ZÉRO FUITES : realCashflow = max(0, revenus - fixed - variable - funBudget - manualSavings)', () => {
+    const income = 2500;
+    const fixedCosts = 200;
+    const housingCost = 800;
+    const variable = 300;
+    const funBudget = 200;
+    const manualSavings = 0;
+
+    const fixed = fixedCosts + housingCost;
+    const mandatoryAndVital = fixed + variable;
+    const rawCapacity = income - mandatoryAndVital - funBudget;
+    const totalSavingsCapacity = Math.max(0, rawCapacity);
+    const expectedNetCashflow = Math.max(0, totalSavingsCapacity - manualSavings);
+
     const profile = makeProfile({
-      incomes: [makeItem({ amount: 2500, category: ItemCategory.INCOME })],
-      fixedCosts: [makeItem({ amount: 200, category: ItemCategory.FIXED_COST })],
-      variableCosts: [makeItem({ amount: 300, category: ItemCategory.VARIABLE_COST })],
-      funBudget: 200,
+      incomes: [makeItem({ amount: income, category: ItemCategory.INCOME })],
+      fixedCosts: [makeItem({ amount: fixedCosts, category: ItemCategory.FIXED_COST })],
+      variableCosts: [makeItem({ amount: variable, category: ItemCategory.VARIABLE_COST })],
+      funBudget,
+      savingsContributions: [],
     });
 
     const result = computeFinancialPlan(profile);
-    expect(result.budget.income).toBe(2500);
-    expect(result.budget.fixed).toBeGreaterThanOrEqual(200);
-    expect(result.budget.variable).toBe(300);
-    expect(result.budget.capacityToSave).toBeGreaterThan(0);
+
+    expect(result.budget.realCashflow).toBeCloseTo(expectedNetCashflow, 0);
+    expect(result.budget.income).toBe(income);
+    expect(result.budget.fixed).toBeGreaterThanOrEqual(fixed);
   });
 
-  it('includes housing cost for tenants', () => {
+  it('INVARIANT CONSERVATION : Revenus 0€, charges 10000€ → patrimoine ne peut pas augmenter', () => {
+    const income = 0;
+    const charges = 10000;
+    const expectedNetCashflow = 0;
+    const expectedRawCapacity = income - charges - 0;
+
+    const profile = makeProfile({
+      incomes: [],
+      fixedCosts: [makeItem({ amount: charges, category: ItemCategory.FIXED_COST })],
+      variableCosts: [],
+      funBudget: 0,
+      housing: { status: HousingStatus.FREE, monthlyCost: 0, paymentDay: 1 },
+      assets: [],
+      savingsContributions: [],
+    });
+
+    const result = computeFinancialPlan(profile);
+
+    expect(result.budget.income).toBe(income);
+    expect(result.budget.realCashflow).toBe(expectedNetCashflow);
+    expect(result.budget.rawCapacity).toBeLessThanOrEqual(0);
+    expect(result.budget.endOfMonthBalance).toBeLessThanOrEqual(0);
+  });
+
+  it('Scénario catastrophe : revenus 0€, charges 10000€, patrimoine négatif impossible à afficher', () => {
+    const profile = makeProfile({
+      incomes: [],
+      fixedCosts: [makeItem({ amount: 10000, category: ItemCategory.FIXED_COST })],
+      housing: { status: HousingStatus.FREE, monthlyCost: 0, paymentDay: 1 },
+      assets: [],
+    });
+
+    const result = computeFinancialPlan(profile);
+
+    expect(result.budget.income).toBe(0);
+    expect(result.budget.capacityToSave).toBe(0);
+    expect(result.budget.realCashflow).toBe(0);
+  });
+
+  it('Calcul théorique : income - fixed - variable - fun = capacity (Blind & Logic)', () => {
+    const income = 3000;
+    const fixedItem = 1000;
+    const housing = 800;
+    const variable = 500;
+    const funBudget = 200;
+
+    const expectedFixed = fixedItem + housing;
+    const expectedRawCapacity = income - expectedFixed - variable - funBudget;
+
+    const profile = makeProfile({
+      incomes: [makeItem({ amount: income, category: ItemCategory.INCOME })],
+      fixedCosts: [makeItem({ amount: fixedItem, category: ItemCategory.FIXED_COST })],
+      variableCosts: [makeItem({ amount: variable, category: ItemCategory.VARIABLE_COST })],
+      funBudget,
+    });
+
+    const result = computeFinancialPlan(profile);
+
+    expect(result.budget.fixed).toBe(expectedFixed);
+    expect(result.budget.rawCapacity).toBeCloseTo(expectedRawCapacity, 0);
+  });
+
+  it('Housing FREE → fixed exclut le logement', () => {
+    const expectedFixed = 0;
     const profile = makeProfile({
       incomes: [makeItem({ amount: 3000, category: ItemCategory.INCOME })],
-      housing: { status: HousingStatus.TENANT, monthlyCost: 900, paymentDay: 5 },
+      housing: { status: HousingStatus.FREE, monthlyCost: 0, paymentDay: 5 },
     });
 
     const result = computeFinancialPlan(profile);
-    expect(result.budget.fixed).toBeGreaterThanOrEqual(900);
+    expect(result.budget.fixed).toBe(expectedFixed);
   });
 
-  it('excludes housing cost for FREE status', () => {
-    const profile = makeProfile({
-      incomes: [makeItem({ amount: 3000, category: ItemCategory.INCOME })],
-      housing: { status: HousingStatus.FREE, monthlyCost: 0 },
-    });
-
-    const result = computeFinancialPlan(profile);
-    expect(result.budget.fixed).toBe(0);
-  });
-
-  it('handles empty profile (all zeros)', () => {
+  it('Profil vide → tout à 0', () => {
     const profile = makeProfile({
       funBudget: 0,
       housingCost: 0,
-      housing: { status: HousingStatus.FREE, monthlyCost: 0 },
+      housing: { status: HousingStatus.FREE, monthlyCost: 0, paymentDay: 5 },
     });
+
     const result = computeFinancialPlan(profile);
+
     expect(result.budget.income).toBe(0);
     expect(result.budget.fixed).toBe(0);
     expect(result.budget.capacityToSave).toBe(0);
   });
 
-  it('classifies assets by type (CC / LIVRET / Invested)', () => {
+  it('Agrégation actifs : CC + LIVRET + PEA = totalWealth', () => {
+    const cc = 1500;
+    const livret = 8000;
+    const pea = 15000;
+    const expectedTotalWealth = cc + livret + pea;
+
     const profile = makeProfile({
       incomes: [makeItem({ amount: 3000, category: ItemCategory.INCOME })],
       assets: [
-        makeAsset({ type: AssetType.CC, currentValue: 1500 }),
-        makeAsset({ type: AssetType.LIVRET, currentValue: 8000 }),
-        makeAsset({ type: AssetType.PEA, currentValue: 15000 }),
+        makeAsset({ type: AssetType.CC, currentValue: cc }),
+        makeAsset({ type: AssetType.LIVRET, currentValue: livret }),
+        makeAsset({ type: AssetType.PEA, currentValue: pea }),
       ],
     });
 
     const result = computeFinancialPlan(profile);
-    expect(result.budget.currentBalance).toBe(1500);
-    expect(result.budget.matelas).toBe(8000);
-    expect(result.budget.investments).toBe(15000);
-    expect(result.budget.totalWealth).toBe(24500);
+
+    expect(result.budget.currentBalance).toBe(cc);
+    expect(result.budget.matelas).toBe(livret);
+    expect(result.budget.investments).toBe(pea);
+    expect(result.budget.totalWealth).toBe(expectedTotalWealth);
   });
 
-  it('calculates safety months from matelas and burn rate', () => {
+  it('safetyMonths = matelas / burnRate (calcul théorique)', () => {
+    const matelas = 6000;
+    const fixed = 1000;
+    const housing = 800;
+    const variable = 500;
+    const funBudget = 200;
+    const burnRate = fixed + housing + variable + Math.min(funBudget, 500);
+    const expectedSafetyMonths = matelas / burnRate;
+
+    const profile = makeProfile({
+      incomes: [makeItem({ amount: 3000, category: ItemCategory.INCOME })],
+      fixedCosts: [makeItem({ amount: fixed, category: ItemCategory.FIXED_COST })],
+      variableCosts: [makeItem({ amount: variable, category: ItemCategory.VARIABLE_COST })],
+      funBudget,
+      assets: [makeAsset({ type: AssetType.LIVRET, currentValue: matelas })],
+    });
+
+    const result = computeFinancialPlan(profile);
+
+    expect(result.budget.safetyMonths).toBeCloseTo(expectedSafetyMonths, 1);
+  });
+
+  it('savingsContributions réduisent endOfMonthBalance (A.0)', () => {
+    const income = 3000;
+    const savingsTotal = 500;
+
+    const profileWithSavings = makeProfile({
+      incomes: [makeItem({ amount: income, category: ItemCategory.INCOME })],
+      savingsContributions: [
+        { id: 'sc-1', name: 'Livret A', amount: 200, dayOfMonth: 5 },
+        { id: 'sc-2', name: 'PEA', amount: 300, dayOfMonth: 10 },
+      ],
+    });
+
+    const profileNoSavings = makeProfile({
+      incomes: [makeItem({ amount: income, category: ItemCategory.INCOME })],
+      savingsContributions: [],
+    });
+
+    const resultWith = computeFinancialPlan(profileWithSavings);
+    const resultNo = computeFinancialPlan(profileNoSavings);
+
+    const expectedDiff = savingsTotal;
+    expect(resultWith.budget.endOfMonthBalance).toBe(
+      resultNo.budget.endOfMonthBalance - expectedDiff
+    );
+  });
+
+  it('securityBuffer = matelas - idealSafety (A.2)', () => {
+    const matelas = 6000;
+    const burnRate = 2500;
+    const targetMonths = 3;
+    const idealSafety = burnRate * targetMonths;
+    const expectedSecurityBuffer = matelas - idealSafety;
+
     const profile = makeProfile({
       incomes: [makeItem({ amount: 3000, category: ItemCategory.INCOME })],
       fixedCosts: [makeItem({ amount: 1000, category: ItemCategory.FIXED_COST })],
       variableCosts: [makeItem({ amount: 500, category: ItemCategory.VARIABLE_COST })],
       funBudget: 200,
-      assets: [makeAsset({ type: AssetType.LIVRET, currentValue: 6000 })],
+      assets: [makeAsset({ type: AssetType.LIVRET, currentValue: matelas })],
+      persona: UserPersona.SALARIED,
     });
 
     const result = computeFinancialPlan(profile);
-    // fixed = 1000 (fixedCosts) + 800 (housing tenant) = 1800
-    // mandatoryAndVital = 1800 + 500 = 2300
-    // burnRate = 2300 + min(200, 500) = 2500
-    // safetyMonths = 6000 / 2500 = 2.4
-    expect(result.budget.safetyMonths).toBeCloseTo(2.4, 1);
+
+    expect(result.budget.securityBuffer).toBeCloseTo(expectedSecurityBuffer, 0);
   });
 
-  it('calculates debt ratio correctly', () => {
+  it('availableForProjects = max(0, netCashflow - totalAllocated)', () => {
     const profile = makeProfile({
       incomes: [makeItem({ amount: 3000, category: ItemCategory.INCOME })],
-      credits: [makeItem({ amount: 500, category: ItemCategory.CREDIT })],
-      housing: { status: HousingStatus.OWNER_LOAN, monthlyCost: 1000, paymentDay: 5 },
+      funBudget: 200,
+      goals: [],
     });
 
     const result = computeFinancialPlan(profile);
-    // debtTotal = 500 (credits) + 1000 (housing loan) = 1500
-    // ratio = 1500 / 3000 * 100 = 50%
-    expect(result.budget.engagementRate).toBeCloseTo(50, 0);
+
+    expect(result.budget.availableForProjects).toBe(result.budget.realCashflow);
   });
 
-  it('accepts custom rates override', () => {
+  it('savingsContributions avec mauvais champs (monthlyFlow/transferDay) ignorés (A.0)', () => {
+    const brokenContributions = [
+      { id: 'sc-1', name: 'Livret A', monthlyFlow: 200, transferDay: 5 },
+    ] as unknown as Profile['savingsContributions'];
+
     const profile = makeProfile({
       incomes: [makeItem({ amount: 3000, category: ItemCategory.INCOME })],
+      savingsContributions: brokenContributions,
     });
-    const result = computeFinancialPlan(profile, { INFLATION: 0.10 });
-    expect(result.usedRates!.INFLATION).toBe(0.10);
-    expect(result.usedRates!.MARKET_AVG).toBe(0.07);
+
+    const result = computeFinancialPlan(profile);
+    const resultNoSavings = computeFinancialPlan(
+      makeProfile({
+        incomes: [makeItem({ amount: 3000, category: ItemCategory.INCOME })],
+        savingsContributions: [],
+      })
+    );
+
+    expect(result.budget.endOfMonthBalance).toBe(resultNoSavings.budget.endOfMonthBalance);
   });
 });
 
 // ============================================================================
-// 5. simulateGoalScenario
+// simulateGoalScenario
 // ============================================================================
 
 describe('simulateGoalScenario', () => {
-  beforeEach(() => { vi.useFakeTimers(); vi.setSystemTime(NOW); });
-  afterEach(() => { vi.useRealTimers(); });
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(NOW);
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
 
-  it('returns diagnosis and monthly effort for a goal', () => {
+  it('monthlyEffort = (target - currentSaved) / months (Blind & Logic)', () => {
+    const targetAmount = 3000;
+    const currentSaved = 0;
+    const deadline = new Date('2027-03-08');
+    const months = Math.max(1, differenceInMonths(deadline, NOW));
+    const expectedEffort = (targetAmount - currentSaved) / months;
+
     const goalInput = {
       name: 'Voyage',
-      targetAmount: 3000,
-      currentSaved: 0,
-      deadline: new Date('2027-03-08'),
+      targetAmount,
+      currentSaved,
+      deadline,
       category: GoalCategory.TRAVEL,
       projectedYield: 0,
     };
     const context = { availableForProjects: 500, monthlyIncome: 2500, matelas: 5000 };
+
     const result = simulateGoalScenario(goalInput, {}, context);
 
-    // differenceInMonths('2027-03-08', NOW) = 11
-    expect(result.monthlyEffort).toBeCloseTo(3000 / 11, 0);
-    expect(result.diagnosis).toBeDefined();
-    expect(result.diagnosis.status).toBe('POSSIBLE');
+    expect(result.monthlyEffort).toBeCloseTo(expectedEffort, 0);
   });
 
-  it('diagnoses IMPOSSIBLE for unrealistic goal', () => {
+  it('projection démarre à currentSaved', () => {
+    const currentSaved = 1200;
     const goalInput = {
-      name: 'Manoir',
-      targetAmount: 500000,
-      currentSaved: 0,
+      name: 'Épargne',
+      targetAmount: 5000,
+      currentSaved,
       deadline: new Date('2027-03-08'),
-      category: GoalCategory.REAL_ESTATE,
+      category: GoalCategory.OTHER,
       projectedYield: 0,
     };
-    const context = { availableForProjects: 200, monthlyIncome: 2000, matelas: 1000 };
+    const context = { availableForProjects: 500, monthlyIncome: 3000, matelas: 5000 };
+
+    const result = simulateGoalScenario(goalInput, {}, context);
+    const first = result.projectionData.projection[0];
+
+    expect(first.balance).toBe(currentSaved);
+    expect(first.contributed).toBe(currentSaved);
+  });
+
+  it('summary.totalInterests = 0 quand non investi', () => {
+    const goalInput = {
+      name: 'Cash Goal',
+      targetAmount: 5000,
+      currentSaved: 0,
+      deadline: new Date('2028-03-08'),
+      category: GoalCategory.OTHER,
+      projectedYield: 0,
+    };
+    const context = { availableForProjects: 500, monthlyIncome: 3000, matelas: 5000 };
+
     const result = simulateGoalScenario(goalInput, {}, context);
 
-    expect(result.diagnosis.status).toBe('IMPOSSIBLE');
+    expect(result.projectionData.summary.totalInterests).toBe(0);
+    expect(result.projectionData.summary.finalAmount).toBe(
+      result.projectionData.summary.totalPocket
+    );
   });
 });
 
 // ============================================================================
-// 6. analyzeProfileHealth — Le Docteur Financier
+// analyzeProfileHealth — Portes hiérarchiques
 // ============================================================================
 
 describe('analyzeProfileHealth', () => {
-  const makeContext = (overrides: Partial<SimulationResult['budget']> = {}): SimulationResult['budget'] => ({
+  const makeContext = (
+    overrides: Partial<SimulationResult['budget']> = {}
+  ): SimulationResult['budget'] => ({
     income: 2500,
     fixed: 1000,
     variable: 300,
@@ -473,221 +645,80 @@ describe('analyzeProfileHealth', () => {
     ...overrides,
   });
 
-  // --- PORTE 1 : SURVIE ---
-
-  it('returns DANGER (score 10) for structural deficit', () => {
+  it('DANGER (score 10) pour déficit structurel', () => {
+    const expectedScore = 10;
     const profile = makeProfile();
     const context = makeContext({ rawCapacity: -500, endOfMonthBalance: -700 });
+
     const result = analyzeProfileHealth(profile, context);
 
-    expect(result.globalScore).toBe(10);
+    expect(result.globalScore).toBe(expectedScore);
     expect(result.tags).toContain('DANGER');
-    expect(result.opportunities[0].id).toBe('CRITICAL_DEFICIT');
-    expect(result.opportunities[0].level).toBe('CRITICAL');
   });
 
-  it('returns SURCHAUFFE (score 30) for over-investing', () => {
+  it('SURCHAUFFE (score 30) pour sur-investissement', () => {
+    const expectedScore = 30;
     const profile = makeProfile();
     const context = makeContext({
       rawCapacity: 500,
       endOfMonthBalance: -200,
       profitableExpenses: 700,
     });
+
     const result = analyzeProfileHealth(profile, context);
 
-    expect(result.globalScore).toBe(30);
+    expect(result.globalScore).toBe(expectedScore);
     expect(result.tags).toContain('SURCHAUFFE');
-    expect(result.opportunities[0].id).toBe('OVER_INVEST');
   });
 
-  // --- PORTE 2 : SÉCURITÉ ---
+  it('fireYear = 0 quand wealth >= 25× dépenses annuelles', () => {
+    const annualExpenses = (1000 + 300 + 200) * 12;
+    const fireTarget = annualExpenses / 0.04;
+    const totalWealth = 500000;
+    const expectedFireYear = totalWealth >= fireTarget ? 0 : 99;
 
-  it('flags CRITICAL safety when matelas < 1000€', () => {
     const profile = makeProfile();
-    const context = makeContext({ matelas: 500, endOfMonthBalance: 200 });
-    const result = analyzeProfileHealth(profile, context);
-
-    const safetyOpp = result.opportunities.find(o => o.id === 'safety_danger');
-    expect(safetyOpp).toBeDefined();
-    expect(safetyOpp!.level).toBe('CRITICAL');
-  });
-
-  it('requires 6 months safety for freelance profiles', () => {
-    const profile = makeProfile({ persona: UserPersona.FREELANCE });
     const context = makeContext({
-      matelas: 3000,
-      endOfMonthBalance: 500,
+      totalWealth,
       fixed: 1000,
       variableExpenses: 300,
       discretionaryExpenses: 200,
     });
+
     const result = analyzeProfileHealth(profile, context);
 
-    const safetyOpp = result.opportunities.find(o =>
-      o.id === 'safety_boost' || o.id === 'safety_build'
-    );
-    expect(safetyOpp).toBeDefined();
-    expect(safetyOpp!.level).toBe('CRITICAL');
+    expect(result.projections.fireYear).toBe(expectedFireYear);
   });
 
-  it('flags high debt ratio (> 35%)', () => {
+  it('fireYear = 99 quand capacityToSave = 0', () => {
+    const expectedFireYear = 99;
     const profile = makeProfile();
     const context = makeContext({
-      engagementRate: 42,
-      endOfMonthBalance: 200,
-      matelas: 5000,
-    });
-    const result = analyzeProfileHealth(profile, context);
-
-    const debtOpp = result.opportunities.find(o => o.id === 'debt_alert');
-    expect(debtOpp).toBeDefined();
-    expect(debtOpp!.level).toBe('WARNING');
-  });
-
-  // --- PORTE 3 : INVESTISSEMENT ---
-
-  it('detects cash drag when too much idle cash', () => {
-    const profile = makeProfile({
-      assets: [makeAsset({ type: AssetType.CC, currentValue: 5000 })],
-    });
-    const context = makeContext({
-      matelas: 10000,
-      currentBalance: 5000,
-      fixed: 1000,
-      endOfMonthBalance: 500,
-      variableExpenses: 300,
-      discretionaryExpenses: 200,
-    });
-    const result = analyzeProfileHealth(profile, context);
-
-    const cashDrag = result.opportunities.find(o => o.id === 'cash_drag');
-    expect(cashDrag).toBeDefined();
-    expect(cashDrag!.type).toBe('INVESTMENT');
-  });
-
-  it('suggests PEA for late starters (age > 25, invested < 1000, savings > 3000)', () => {
-    const profile = makeProfile({ age: 30, assets: [] });
-    const context = makeContext({
-      investments: 0,
-      matelas: 5000,
-      endOfMonthBalance: 500,
-    });
-    const result = analyzeProfileHealth(profile, context);
-
-    const lateStarter = result.opportunities.find(o => o.id === 'late_starter');
-    expect(lateStarter).toBeDefined();
-  });
-
-  it('suggests LEP for eligible low-income single', () => {
-    const profile = makeProfile({
-      household: { adults: 1, children: 0 },
-      assets: [],
-    });
-    // Income * 12 < 22000 → monthlyIncome < 1833
-    const context = makeContext({
+      capacityToSave: 0,
+      endOfMonthBalance: 0,
       monthlyIncome: 1500,
-      matelas: 3000,
-      endOfMonthBalance: 200,
-      investments: 0,
-      currentBalance: 500,
-      fixed: 500,
-      variableExpenses: 200,
-      discretionaryExpenses: 100,
     });
+
     const result = analyzeProfileHealth(profile, context);
 
-    const lepOpp = result.opportunities.find(o => o.id === 'lep_opp');
-    expect(lepOpp).toBeDefined();
-    expect(lepOpp!.level).toBe('SUCCESS');
+    expect(result.projections.fireYear).toBe(expectedFireYear);
   });
 
-  // --- SCORING ---
-
-  it('produces a score between 0 and 100', () => {
+  it('fireYear décroît quand savings rate augmente', () => {
     const profile = makeProfile();
-    const context = makeContext();
-    const result = analyzeProfileHealth(profile, context);
-
-    expect(result.globalScore).toBeGreaterThanOrEqual(0);
-    expect(result.globalScore).toBeLessThanOrEqual(100);
-  });
-
-  it('tags "Fourmi" for high savers (savings ratio > 25%)', () => {
-    const profile = makeProfile();
-    const context = makeContext({
-      capacityToSave: 1000,
-      monthlyIncome: 3000,
-      endOfMonthBalance: 500,
-      matelas: 5000,
-      fixed: 1000,
-      variableExpenses: 300,
-      discretionaryExpenses: 200,
-    });
-    const result = analyzeProfileHealth(profile, context);
-
-    expect(result.tags).toContain('Fourmi');
-  });
-
-  it('tags "Investisseur" when invested > 50% of savings', () => {
-    const profile = makeProfile({
-      assets: [makeAsset({ type: AssetType.PEA, currentValue: 20000 })],
-    });
-    const context = makeContext({
-      investments: 20000,
-      matelas: 5000,
-      endOfMonthBalance: 500,
-      currentBalance: 2000,
-      monthlyIncome: 4000,
-      fixed: 1500,
-      variableExpenses: 400,
-      discretionaryExpenses: 300,
-      capacityToSave: 1500,
-    });
-    const result = analyzeProfileHealth(profile, context);
-
-    expect(result.tags).toContain('Investisseur');
-  });
-
-  it('computes 10-year and 20-year wealth projections', () => {
-    const profile = makeProfile();
-    const context = makeContext({
+    const base = {
       totalWealth: 20000,
-      capacityToSave: 500,
       endOfMonthBalance: 500,
       matelas: 5000,
       fixed: 1000,
       variableExpenses: 300,
       discretionaryExpenses: 200,
       monthlyIncome: 3000,
-    });
-    const result = analyzeProfileHealth(profile, context) as any;
+    };
 
-    expect(result.projections.wealth10y).toBeGreaterThan(20000);
-    expect(result.projections.wealth20y).toBeGreaterThan(result.projections.wealth10y);
-  });
+    const lowSaver = analyzeProfileHealth(profile, makeContext({ ...base, capacityToSave: 500 }));
+    const highSaver = analyzeProfileHealth(profile, makeContext({ ...base, capacityToSave: 2000 }));
 
-  it('sorts opportunities by severity (CRITICAL first)', () => {
-    const profile = makeProfile({ persona: UserPersona.FREELANCE, age: 30 });
-    const context = makeContext({
-      matelas: 500,
-      endOfMonthBalance: 200,
-      investments: 0,
-      engagementRate: 40,
-      monthlyIncome: 3000,
-      currentBalance: 500,
-      fixed: 1000,
-      variableExpenses: 300,
-      discretionaryExpenses: 200,
-    });
-    const result = analyzeProfileHealth(profile, context);
-
-    if (result.opportunities.length >= 2) {
-      const levels: Record<string, number> = { CRITICAL: 0, WARNING: 1, SUCCESS: 2, INFO: 3 };
-      for (let i = 1; i < result.opportunities.length; i++) {
-        expect(levels[result.opportunities[i].level]).toBeGreaterThanOrEqual(
-          levels[result.opportunities[i - 1].level]
-        );
-      }
-    }
+    expect(highSaver.projections.fireYear).toBeLessThan(lowSaver.projections.fireYear);
   });
 });

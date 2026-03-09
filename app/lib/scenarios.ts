@@ -3,7 +3,11 @@ import { fr } from 'date-fns/locale';
 import { 
   Profile, 
   Purchase, 
+  PurchaseDecision,
+  BudgetResult,
   AnalysisResult, 
+  AnalysisIssue,
+  AnalysisTip,
   safeFloat, 
   generateId, 
   formatCurrency, 
@@ -56,8 +60,8 @@ const round = (num: number): number => Math.round((num + Number.EPSILON) * 100) 
 // ============================================================================
 // 2. SIMULATEUR (Découpage des paiements)
 // ============================================================================
-export const getSimulatedEvents = (purchase: Purchase) => {
-    const events: any[] = [];
+export const getSimulatedEvents = (purchase: Purchase): TimelineEvent[] => {
+    const events: TimelineEvent[] = [];
     const rawAmount = typeof purchase.amount === 'string' ? parseFloat(purchase.amount) : purchase.amount;
     const amount = Math.abs(rawAmount || 0);
     const date = new Date(purchase.date || new Date()); date.setHours(12, 0, 0, 0);
@@ -87,7 +91,8 @@ export const getSimulatedEvents = (purchase: Purchase) => {
         const rateVal = typeof rawRate === 'string' ? parseFloat(rawRate) : rawRate;
         const rate = rateVal || 0;
         
-        const totalPaid = amount * (1 + (rate / 100) * (months / 12)); 
+        const r = rate / 100 / 12;
+        const totalPaid = r > 0 ? (amount * r * Math.pow(1 + r, months)) / (Math.pow(1 + r, months) - 1) * months : amount;
         const monthlyPart = totalPaid / months;
         for (let i = 0; i < months; i++) {
              events.push({ id: generateId(), name: `${purchase.name} (${i + 1}/${months})`, amount: -monthlyPart, type: 'debt', date: addMonths(date, i), isSimulation: true });
@@ -104,8 +109,8 @@ export const getSimulatedEvents = (purchase: Purchase) => {
 // ============================================================================
 export const generateTimeline = (
     profile: Profile, 
-    history: any[], 
-    simulatedEvents: any[] = [], 
+    history: PurchaseDecision[], 
+    simulatedEvents: TimelineEvent[] = [], 
     daysToProject = 730
 ): MonthData[] => {
   
@@ -126,7 +131,7 @@ export const generateTimeline = (
   const costPerWeekDay = SPENDING_WEIGHTS.map(w => avgDaily * w);
 
   // A. Gestion des Récurrents
-  const recurringByDay = new Map<number, any[]>();
+  const recurringByDay = new Map<number, TimelineEvent[]>();
   
   const pushRecurring = (items: FinancialItem[], type: 'income' | 'expense', defaultDay: number) => {
       (items || []).forEach((item) => {
@@ -157,36 +162,34 @@ export const generateTimeline = (
   });
 
   // B. Gestion des Événements Ponctuels (Historique + Simu)
-  const oneOffEventsMap = new Map<string, any[]>();
-  const addOneOffEvent = (date: Date | string, event: any) => {
+  const oneOffEventsMap = new Map<string, TimelineEvent[]>();
+  const addOneOffEvent = (date: Date | string, event: TimelineEvent) => {
       const key = toDateKey(date);
       if (!oneOffEventsMap.has(key)) oneOffEventsMap.set(key, []);
       oneOffEventsMap.get(key)?.push(event);
   };
 
   if (Array.isArray(history)) {
-      history.forEach((decision: any) => {
-          // On ne prend que les achats payés via compte courant ou crédit (impact timeline)
+      history.forEach((decision) => {
           if (decision.paymentMode === PaymentMode.CASH_CURRENT || decision.paymentMode === PaymentMode.SPLIT || decision.paymentMode === PaymentMode.CREDIT) {
-                // On recrée l'objet Purchase pour utiliser getSimulatedEvents
                 const purchaseStruct: Purchase = {
                     name: decision.name,
                     amount: decision.amount,
                     date: decision.date,
                     type: decision.type,
                     paymentMode: decision.paymentMode,
-                    duration: decision.duration,
-                    rate: decision.rate,
+                    duration: decision.duration ?? undefined,
+                    rate: decision.rate ?? undefined,
                     isReimbursable: decision.isReimbursable,
                     isPro: decision.isPro
                 };
                 const evts = getSimulatedEvents(purchaseStruct);
-                evts.forEach(e => addOneOffEvent(e.date, e));
+                evts.forEach(e => { if (e.date) addOneOffEvent(e.date, e); });
           }
       });
   }
   if (simulatedEvents && simulatedEvents.length > 0) {
-      simulatedEvents.forEach((s: any) => addOneOffEvent(s.date, s));
+      simulatedEvents.forEach((s) => { if (s.date) addOneOffEvent(s.date, s); });
   }
 
   // C. Boucle de Projection
@@ -212,7 +215,7 @@ export const generateTimeline = (
     let dailyPositiveImpact = 0; 
     let simulationImpact = 0;
 
-    const addEvents = (events: any[]) => {
+    const addEvents = (events: TimelineEvent[]) => {
         if (!events) return;
         events.forEach(e => {
             eventsOfTheDay.push({ id: generateId(), ...e });
@@ -282,10 +285,10 @@ export const generateTimeline = (
 // 4. ANALYSEUR D'ACHAT (Qui utilise la Timeline)
 // ============================================================================
 export const analyzePurchaseImpact = (
-    currentStats: any, 
+    currentStats: BudgetResult, 
     purchase: Purchase, 
     profile: Profile | null = null, 
-    history: any[] = []
+    history: PurchaseDecision[] = []
 ): AnalysisResult => {
   
   const rawAmount = typeof purchase.amount === 'string' ? parseFloat(purchase.amount) : purchase.amount;
@@ -321,7 +324,8 @@ export const analyzePurchaseImpact = (
     const rawRate = typeof purchase.rate === 'string' ? parseFloat(purchase.rate) : purchase.rate;
     const rate = paymentMode === PaymentMode.CREDIT ? Math.abs(rawRate || 0) : 0;
     
-    const totalPaid = amount * (1 + (rate / 100) * (months / 12)); 
+    const r = rate / 100 / 12;
+    const totalPaid = r > 0 ? (amount * r * Math.pow(1 + r, months)) / (Math.pow(1 + r, months) - 1) * months : amount;
     monthlyCost = round(totalPaid / months);
     
     if (paymentMode === PaymentMode.CREDIT) { creditCost = round(totalPaid - amount); realCost = totalPaid; }
@@ -331,6 +335,9 @@ export const analyzePurchaseImpact = (
 
   if (isReimbursable) { realCost = 0; creditCost = 0; opportunityCost = 0; timeToWork = 0; }
   else if (isPro) { opportunityCost = 0; }
+
+  const burnRate = currentStats.safetyMonths > 0 ? currentStats.matelas / currentStats.safetyMonths : 0;
+  const newSafetyMonths = burnRate > 0 ? round(newMatelas / burnRate) : 0;
 
   // Projection Timeline
   let lowestProjectedBalance = Infinity;
@@ -356,7 +363,7 @@ export const analyzePurchaseImpact = (
 
   // Verdict
   let isBudgetOk = true;
-  if (paymentMode === PaymentMode.CASH_SAVINGS) isBudgetOk = newMatelas >= 0;
+  if (paymentMode === PaymentMode.CASH_SAVINGS) isBudgetOk = amount <= currentStats.matelas;
   else isBudgetOk = newRemainingToLive >= rules.minLiving; 
   
   const isCashflowOk = lowestProjectedBalance >= 0;
@@ -365,7 +372,8 @@ export const analyzePurchaseImpact = (
   let smartTitle = "Feu vert";
   let smartMessage = "Tout est ok.";
   let score = 100;
-  // const issues: any[] = []; const tips: any[] = []; // Inutilisés dans cette version simplifiée
+  const issues: AnalysisIssue[] = [];
+  const tips: AnalysisTip[] = [];
 
   if (isPast) { 
       verdict = 'green'; smartTitle = "Mise à jour"; smartMessage = "Historique mis à jour."; 
@@ -381,5 +389,20 @@ export const analyzePurchaseImpact = (
       verdict = 'red'; smartTitle = "Impossible"; smartMessage = "Ni budget, ni trésorerie."; score = 10;
   }
 
-  return { verdict, score: Math.max(0, score), isBudgetOk, isCashflowOk, smartTitle, smartMessage, issues: [], tips: [], newMatelas, newRV: newRemainingToLive, newSafetyMonths: 0, newEngagementRate: 0, realCost: round(realCost), creditCost: round(creditCost), opportunityCost: round(opportunityCost), timeToWork, lowestProjectedBalance: round(lowestProjectedBalance), projectedCurve };
+  if (!isPast && !isReimbursable) {
+    if (newSafetyMonths < 3) {
+      issues.push({ text: `Matelas en danger : il ne couvrirait plus que ${round(newSafetyMonths)} mois de dépenses.`, level: 'red' });
+    }
+    if (creditCost > amount * 0.10) {
+      issues.push({ text: `Coût du crédit élevé : ${formatCurrency(creditCost)} d'intérêts, soit ${round(creditCost / amount * 100)}% du prix.`, level: 'orange' });
+    }
+    if (opportunityCost > amount) {
+      tips.push({ text: `Cet argent investi vaudrait ${formatCurrency(amount + opportunityCost)} dans 10 ans.` });
+    }
+  }
+  if (isReimbursable) {
+    tips.push({ text: `Pensez à suivre le remboursement.` });
+  }
+
+  return { verdict, score: Math.max(0, score), isBudgetOk, isCashflowOk, smartTitle, smartMessage, issues, tips, newMatelas, newRV: newRemainingToLive, newSafetyMonths, newEngagementRate: 0, realCost: round(realCost), creditCost: round(creditCost), opportunityCost: round(opportunityCost), timeToWork, lowestProjectedBalance: round(lowestProjectedBalance), projectedCurve };
 };

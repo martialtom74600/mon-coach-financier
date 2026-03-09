@@ -2,7 +2,25 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useUser } from '@clerk/nextjs';
-import { INITIAL_PROFILE, Profile, FinancialItem, Asset, Goal, PurchaseDecision } from '@/app/lib/definitions'; 
+import { INITIAL_PROFILE, Profile, FinancialItem, Asset, Goal, HousingStatus } from '@/app/lib/definitions';
+import {
+  profileAPIResponseSchema,
+  financialItemResponseSchema,
+  parseAPIResponse,
+} from '@/app/lib/validations';
+
+interface DecisionInput {
+  name: string;
+  amount: number;
+  date?: Date | string;
+  type?: string;
+  paymentMode: string;
+  isPro?: boolean;
+  isReimbursable?: boolean;
+  reimbursedAt?: Date | string | null;
+  duration?: number | null;
+  rate?: number | null;
+}
 
 export function useFinancialData() {
   const { user, isLoaded: isClerkLoaded } = useUser();
@@ -12,7 +30,7 @@ export function useFinancialData() {
   const [error, setError] = useState<string | null>(null);
 
   // ==========================================================================
-  // 1. CHARGEMENT INITIAL (GET global)
+  // 1. CHARGEMENT INITIAL (GET global) — Protégé par le Bouclier Zod
   // ==========================================================================
   const fetchData = useCallback(async () => {
     if (!user) return;
@@ -20,38 +38,42 @@ export function useFinancialData() {
     setError(null);
 
     try {
-      // On récupère tout le dashboard d'un coup
-      const res = await fetch(`/api/user?t=${Date.now()}`);
+      const res = await fetch('/api/user');
       
       if (res.ok) {
-        const data = await res.json();
-        if (data) {
-            // Nettoyage et fusion avec les valeurs par défaut
-            const cleanProfile: Profile = {
-                ...INITIAL_PROFILE,
-                ...data, // Les données de l'API écrasent les defaults
-                
-                // Sécurisation des objets imbriqués
-                household: { ...INITIAL_PROFILE.household, ...(data.household || {}) },
-                housing: { ...INITIAL_PROFILE.housing, ...(data.housing || {}) },
-                
-                // Sécurisation des tableaux (API renvoie [] si vide, mais on assure le coup)
-                items: data.items || [], // Items bruts
-                assets: data.assets || [],
-                goals: data.goals || [],
-                decisions: data.decisions || [],
+        const raw = await res.json();
+        if (raw) {
+            const validated = parseAPIResponse(
+              profileAPIResponseSchema, raw, 'GET /api/user',
+            );
 
-                // Listes filtrées (déjà préparées par l'API normalement, sinon fallback)
-                incomes: data.incomes || [],
-                fixedCosts: data.fixedCosts || [],
-                variableCosts: data.variableCosts || [],
-                credits: data.credits || [],
-                subscriptions: data.subscriptions || [],
-                annualExpenses: data.annualExpenses || [],
-            };
+            if (!validated) {
+              setError("Données incohérentes reçues du serveur.");
+              return;
+            }
+
+            // API retourne des dates en string (JSON) ; le moteur gère les deux via new Date()
+            const cleanProfile = {
+                ...INITIAL_PROFILE,
+                ...validated,
+                household: { ...INITIAL_PROFILE.household, ...(validated.household || {}) },
+                housing: {
+                    status: validated.housing?.status ?? HousingStatus.TENANT,
+                    monthlyCost: validated.housing?.monthlyCost ?? 0,
+                    paymentDay: validated.housing?.paymentDay ?? undefined,
+                },
+                assets: validated.assets || [],
+                goals: validated.goals || [],
+                decisions: validated.decisions || [],
+                incomes: validated.incomes || [],
+                fixedCosts: validated.fixedCosts || [],
+                variableCosts: validated.variableCosts || [],
+                credits: validated.credits || [],
+                subscriptions: validated.subscriptions || [],
+                annualExpenses: validated.annualExpenses || [],
+            } as unknown as Profile;
             setProfile(cleanProfile);
         } else {
-            // Nouvel utilisateur
             setProfile({ ...INITIAL_PROFILE, firstName: user.firstName || '' });
         }
       } else {
@@ -96,7 +118,6 @@ export function useFinancialData() {
 
   // 🔹 Ajouter un Item (Revenu/Dépense)
   const addItem = async (item: Partial<FinancialItem>) => {
-    // Optimistic (Optionnel, ici on attend le retour pour avoir l'ID)
     try {
       const res = await fetch('/api/items', {
         method: 'POST',
@@ -104,10 +125,11 @@ export function useFinancialData() {
         body: JSON.stringify(item),
       });
       if (res.ok) {
-          const newItem = await res.json();
-          // On recharge tout pour être sûr que les calculs et tris sont bons
-          // (Ou on ajoute manuellement à la bonne liste si on veut être ultra-performant)
-          fetchData(); 
+          const raw = await res.json();
+          const newItem = parseAPIResponse(
+            financialItemResponseSchema, raw, 'POST /api/items',
+          );
+          fetchData();
           return newItem;
       }
     } catch (err) { console.error(err); }
@@ -177,7 +199,7 @@ export function useFinancialData() {
   };
 
   // 🔹 Gérer les Décisions d'achat
-  const addDecision = async (decision: any) => {
+  const addDecision = async (decision: DecisionInput) => {
       try {
           await fetch('/api/decisions', {
               method: 'POST',

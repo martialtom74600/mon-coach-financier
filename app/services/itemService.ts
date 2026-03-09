@@ -1,3 +1,4 @@
+import { Prisma } from '@prisma/client';
 import { prisma } from '@/app/lib/prisma';
 import { serializeDecimals } from '@/app/lib/definitions';
 import { getProfileId } from './profileService';
@@ -5,7 +6,7 @@ import { ServiceError } from './errors';
 
 export async function createItem(
   userId: string,
-  data: Parameters<typeof prisma.financialItem.create>[0]['data'],
+  data: Omit<Prisma.FinancialItemUncheckedCreateInput, 'profileId' | 'profile'>,
 ) {
   const profileId = await getProfileId(userId);
   const item = await prisma.financialItem.create({

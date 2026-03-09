@@ -1,3 +1,4 @@
+import { Prisma } from '@prisma/client';
 import { prisma } from '@/app/lib/prisma';
 import { serializeDecimals } from '@/app/lib/definitions';
 import { getProfileId } from './profileService';
@@ -5,7 +6,7 @@ import { ServiceError } from './errors';
 
 export async function createGoal(
   userId: string,
-  data: Parameters<typeof prisma.financialGoal.create>[0]['data'],
+  data: Omit<Prisma.FinancialGoalUncheckedCreateInput, 'profileId' | 'profile'>,
 ) {
   const profileId = await getProfileId(userId);
   const goal = await prisma.financialGoal.create({

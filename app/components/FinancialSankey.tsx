@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 import { ResponsiveSankey } from '@nivo/sankey';
 import { calculateListTotal, safeFloat, formatCurrency } from '@/app/lib/logic';
 import { useFinancialData } from '@/app/hooks/useFinancialData';
+import { Profile } from '@/app/lib/definitions';
 import { 
   Layers, ArrowDown, TrendingUp, Home, Zap, 
   ShoppingCart, PiggyBank, CreditCard, Wallet, 
@@ -27,6 +28,8 @@ const HUB_ID = "Budget";
 // --- TYPES ---
 type AddLinkFn = (source: string, target: string, value: number, colorSource: string, colorTarget: string) => void;
 
+type FlowItem = { label: string; value: number; color: string };
+
 // ============================================================================
 // 1. COMPOSANT MOBILE : LA TIMELINE FINANCIÈRE
 // ============================================================================
@@ -41,7 +44,7 @@ const getCategoryIcon = (label: string) => {
     return Wallet;
 };
 
-const MobileTimelineCard = ({ item, totalIncome, isLast }: { item: any, totalIncome: number, isLast: boolean }) => {
+const MobileTimelineCard = ({ item, totalIncome, isLast }: { item: FlowItem, totalIncome: number, isLast: boolean }) => {
     const percent = totalIncome > 0 ? Math.round((item.value / totalIncome) * 100) : 0;
     const Icon = getCategoryIcon(item.label);
     const isSavings = item.label.includes('Cash');
@@ -87,7 +90,7 @@ const MobileTimelineCard = ({ item, totalIncome, isLast }: { item: any, totalInc
     );
 };
 
-const MobileFlowView = ({ totals, totalIncome }: { totals: any[], totalIncome: number }) => {
+const MobileFlowView = ({ totals, totalIncome }: { totals: FlowItem[], totalIncome: number }) => {
     // Séparer le Cash Dispo pour le mettre à la fin ou le traiter différemment
     const expenses = totals.filter(t => !t.label.includes('Cash'));
     const savings = totals.find(t => t.label.includes('Cash'));
@@ -148,7 +151,7 @@ const MobileFlowView = ({ totals, totalIncome }: { totals: any[], totalIncome: n
                           <div className="text-cyan-100 text-xs font-bold uppercase tracking-widest mb-1">Il vous reste</div>
                           <div className="text-3xl font-black">{formatCurrency(savings.value)}</div>
                           <div className="mt-2 inline-flex items-center bg-white/20 px-2 py-1 rounded-lg text-[10px] font-medium backdrop-blur-sm border border-white/10">
-                             <TrendingUp size={10} className="mr-1" /> Capacité d'épargne réelle
+                             <TrendingUp size={10} className="mr-1" /> Capacité d&apos;épargne réelle
                           </div>
                       </div>
                  </div>
@@ -167,7 +170,7 @@ const MobileFlowView = ({ totals, totalIncome }: { totals: any[], totalIncome: n
 // 2. LOGIQUE MODULAIRE (Inchangée)
 // ============================================================================
 
-const processHousing = (profile: any, addLink: AddLinkFn, mobileItems: any[]) => {
+const processHousing = (profile: Profile, addLink: AddLinkFn, mobileItems: FlowItem[]) => {
     let total = 0;
     if (profile.housing) {
         const cost = safeFloat(profile.housing.monthlyCost);
@@ -181,16 +184,16 @@ const processHousing = (profile: any, addLink: AddLinkFn, mobileItems: any[]) =>
     return total;
 };
 
-const processFixedCosts = (profile: any, addLink: AddLinkFn, mobileItems: any[]) => {
+const processFixedCosts = (profile: Profile, addLink: AddLinkFn, mobileItems: FlowItem[]) => {
     let total = 0;
     const allSubs = [...(profile.subscriptions || []), ...(profile.fixedCosts || [])];
-    allSubs.forEach((item: any) => total += safeFloat(item.amount));
+    allSubs.forEach((item) => total += safeFloat(item.amount));
 
     if (total > 0) {
         addLink(HUB_ID, "Abonnements", total, THEME.wallet, THEME.fixed);
         mobileItems.push({ label: "Abonnements & Charges", value: total, color: THEME.fixed });
-        allSubs.sort((a: any, b: any) => safeFloat(b.amount) - safeFloat(a.amount))
-            .forEach((sub: any) => {
+        allSubs.sort((a, b) => safeFloat(b.amount) - safeFloat(a.amount))
+            .forEach((sub) => {
                 const val = safeFloat(sub.amount);
                 if (val > 0) addLink("Abonnements", sub.name, val, THEME.fixed, THEME.fixed);
             });
@@ -198,7 +201,7 @@ const processFixedCosts = (profile: any, addLink: AddLinkFn, mobileItems: any[])
     return total;
 };
 
-const processDailyLife = (profile: any, addLink: AddLinkFn, mobileItems: any[]) => {
+const processDailyLife = (profile: Profile, addLink: AddLinkFn, mobileItems: FlowItem[]) => {
     const variable = calculateListTotal(profile.variableCosts || []);
     const fun = safeFloat(profile.funBudget);
     const total = variable + fun;
@@ -212,20 +215,20 @@ const processDailyLife = (profile: any, addLink: AddLinkFn, mobileItems: any[]) 
     return total;
 };
 
-const processInvestments = (profile: any, addLink: AddLinkFn, mobileItems: any[]) => {
+const processInvestments = (profile: Profile, addLink: AddLinkFn, mobileItems: FlowItem[]) => {
     let total = 0;
     const investList = profile.savingsContributions || [];
-    investList.forEach((i: any) => total += safeFloat(i.amount));
+    investList.forEach((i) => total += safeFloat(i.amount));
     
     let creditTotal = 0;
     const creditList = profile.credits || [];
-    creditList.forEach((c: any) => creditTotal += safeFloat(c.monthlyPayment));
+    creditList.forEach((c) => creditTotal += safeFloat(c.amount));
 
     if (total > 0) {
         addLink(HUB_ID, "Investissements", total, THEME.wallet, THEME.invest);
         mobileItems.push({ label: "Investissements", value: total, color: THEME.invest });
-        investList.sort((a: any, b: any) => safeFloat(b.amount) - safeFloat(a.amount))
-            .forEach((sav: any) => {
+        investList.sort((a, b) => safeFloat(b.amount) - safeFloat(a.amount))
+            .forEach((sav) => {
                  const val = safeFloat(sav.amount);
                  if (val > 0) addLink("Investissements", sav.name || "Épargne", val, THEME.invest, THEME.invest);
             });
@@ -234,8 +237,8 @@ const processInvestments = (profile: any, addLink: AddLinkFn, mobileItems: any[]
     if (creditTotal > 0) {
          addLink(HUB_ID, "Dettes", creditTotal, THEME.wallet, THEME.invest);
          mobileItems.push({ label: "Crédits", value: creditTotal, color: THEME.invest });
-         creditList.forEach((cred: any) => {
-            const val = safeFloat(cred.monthlyPayment);
+         creditList.forEach((cred) => {
+            const val = safeFloat(cred.amount);
             if (val > 0) addLink("Dettes", cred.name, val, THEME.invest, THEME.invest);
          });
     }
@@ -255,7 +258,7 @@ export default function FinancialSankey() {
     
     const nodes: { id: string; nodeColor: string }[] = [];
     const links: { source: string; target: string; value: number }[] = [];
-    const mobileItems: { label: string; value: number; color: string }[] = [];
+    const mobileItems: FlowItem[] = [];
     
     const addLink: AddLinkFn = (source, target, value, colorSource, colorTarget) => {
       if (value <= 0.5) return;
@@ -303,7 +306,7 @@ export default function FinancialSankey() {
                 data={sankeyData}
                 margin={{ top: 20, right: 180, bottom: 20, left: 80 }}
                 align="justify"
-                colors={(node: any) => node.nodeColor}
+                colors={(node) => (node as { nodeColor: string }).nodeColor}
                 sort="input" 
                 nodeOpacity={1}
                 nodeThickness={10}

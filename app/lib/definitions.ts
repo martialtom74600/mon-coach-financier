@@ -373,6 +373,16 @@ export interface BudgetResult {
   totalGoalsEffort: number;
 }
 
+/** BudgetResult vide pour fallback (ex: profil non chargé) */
+export const EMPTY_BUDGET_RESULT: BudgetResult = {
+  income: 0, fixed: 0, variable: 0, variableExpenses: 0, monthlyIncome: 0,
+  mandatoryExpenses: 0, discretionaryExpenses: 0, capacityToSave: 0, rawCapacity: 0,
+  endOfMonthBalance: 0, profitableExpenses: 0, totalRecurring: 0, remainingToLive: 0,
+  realCashflow: 0, matelas: 0, investments: 0, totalWealth: 0, safetyMonths: 0,
+  engagementRate: 0, rules: { safetyMonths: 3, maxDebt: 35, minLiving: 300 },
+  securityBuffer: 0, availableForProjects: 0, currentBalance: 0, capacity: 0, totalGoalsEffort: 0,
+};
+
 export interface SimulationResult {
   allocations: GoalAllocation[];
   budget: BudgetResult;

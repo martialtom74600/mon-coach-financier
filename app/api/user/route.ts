@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { revalidateTag } from 'next/cache';
 import { auth, currentUser } from '@clerk/nextjs/server';
 import { saveUserSchema, validationError } from '@/app/lib/validations';
 import { userService, ServiceError } from '@/app/services';
@@ -10,7 +11,7 @@ export async function GET() {
   if (!userId) return new NextResponse("Non autorisé", { status: 401 });
 
   try {
-    const profile = await userService.getFullUserProfile(userId);
+    const profile = await userService.getCachedProfile(userId);
     return NextResponse.json(profile);
   } catch (error) {
     if (error instanceof ServiceError) {
@@ -42,6 +43,8 @@ export async function POST(req: Request) {
       parsed.data,
     );
 
+    revalidateTag(`profile-${userId}`);
+    revalidateTag('profile');
     return NextResponse.json(result);
   } catch (error) {
     if (error instanceof ServiceError) {

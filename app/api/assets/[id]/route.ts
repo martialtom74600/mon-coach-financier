@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { revalidateTag } from 'next/cache';
 import { auth } from '@clerk/nextjs/server';
 import { updateAssetSchema, validationError } from '@/app/lib/validations';
 import { assetService, ServiceError } from '@/app/services';
@@ -13,6 +14,8 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     if (!parsed.success) return validationError(parsed.error);
 
     const updatedAsset = await assetService.updateAsset(userId, params.id, parsed.data);
+    revalidateTag(`profile-${userId}`);
+    revalidateTag('profile');
     return NextResponse.json(updatedAsset);
   } catch (error) {
     if (error instanceof ServiceError) {
@@ -29,6 +32,8 @@ export async function DELETE(req: Request, { params }: { params: { id: string } 
 
   try {
     const result = await assetService.deleteAsset(userId, params.id);
+    revalidateTag(`profile-${userId}`);
+    revalidateTag('profile');
     return NextResponse.json(result);
   } catch (error) {
     if (error instanceof ServiceError) {

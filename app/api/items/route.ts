@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { revalidateTag } from 'next/cache';
 import { auth } from '@clerk/nextjs/server';
 import { createItemSchema, validationError } from '@/app/lib/validations';
 import { itemService, ServiceError } from '@/app/services';
@@ -13,6 +14,8 @@ export async function POST(req: Request) {
     if (!parsed.success) return validationError(parsed.error);
 
     const newItem = await itemService.createItem(userId, parsed.data);
+    revalidateTag(`profile-${userId}`);
+    revalidateTag('profile');
     return NextResponse.json(newItem);
   } catch (error) {
     if (error instanceof ServiceError) {
