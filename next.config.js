@@ -30,10 +30,10 @@ const nextConfig = {
   },
 };
 
-// Configuration PWA — même comportement en dev et prod (évite les écarts Clerk, notifications)
+// Configuration PWA — désactivé en dev pour éviter les bugs de cache
 const withPWA = require("@ducanh2912/next-pwa").default({
   dest: "public",
-  disable: false,
+  disable: process.env.NODE_ENV === "development",
   register: true,
   skipWaiting: true,
   customWorkerSrc: "worker",
