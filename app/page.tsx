@@ -1,3 +1,4 @@
+import { redirect } from 'next/navigation';
 import { revalidateTag } from 'next/cache';
 import { auth, currentUser } from '@clerk/nextjs/server';
 import { userService, insightService, profileService } from '@/app/services';
@@ -7,7 +8,7 @@ import type { StoredInsight } from '@/app/components/dashboard/ProactiveInsights
 
 export default async function Home() {
   const { userId } = await auth();
-  // La redirection / → /sign-in se fait dans le middleware (évite le flash)
+  if (!userId) redirect('/sign-in');
 
   const [profileRaw, user] = await Promise.all([
     userService.getCachedProfile(userId),
