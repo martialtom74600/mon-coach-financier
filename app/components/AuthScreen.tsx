@@ -1,17 +1,38 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
+import dynamic from 'next/dynamic';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { SignIn, SignUp } from '@clerk/nextjs';
 import { clerkAppearanceHybrid } from '@/app/config/clerk-theme';
 import { Target, Zap, ShieldCheck } from 'lucide-react';
+
+const SignIn = dynamic(
+  () => import('@clerk/nextjs').then((mod) => mod.SignIn),
+  { ssr: false, loading: () => <div className="h-12 animate-pulse bg-slate-200 rounded" /> }
+);
+const SignUp = dynamic(
+  () => import('@clerk/nextjs').then((mod) => mod.SignUp),
+  { ssr: false, loading: () => <div className="h-12 animate-pulse bg-slate-200 rounded" /> }
+);
 
 export default function AuthScreen() {
     const searchParams = useSearchParams();
     const isSignUpMode = searchParams.get('mode') === 'signup';
-    const router = useRouter(); 
+    const router = useRouter();
+    const [mounted, setMounted] = useState(false);
+
+    useEffect(() => setMounted(true), []);
+
     const switchToSignIn = () => { router.replace('/?mode=login'); };
     const switchToSignUp = () => { router.replace('/?mode=signup'); };
+
+    if (!mounted) {
+      return (
+        <div className="min-h-screen w-full bg-white flex items-center justify-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600" />
+        </div>
+      );
+    }
     
     return (
       <div className="min-h-screen w-full bg-white flex md:grid md:grid-cols-2">
