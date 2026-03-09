@@ -2,10 +2,7 @@ import { NextResponse } from 'next/server';
 import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server';
 import { checkRateLimit } from '@/app/lib/ratelimit';
 
-// Routes d'auth accessibles sans être connecté
-const isAuthRoute = createRouteMatcher(['/sign-in(.*)', '/sign-up(.*)']);
-
-// '/' est public mais on redirige vers /sign-in si non connecté (évite le flash)
+// Routes accessibles sans être connecté
 const isPublicRoute = createRouteMatcher([
   '/',
   '/sign-in(.*)',
@@ -30,15 +27,8 @@ export default clerkMiddleware(async (auth, req) => {
     return NextResponse.next();
   }
 
-  // Redirection / → /sign-in si non connecté (dans le middleware = pas de flash)
-  if (req.nextUrl.pathname === '/' && !isAuthRoute(req)) {
-    const { userId } = await auth();
-    if (!userId) {
-      return NextResponse.redirect(new URL('/sign-in', req.url));
-    }
-  }
-
   // RÈGLE : Si ce n'est PAS une route publique, on bloque l'accès (404/Redirection).
+  // La redirection / → /sign-in se fait dans page.tsx (évite les conflits de timing après connexion)
   if (!isPublicRoute(req)) {
     auth().protect();
   }

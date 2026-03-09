@@ -5,6 +5,7 @@ import Navigation from '@/app/components/Navigation';
 import Header from '@/app/components/Header';
 import { ToastProvider } from '@/app/components/ui/Toast';
 import PushNotificationPrompt from '@/app/components/PushNotificationPrompt';
+import ClerkLoadingFallback from '@/app/components/ClerkLoadingFallback';
 
 // Imports Clerk
 import { 
@@ -57,11 +58,9 @@ export default function RootLayout({
         </head>
         <body className={`${inter.className} bg-slate-50 text-slate-900 h-full`}>
           
-          {/* 1. CHARGEMENT (Spinner centré) */}
+          {/* 1. CHARGEMENT — Sur /sign-in et /sign-up : branding + loader (pas d'écran vide 5s) */}
           <ClerkLoading>
-            <div className="flex flex-col items-center justify-center min-h-screen gap-4">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
-            </div>
+            <ClerkLoadingFallback />
           </ClerkLoading>
 
           {/* 2. APPLICATION CHARGÉE */}
