@@ -5,9 +5,9 @@ import {
   ChevronDown, 
   Trash2, 
   Plus, 
-  Info, 
   LucideIcon 
 } from 'lucide-react';
+import InfoBox from '@/app/components/ui/InfoBox';
 import { calculateListTotal, formatCurrency } from '@/app/lib/logic';
 
 // --- TYPES ---
@@ -36,14 +36,6 @@ interface AccordionSectionProps {
   unit?: string;
   hideDate?: boolean; // ✅ Pour cacher la date (ex: Courses)
 }
-
-// --- SOUS-COMPOSANT INTERNE (Info-bulle) ---
-const InfoBox = ({ children, className = "mb-6" }: { children: React.ReactNode, className?: string }) => (
-  <div className={`bg-indigo-50/50 border border-indigo-100 rounded-xl p-3 flex gap-3 text-xs text-indigo-800 ${className}`}>
-    <Info size={16} className="shrink-0 mt-0.5 text-indigo-500" />
-    <div className="leading-relaxed opacity-90 font-medium">{children}</div>
-  </div>
-);
 
 // --- COMPOSANT PRINCIPAL ---
 

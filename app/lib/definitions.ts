@@ -250,6 +250,7 @@ export interface PersonaRules { safetyMonths: number; maxDebt: number; minLiving
 // 🔹 ProfileDB — Shape base de données (validable par Zod end-to-end)
 export interface ProfileDB {
   id: string;
+  profileId?: string; // FinancialProfile.id (pour insights, etc.)
   userId: string;
   email?: string;
   firstName?: string;
@@ -267,6 +268,8 @@ export interface ProfileDB {
   assets: Asset[];
   goals: FinancialGoal[];
   decisions: PurchaseDecision[];
+
+  lastBudgetSnapshot?: BudgetResult | null;
 
   updatedAt?: Date | string;
 }

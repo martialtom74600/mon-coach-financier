@@ -10,6 +10,7 @@ import {
   CartesianGrid,
 } from 'recharts';
 import { formatCurrency } from '@/app/lib/definitions';
+import { formatDate } from '@/app/lib/format';
 import type { GoalProjectionPoint } from '@/app/lib/definitions';
 
 export function ProjectionChart({ data }: { data: GoalProjectionPoint[] }) {
@@ -27,9 +28,7 @@ export function ProjectionChart({ data }: { data: GoalProjectionPoint[] }) {
           <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
           <XAxis
             dataKey="date"
-            tickFormatter={(date) =>
-              date ? new Date(date).toLocaleDateString('fr-FR', { month: 'short', year: '2-digit' }) : ''
-            }
+            tickFormatter={(date) => formatDate(date, 'monthYear2Digit')}
             tick={{ fontSize: 10, fill: '#94a3b8' }}
             axisLine={false}
             tickLine={false}
@@ -43,9 +42,7 @@ export function ProjectionChart({ data }: { data: GoalProjectionPoint[] }) {
               boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
             }}
             formatter={(value: number) => [formatCurrency(value), 'Capital']}
-            labelFormatter={(label) =>
-              label ? new Date(label).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' }) : ''
-            }
+            labelFormatter={(label) => formatDate(label, 'monthLongYear')}
           />
           <Area
             type="monotone"

@@ -3,12 +3,14 @@ import {
   Profile, Goal, SimulationResult, GoalDiagnosis, GoalStrategy, 
   DeepAnalysis, OptimizationOpportunity, ActionGuide,
   GoalScenarioInput, GoalScenarioContext, GoalScenarioResult, GoalProjectionPoint,
+  BudgetResult,
   safeFloat, calculateListTotal, formatCurrency, 
   CONSTANTS, GOAL_CATEGORIES, PERSONA_PRESETS,
   AssetType,
   UserPersona,
   HousingStatus
 } from './definitions';
+import { detectDrift, detectMilestones } from './proactive';
 
 // ============================================================================
 // 1. CONFIGURATION & ACTION GUIDES
@@ -411,7 +413,8 @@ export const simulateGoalScenario = (
 export const analyzeProfileHealth = (
     profile: Profile, 
     context: SimulationResult['budget'],
-    customRates?: Partial<SimulationRates>
+    customRates?: Partial<SimulationRates>,
+    previousBudget?: BudgetResult | null
 ): DeepAnalysis => {
   
   const RATES = { ...FINANCIAL_KNOWLEDGE.RATES, ...customRates };
@@ -593,6 +596,28 @@ export const analyzeProfileHealth = (
   if (savingsRatio > 25) tags.push("Fourmi");
   else if (wantsRatio > 40) tags.push("Cigale");
   if (invested > savings * 0.5) tags.push("Investisseur");
+
+  // --- DÉRIVE & MILESTONES (proactif) ---
+  const driftInsights = detectDrift(profile, context, previousBudget ?? null);
+  const milestoneInsights = detectMilestones(profile, context);
+  for (const i of driftInsights) {
+    opps.push({
+      id: i.id,
+      type: 'SAVINGS',
+      level: i.severity === 'critical' ? 'CRITICAL' : i.severity === 'warning' ? 'WARNING' : 'INFO',
+      title: 'Dérive',
+      message: i.message,
+    });
+  }
+  for (const i of milestoneInsights) {
+    opps.push({
+      id: i.id,
+      type: 'SAVINGS',
+      level: 'SUCCESS',
+      title: 'Palier atteint',
+      message: i.message,
+    });
+  }
 
   const wealth10y = simulateFutureWealth(totalWealth, context.capacityToSave, 10, RATES.MARKET_AVG);
   const wealth20y = simulateFutureWealth(totalWealth, context.capacityToSave, 20, RATES.MARKET_AVG);

@@ -1,29 +1,9 @@
 'use client';
 
 import { X, BookOpen, CheckSquare, Lightbulb } from 'lucide-react';
+import Badge from '@/app/components/ui/Badge';
+import Modal from '@/app/components/ui/Modal';
 import type { ActionGuide } from '@/app/lib/definitions';
-
-const Badge = ({
-  children,
-  color = 'indigo',
-}: {
-  children: React.ReactNode;
-  color?: 'indigo' | 'emerald' | 'rose' | 'amber';
-}) => {
-  const colors = {
-    indigo: 'bg-indigo-50 text-indigo-700 border-indigo-100',
-    emerald: 'bg-emerald-50 text-emerald-700 border-emerald-100',
-    rose: 'bg-rose-50 text-rose-700 border-rose-100',
-    amber: 'bg-amber-50 text-amber-700 border-amber-100',
-  };
-  return (
-    <span
-      className={`px-2.5 py-1 rounded-full text-[11px] font-bold uppercase tracking-wider border ${colors[color]}`}
-    >
-      {children}
-    </span>
-  );
-};
 
 interface EducationalModalProps {
   guide: ActionGuide | null;
@@ -34,14 +14,7 @@ export function EducationalModal({ guide, onClose }: EducationalModalProps) {
   if (!guide) return null;
 
   return (
-    <div
-      className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-in fade-in duration-200"
-      onClick={onClose}
-    >
-      <div
-        className="bg-white rounded-[2rem] shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh] animate-in slide-in-from-bottom-8 duration-300 scale-100"
-        onClick={(e) => e.stopPropagation()}
-      >
+    <Modal open={!!guide} onClose={onClose} zIndex={100} contentClassName="w-full max-w-2xl flex flex-col max-h-[90vh]">
         <div className="bg-slate-900 p-8 text-white relative overflow-hidden shrink-0">
           <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/20 rounded-full blur-3xl -mr-16 -mt-16"></div>
           <div className="relative z-10 flex gap-5">
@@ -109,7 +82,6 @@ export function EducationalModal({ guide, onClose }: EducationalModalProps) {
             C&apos;est noté, je m&apos;y mets
           </button>
         </div>
-      </div>
-    </div>
+    </Modal>
   );
 }

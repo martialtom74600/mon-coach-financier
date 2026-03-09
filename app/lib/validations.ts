@@ -281,6 +281,25 @@ export const financialGoalResponseSchema = z.object({
   updatedAt: z.string(),
 });
 
+export const listDecisionsQuerySchema = z.object({
+  cursor: z.string().cuid().optional(),
+  limit: z.coerce.number().int().min(1).max(100).optional(),
+});
+
+export const listInsightsQuerySchema = z.object({
+  unreadOnly: z.coerce.boolean().optional(),
+  limit: z.coerce.number().int().min(1).max(50).optional(),
+});
+
+/** I.3 — Push subscription (Web Push API) */
+export const pushSubscriptionSchema = z.object({
+  endpoint: z.string().url(),
+  keys: z.object({
+    p256dh: z.string().min(1),
+    auth: z.string().min(1),
+  }),
+});
+
 export const purchaseDecisionResponseSchema = z.object({
   id: z.string(),
   profileId: z.string(),
@@ -296,6 +315,17 @@ export const purchaseDecisionResponseSchema = z.object({
   rate: z.number().nullable(),
   outcome: DecisionOutcomeEnum.nullable().optional(),
   createdAt: z.string(),
+});
+
+export const decisionsListResponseSchema = z.object({
+  decisions: z.array(purchaseDecisionResponseSchema),
+  nextCursor: z.string().nullable(),
+  stats: z.object({
+    total: z.number(),
+    accepted: z.number(),
+    rejected: z.number(),
+    amountTotal: z.number(),
+  }),
 });
 
 /** Schéma pour les réponses DELETE (success: true) */

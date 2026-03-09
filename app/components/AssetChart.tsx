@@ -10,9 +10,8 @@ import {
   Tooltip as RechartsTooltip,
   ResponsiveContainer,
 } from 'recharts';
-import { format } from 'date-fns';
-import { fr } from 'date-fns/locale';
 import { formatCurrency } from '@/app/lib/definitions';
+import { formatDate } from '@/app/lib/format';
 import { TrendingUp, ChevronDown, ChevronUp, Loader2 } from 'lucide-react';
 
 interface AssetHistoryPoint {
@@ -66,7 +65,7 @@ export default function AssetChart({ assetId, assetName, className = '' }: Asset
   const chartData =
     data?.map((p) => ({
       ...p,
-      label: format(new Date(p.date), 'd MMM yyyy', { locale: fr }),
+      label: formatDate(p.date, 'short'),
     })) ?? [];
 
   const canShowChart = chartData.length >= 2;

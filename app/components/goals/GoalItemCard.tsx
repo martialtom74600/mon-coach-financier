@@ -4,6 +4,7 @@ import Card from '@/app/components/ui/Card';
 import Button from '@/app/components/ui/Button';
 import { Trash2, CalendarDays } from 'lucide-react';
 import { formatCurrency } from '@/app/lib/definitions';
+import { formatDate } from '@/app/lib/format';
 import { GOAL_CATEGORIES } from '@/app/lib/definitions';
 import type { Goal, GoalCategory } from '@/app/lib/definitions';
 
@@ -31,7 +32,7 @@ export function GoalItemCard({ goal, onDelete }: GoalItemCardProps) {
               <span>Cible : {formatCurrency(goal.targetAmount)}</span>
               <span>•</span>
               <span className="flex items-center gap-1">
-                <CalendarDays size={12} /> {new Date(goal.deadline).toLocaleDateString()}
+                <CalendarDays size={12} /> {formatDate(goal.deadline, 'short')}
               </span>
             </div>
           </div>

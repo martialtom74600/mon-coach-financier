@@ -3,9 +3,13 @@
 import React, { useState, useEffect } from 'react';
 import { 
   ChevronLeft, ChevronRight, Calendar as CalendarIcon, 
-  Loader2, AlertCircle, X, CreditCard, ShoppingBag 
+  X, CreditCard, ShoppingBag 
 } from 'lucide-react';
 import { formatCurrency } from '@/app/lib/logic';
+import { formatDate } from '@/app/lib/format';
+import LoadingState from '@/app/components/ui/LoadingState';
+import EmptyState from '@/app/components/ui/EmptyState';
+import Modal from '@/app/components/ui/Modal';
 import { MonthData, TimelineDay } from '@/app/lib/scenarios';
 
 // --- COMPOSANT MODAL (Détail du jour) ---
@@ -13,14 +17,12 @@ const DayDetailModal = ({ day, onClose }: { day: TimelineDay, onClose: () => voi
   if (!day) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in" onClick={onClose}>
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden animate-slide-up" onClick={e => e.stopPropagation()}>
-        
+    <Modal open={!!day} onClose={onClose} contentClassName="w-full max-w-sm overflow-hidden">
         {/* Header Modal */}
         <div className="bg-slate-50 p-4 border-b border-slate-100 flex justify-between items-center">
           <div>
             <h3 className="font-bold text-slate-800 text-lg">
-              {new Date(day.date).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })}
+              {formatDate(day.date, 'long')}
             </h3>
             <div className={`text-sm font-bold ${(day.balance ?? 0) < 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
               Solde : {formatCurrency(day.balance ?? 0)}
@@ -51,8 +53,7 @@ const DayDetailModal = ({ day, onClose }: { day: TimelineDay, onClose: () => voi
             ))
           )}
         </div>
-      </div>
-    </div>
+    </Modal>
   );
 };
 
@@ -117,7 +118,7 @@ const CalendarView = ({ timeline }: { timeline: MonthData[] }) => {
                   <div className="flex justify-between items-center mb-3">
                       <div className="flex items-center gap-3">
                           <div className={`w-10 h-10 rounded-xl flex flex-col items-center justify-center border ${isToday ? 'bg-indigo-600 border-indigo-600 text-white' : 'bg-white border-slate-200 text-slate-700'}`}>
-                              <span className="text-[10px] font-bold uppercase leading-none">{new Date(day.date).toLocaleDateString('fr-FR', { weekday: 'short' }).slice(0, 3)}</span>
+                              <span className="text-[10px] font-bold uppercase leading-none">{formatDate(day.date, 'weekdayShort')}</span>
                               <span className="text-lg font-black leading-none">{day.dayOfMonth}</span>
                           </div>
                           <div>
@@ -204,20 +205,5 @@ const CalendarView = ({ timeline }: { timeline: MonthData[] }) => {
     </>
   );
 };
-
-// --- STATES ---
-const LoadingState = ({ message }: { message: string }) => (
-  <div className="bg-white rounded-3xl border border-slate-200 p-12 flex flex-col items-center justify-center text-slate-400 min-h-[400px]">
-    <Loader2 size={32} className="animate-spin mb-3 text-indigo-500" />
-    <p className="text-sm font-medium">{message}</p>
-  </div>
-);
-
-const EmptyState = () => (
-  <div className="bg-white rounded-3xl border border-slate-200 p-12 flex flex-col items-center justify-center text-slate-400 min-h-[400px]">
-    <AlertCircle size={32} className="mb-3 text-slate-300" />
-    <p className="text-sm font-medium">Aucune donnée.</p>
-  </div>
-);
 
 export default CalendarView;

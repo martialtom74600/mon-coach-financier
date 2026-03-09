@@ -115,6 +115,7 @@ export async function getFullUserProfile(userId: string) {
 
   return serializeDecimals({
     id: user.id,
+    profileId: p.id,
     email: user.email,
     firstName: user.firstName,
 
@@ -147,6 +148,8 @@ export async function getFullUserProfile(userId: string) {
 
     goals: p.goals,
     decisions: p.decisions,
+
+    lastBudgetSnapshot: p.lastBudgetSnapshot,
 
     createdAt: user.createdAt,
     updatedAt: p.updatedAt,

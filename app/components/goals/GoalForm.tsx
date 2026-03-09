@@ -3,7 +3,9 @@
 import InputGroup from '@/app/components/ui/InputGroup';
 import Button from '@/app/components/ui/Button';
 import Card from '@/app/components/ui/Card';
-import { PiggyBank, TrendingUp, ArrowRight, CheckCircle } from 'lucide-react';
+import ContextToggle from '@/app/components/ui/ContextToggle';
+import BackLink from '@/app/components/ui/BackLink';
+import { PiggyBank, TrendingUp, ArrowRight } from 'lucide-react';
 import { GOAL_CATEGORIES } from '@/app/lib/definitions';
 import type { GoalCategory } from '@/app/lib/definitions';
 
@@ -16,41 +18,6 @@ export interface GoalFormData {
   projectedYield: string;
   transferDay: string;
 }
-
-interface ContextToggleProps {
-  label: string;
-  subLabel: string;
-  icon: React.ComponentType<{ size?: number | string }>;
-  checked: boolean;
-  onChange: (checked: boolean) => void;
-}
-
-const ContextToggle = ({ label, subLabel, icon: Icon, checked, onChange }: ContextToggleProps) => (
-  <label
-    className={`flex items-center gap-4 p-4 border rounded-xl cursor-pointer transition-all duration-200 ${checked ? 'bg-emerald-50 border-emerald-200 ring-1 ring-emerald-200' : 'bg-white border-slate-200 hover:bg-slate-50'}`}
-  >
-    <div
-      className={`p-2 rounded-lg ${checked ? 'bg-emerald-100 text-emerald-600' : 'bg-slate-100 text-slate-400'}`}
-    >
-      <Icon size={20} />
-    </div>
-    <div className="flex-1">
-      <div className={`font-bold text-sm ${checked ? 'text-emerald-900' : 'text-slate-700'}`}>{label}</div>
-      <div className="text-xs text-slate-500 mt-0.5">{subLabel}</div>
-    </div>
-    <div
-      className={`w-6 h-6 rounded-full border flex items-center justify-center transition-colors ${checked ? 'bg-emerald-600 border-emerald-600' : 'bg-white border-slate-300'}`}
-    >
-      {checked && <CheckCircle size={14} className="text-white" />}
-    </div>
-    <input
-      type="checkbox"
-      className="hidden"
-      checked={checked}
-      onChange={(e) => onChange(e.target.checked)}
-    />
-  </label>
-);
 
 interface GoalFormProps {
   formData: GoalFormData;
@@ -78,12 +45,11 @@ export function GoalForm({
   return (
     <div className="animate-fade-in space-y-4">
       {hasGoals && onBackToList && (
-        <button
+        <BackLink
+          label="Retour à la liste"
           onClick={onBackToList}
-          className="text-slate-500 flex items-center gap-1 text-sm font-medium hover:text-emerald-600 transition-colors"
-        >
-          ← Retour à la liste
-        </button>
+          variant="emerald"
+        />
       )}
       <Card className="p-6 md:p-8 border-emerald-100 shadow-md">
         <div className="space-y-6">
@@ -130,6 +96,7 @@ export function GoalForm({
             <label className="block text-sm font-medium text-slate-600">Paramètres avancés</label>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <ContextToggle
+                variant="emerald"
                 label="Apport initial"
                 subLabel="J'ai déjà une somme"
                 icon={PiggyBank}
@@ -137,6 +104,7 @@ export function GoalForm({
                 onChange={setHasSavings}
               />
               <ContextToggle
+                variant="emerald"
                 label="Investissement"
                 subLabel="Placé avec rendement"
                 icon={TrendingUp}

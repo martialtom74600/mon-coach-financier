@@ -137,15 +137,56 @@ model FinancialProfile {
   // --- STRATÉGIE ---
   funBudget         Decimal       @default(0) @db.Decimal(12, 2)
 
+  // --- SNAPSHOT BUDGET (pour detectDrift) ---
+  lastBudgetSnapshot Json? // Dernier BudgetResult sérialisé pour comparer la dérive
+
   // --- RELATIONS ---
   items     FinancialItem[]
   assets    Asset[]
   goals     FinancialGoal[]
   decisions PurchaseDecision[]
+  insights  Insight[]
+  pushSubscriptions PushSubscription[]
 
   updatedAt DateTime @updatedAt
 
   @@map("financial_profiles")
+}
+
+model PushSubscription {
+  id        String   @id @default(cuid())
+  profileId String
+  profile   FinancialProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  endpoint   String   // URL unique du push service
+  p256dh     String   // Clé publique client
+  auth       String   // Secret auth
+
+  createdAt  DateTime @default(now())
+
+  @@unique([profileId, endpoint])
+  @@index([profileId])
+  @@map("push_subscriptions")
+}
+
+model Insight {
+  id        String   @id @default(cuid())
+  profileId String
+  profile   FinancialProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  insightId String   // ID logique (danger_deficit, drift_matelas_down, milestone_matelas...)
+  type      String   // DANGER | DRIFT | MILESTONE
+  severity  String   // critical | warning | info | success
+  message   String
+  metadata  Json?    // Données additionnelles (montants, etc.)
+
+  createdAt DateTime @default(now())
+  readAt    DateTime? // Réservé pour masquage permanent futur
+  snoozeUntil DateTime? // Masquer jusqu'à cette date (snooze 7 jours)
+
+  @@index([profileId])
+  @@index([profileId, snoozeUntil])
+  @@map("insights")
 }
 
 model FinancialItem {
@@ -223,6 +264,7 @@ model FinancialGoal {
   updatedAt DateTime @updatedAt
 
   @@index([profileId])
+  @@index([profileId, deadline])
   @@map("financial_goals")
 }
 
@@ -252,5 +294,6 @@ model PurchaseDecision {
   createdAt      DateTime @default(now())
 
   @@index([profileId])
+  @@index([profileId, date])
   @@map("purchase_decisions")
 }

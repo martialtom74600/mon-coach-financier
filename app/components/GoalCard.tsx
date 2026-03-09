@@ -2,12 +2,15 @@
 
 import React, { useState } from 'react';
 import { 
-  Target, Calendar, AlertTriangle, 
+  Target, Calendar, 
   CheckCircle, ArrowRight, PiggyBank, Clock, Trash2, Loader2
 } from 'lucide-react';
 import { useGoalManager } from '@/app/hooks/useGoalManager';
 import Card from '@/app/components/ui/Card';
+import ConfirmDialog from '@/app/components/ui/ConfirmDialog';
 import { Goal, GoalStrategy, formatCurrency } from '@/app/lib/definitions';
+import { formatDate } from '@/app/lib/format';
+import { getVerdictTheme } from '@/app/lib/themeUtils';
 
 interface GoalCardProps {
   goal: Goal;
@@ -18,6 +21,7 @@ export default function GoalCard({ goal, onDelete }: GoalCardProps) {
   const { applyStrategy } = useGoalManager();
   const [isApplying, setIsApplying] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
 
   // Sécurité
   if (!goal.diagnosis) return null;
@@ -28,14 +32,7 @@ export default function GoalCard({ goal, onDelete }: GoalCardProps) {
   const target = typeof goal.targetAmount === 'string' ? parseFloat(goal.targetAmount) : goal.targetAmount;
   const percent = Math.min(100, Math.max(0, (current / target) * 100));
 
-  const themeMap: Record<string, { bg: string; border: string; text: string; bar: string; icon: typeof CheckCircle }> = {
-    green: { bg: 'bg-emerald-50', border: 'border-emerald-100', text: 'text-emerald-700', bar: 'bg-emerald-500', icon: CheckCircle },
-    red: { bg: 'bg-rose-50', border: 'border-rose-100', text: 'text-rose-700', bar: 'bg-rose-500', icon: AlertTriangle },
-    orange: { bg: 'bg-amber-50', border: 'border-amber-100', text: 'text-amber-700', bar: 'bg-amber-500', icon: AlertTriangle },
-    black: { bg: 'bg-slate-50', border: 'border-slate-200', text: 'text-slate-700', bar: 'bg-slate-500', icon: AlertTriangle },
-  };
-  const theme = themeMap[color] || { bg: 'bg-slate-50', border: 'border-slate-100', text: 'text-slate-700', bar: 'bg-slate-400', icon: Target };
-
+  const theme = getVerdictTheme(color);
   const StatusIcon = theme.icon;
 
   const handleAction = async (strategy: GoalStrategy) => {
@@ -46,13 +43,17 @@ export default function GoalCard({ goal, onDelete }: GoalCardProps) {
 
   const handleDeleteClick = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (confirm("Supprimer définitivement cet objectif ?")) {
-        setIsDeleting(true);
-        onDelete(goal.id);
-    }
+    setShowConfirm(true);
+  };
+
+  const handleConfirmDelete = () => {
+    setShowConfirm(false);
+    setIsDeleting(true);
+    onDelete(goal.id);
   };
 
   return (
+    <>
     <Card className={`p-5 border-l-4 ${theme.border.replace('border', 'border-l')} transition-all hover:shadow-md relative group`}>
       
       {/* BOUTON SUPPRESSION (Visible au survol ou mobile) */}
@@ -75,7 +76,7 @@ export default function GoalCard({ goal, onDelete }: GoalCardProps) {
             <h3 className="font-bold text-slate-800 text-lg leading-tight">{goal.name}</h3>
             <div className="text-xs text-slate-500 flex items-center gap-1 mt-1">
               <Calendar size={12} /> 
-              {new Date(goal.deadline).toLocaleDateString('fr-FR', { month: 'short', year: 'numeric' })}
+              {formatDate(goal.deadline, 'monthYear')}
             </div>
           </div>
         </div>
@@ -138,5 +139,16 @@ export default function GoalCard({ goal, onDelete }: GoalCardProps) {
         </div>
       )}
     </Card>
+    <ConfirmDialog
+      open={showConfirm}
+      title="Supprimer cet objectif ?"
+      message="Supprimer définitivement cet objectif ?"
+      confirmLabel="Supprimer"
+      cancelLabel="Annuler"
+      variant="danger"
+      onConfirm={handleConfirmDelete}
+      onCancel={() => setShowConfirm(false)}
+    />
+    </>
   );
 }

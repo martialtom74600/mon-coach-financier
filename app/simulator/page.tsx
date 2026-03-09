@@ -10,10 +10,14 @@ import {
   analyzePurchaseImpact,
 } from '@/app/lib/logic';
 import { PurchaseType, PaymentMode } from '@/app/lib/definitions';
-import { ArrowLeft, Save, RefreshCcw, Settings, Wallet, Target, TrendingDown } from 'lucide-react';
+import { Save, RefreshCcw, Settings, Wallet, Target, TrendingDown } from 'lucide-react';
 import Card from '@/app/components/ui/Card';
 import Button from '@/app/components/ui/Button';
+import PageLoader from '@/app/components/ui/PageLoader';
+import { useToast } from '@/app/components/ui/Toast';
 import Badge from '@/app/components/ui/Badge';
+import ProfileEmptyPrompt from '@/app/components/ui/ProfileEmptyPrompt';
+import BackLink from '@/app/components/ui/BackLink';
 import { SimulatorForm, type PurchaseFormState } from '@/app/components/simulator/SimulatorForm';
 import { PurchaseRecap } from '@/app/components/simulator/PurchaseRecap';
 import { DiagnosticCard } from '@/app/components/simulator/DiagnosticCard';
@@ -21,6 +25,7 @@ import { DiagnosticCard } from '@/app/components/simulator/DiagnosticCard';
 export default function SimulatorPage() {
   const router = useRouter();
   const { profile, isLoaded, addDecision } = useFinancialData();
+  const showToast = useToast();
 
   const stats = useMemo(() => {
     if (!profile) return EMPTY_BUDGET_RESULT;
@@ -81,31 +86,24 @@ export default function SimulatorPage() {
       });
     } catch (error) {
       console.error('Erreur sauvegarde', error);
-      alert('Impossible de sauvegarder la décision.');
+      showToast('Impossible de sauvegarder la décision.');
     } finally {
       setIsSaving(false);
     }
   };
 
-  if (!isLoaded)
-    return (
-      <div className="min-h-[50vh] flex items-center justify-center">
-        <div className="animate-pulse h-12 w-12 bg-slate-200 rounded-full"></div>
-      </div>
-    );
+  if (!isLoaded) return <PageLoader />;
 
   if (isProfileEmpty) {
     return (
-      <div className="min-h-[60vh] flex flex-col items-center justify-center p-6 text-center animate-fade-in">
-        <div className="p-4 bg-indigo-50 text-indigo-600 rounded-full mb-6">
-          <Settings size={48} />
-        </div>
-        <h2 className="text-2xl font-bold text-slate-800 mb-3">Profil manquant</h2>
-        <p className="text-slate-500 max-w-md mb-8">
-          Pour simuler un achat, nous avons besoin de connaître ton budget.
-        </p>
-        <Button onClick={() => router.push('/profile')}>Configurer mon Profil</Button>
-      </div>
+      <ProfileEmptyPrompt
+        variant="compact"
+        title="Profil manquant"
+        message="Pour simuler un achat, nous avons besoin de connaître ton budget."
+        buttonLabel="Configurer mon Profil"
+        onAction={() => router.push('/profile')}
+        icon={Settings}
+      />
     );
   }
 
@@ -122,12 +120,11 @@ export default function SimulatorPage() {
 
         {step === 'result' && result && (
           <div className="space-y-6 animate-fade-in">
-            <button
+            <BackLink
+              label="Modifier la saisie"
               onClick={() => setStep('input')}
-              className="text-slate-500 flex items-center gap-1 text-sm font-medium hover:text-indigo-600 transition-colors"
-            >
-              <ArrowLeft size={16} /> Modifier la saisie
-            </button>
+              variant="indigo"
+            />
             <PurchaseRecap purchase={purchase} />
             <DiagnosticCard result={result} />
           </div>

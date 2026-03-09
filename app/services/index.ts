@@ -6,3 +6,5 @@ export * as itemService from './itemService';
 export * as assetService from './assetService';
 export * as goalService from './goalService';
 export * as decisionService from './decisionService';
+export * as insightService from './insightService';
+export * as notificationService from './notificationService';

@@ -1,47 +1,12 @@
 'use client';
 
-import { CheckCircle } from 'lucide-react';
 import Card from '@/app/components/ui/Card';
 import Button from '@/app/components/ui/Button';
 import InputGroup from '@/app/components/ui/InputGroup';
+import ContextToggle from '@/app/components/ui/ContextToggle';
 import { PURCHASE_TYPES, PAYMENT_MODES } from '@/app/lib/definitions';
 import type { PurchaseType, PaymentMode } from '@/app/lib/definitions';
 import { RefreshCw, Briefcase, CalendarDays, ShoppingBag } from 'lucide-react';
-
-interface ContextToggleProps {
-  label: string;
-  subLabel: string;
-  icon: React.ComponentType<{ size?: number | string }>;
-  checked: boolean;
-  onChange: (checked: boolean) => void;
-}
-
-const ContextToggle = ({ label, subLabel, icon: Icon, checked, onChange }: ContextToggleProps) => (
-  <label
-    className={`flex items-center gap-4 p-4 border rounded-xl cursor-pointer transition-all duration-200 ${checked ? 'bg-indigo-50 border-indigo-200 ring-1 ring-indigo-200' : 'bg-white border-slate-200 hover:bg-slate-50'}`}
-  >
-    <div
-      className={`p-2 rounded-lg ${checked ? 'bg-indigo-100 text-indigo-600' : 'bg-slate-100 text-slate-400'}`}
-    >
-      <Icon size={20} />
-    </div>
-    <div className="flex-1">
-      <div className={`font-bold text-sm ${checked ? 'text-indigo-900' : 'text-slate-700'}`}>{label}</div>
-      <div className="text-xs text-slate-500 mt-0.5">{subLabel}</div>
-    </div>
-    <div
-      className={`w-6 h-6 rounded-full border flex items-center justify-center transition-colors ${checked ? 'bg-indigo-600 border-indigo-600' : 'bg-white border-slate-300'}`}
-    >
-      {checked && <CheckCircle size={14} className="text-white" />}
-    </div>
-    <input
-      type="checkbox"
-      className="hidden"
-      checked={checked}
-      onChange={(e) => onChange(e.target.checked)}
-    />
-  </label>
-);
 
 export interface PurchaseFormState {
   name: string;

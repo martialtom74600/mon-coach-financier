@@ -8,3 +8,6 @@ export * from './engine';
 
 // On exporte les scénarios (Timeline, Analyse d'achat)
 export * from './scenarios';
+
+// Moteur proactif (insights)
+export * from './proactive';

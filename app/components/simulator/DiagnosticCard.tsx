@@ -1,7 +1,9 @@
 'use client';
 
-import { CheckCircle, AlertTriangle, XCircle, Info } from 'lucide-react';
+import { CheckCircle, XCircle, Info } from 'lucide-react';
 import Card from '@/app/components/ui/Card';
+import Badge from '@/app/components/ui/Badge';
+import { getVerdictTheme } from '@/app/lib/themeUtils';
 import { formatCurrency } from '@/app/lib/definitions';
 import type { AnalysisResult, AnalysisTip, AnalysisIssue } from '@/app/lib/definitions';
 
@@ -12,28 +14,15 @@ interface DiagnosticCardProps {
 export function DiagnosticCard({ result }: DiagnosticCardProps) {
   if (!result) return null;
 
-  const theme = {
-    green: { bg: 'bg-emerald-600', icon: CheckCircle },
-    orange: { bg: 'bg-amber-500', icon: AlertTriangle },
-    red: { bg: 'bg-rose-600', icon: XCircle },
-  }[result.verdict as 'green' | 'orange' | 'red'] || { bg: 'bg-slate-600', icon: Info };
-
-  const MainIcon = theme.icon;
-
-  const getStatusBadge = (isOk: boolean) =>
-    isOk ? (
-      <span className="flex items-center gap-1 text-xs font-bold text-emerald-700 bg-emerald-100 px-2 py-1 rounded-md border border-emerald-200">
-        <CheckCircle size={12} /> Validé
-      </span>
-    ) : (
-      <span className="flex items-center gap-1 text-xs font-bold text-rose-700 bg-rose-100 px-2 py-1 rounded-md border border-rose-200">
-        <XCircle size={12} /> Risqué
-      </span>
-    );
+  const theme = getVerdictTheme(result.verdict);
+  const headerTheme = result.verdict in { green: 1, orange: 1, red: 1 }
+    ? theme
+    : { ...theme, bgDark: 'bg-slate-600', icon: Info };
+  const MainIcon = headerTheme.icon;
 
   return (
     <Card className="overflow-hidden shadow-xl border-slate-100 p-0 animate-fade-in">
-      <div className={`${theme.bg} p-6 text-white relative overflow-hidden`}>
+      <div className={`${headerTheme.bgDark} p-6 text-white relative overflow-hidden`}>
         <div className="absolute -right-6 -top-6 w-32 h-32 bg-white opacity-10 rounded-full blur-2xl"></div>
         <div className="relative z-10 flex items-start gap-4">
           <div className="p-2 bg-white/20 rounded-xl backdrop-blur-md shrink-0">
@@ -54,7 +43,15 @@ export function DiagnosticCard({ result }: DiagnosticCardProps) {
             <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
               Moyens Théoriques
             </div>
-            {getStatusBadge(result.isBudgetOk)}
+            {result.isBudgetOk ? (
+            <Badge color="emerald" className="inline-flex items-center gap-1 border border-emerald-200">
+              <CheckCircle size={12} /> Validé
+            </Badge>
+          ) : (
+            <Badge color="rose" className="inline-flex items-center gap-1 border border-rose-200">
+              <XCircle size={12} /> Risqué
+            </Badge>
+          )}
           </div>
           <div>
             <div className="text-sm font-bold text-slate-800">Budget Mensuel</div>
@@ -71,7 +68,15 @@ export function DiagnosticCard({ result }: DiagnosticCardProps) {
             <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
               Réalité Compte
             </div>
-            {getStatusBadge(result.isCashflowOk)}
+            {result.isCashflowOk ? (
+            <Badge color="emerald" className="inline-flex items-center gap-1 border border-emerald-200">
+              <CheckCircle size={12} /> Validé
+            </Badge>
+          ) : (
+            <Badge color="rose" className="inline-flex items-center gap-1 border border-rose-200">
+              <XCircle size={12} /> Risqué
+            </Badge>
+          )}
           </div>
           <div>
             <div className="text-sm font-bold text-slate-800">Trésorerie J+45</div>

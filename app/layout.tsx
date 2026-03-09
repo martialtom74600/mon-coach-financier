@@ -3,6 +3,8 @@ import type { Metadata, Viewport } from 'next';
 import { Inter } from 'next/font/google';
 import Navigation from '@/app/components/Navigation';
 import Header from '@/app/components/Header';
+import { ToastProvider } from '@/app/components/ui/Toast';
+import PushNotificationPrompt from '@/app/components/PushNotificationPrompt';
 
 // Imports Clerk
 import { 
@@ -64,10 +66,12 @@ export default function RootLayout({
 
           {/* 2. APPLICATION CHARGÉE */}
           <ClerkLoaded>
+            <ToastProvider>
             
             {/* MENU : Seulement si connecté */}
             <SignedIn>
               <Navigation />
+              <PushNotificationPrompt />
             </SignedIn>
 
             {/* CONTENU PRINCIPAL */}
@@ -93,7 +97,7 @@ export default function RootLayout({
 
               </div>
             </main>
-            
+            </ToastProvider>
           </ClerkLoaded>
 
         </body>

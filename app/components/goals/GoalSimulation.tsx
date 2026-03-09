@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import Button from '@/app/components/ui/Button';
 import Card from '@/app/components/ui/Card';
+import BackLink from '@/app/components/ui/BackLink';
 import { formatCurrency } from '@/app/lib/definitions';
 import type { GoalStrategy, GoalScenarioResult } from '@/app/lib/definitions';
 import type { GoalFormData } from './GoalForm';
@@ -68,12 +69,11 @@ export function GoalSimulation({
 
   return (
     <div className="animate-fade-in space-y-6">
-      <button
+      <BackLink
+        label="Modifier les données"
         onClick={onBack}
-        className="text-slate-500 flex items-center gap-1 text-sm font-medium hover:text-emerald-600 transition-colors"
-      >
-        ← Modifier les données
-      </button>
+        variant="emerald"
+      />
 
       <Card className="overflow-hidden p-0 border-0 shadow-xl">
         <div className={`${statusBg} p-6 text-white relative overflow-hidden transition-colors duration-500`}>

@@ -2,13 +2,7 @@
 
 import { AlertTriangle } from 'lucide-react';
 import { formatCurrency } from '@/app/lib/definitions';
-
-const SimpleTooltip = ({ text }: { text: string }) => (
-  <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 px-3 py-1.5 bg-slate-800 text-white text-xs font-bold rounded-lg opacity-0 group-hover:opacity-100 transition-all duration-200 transform group-hover:translate-y-0 translate-y-1 whitespace-nowrap pointer-events-none z-20 shadow-xl">
-    {text}
-    <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-slate-800"></div>
-  </div>
-);
+import Tooltip from '@/app/components/ui/Tooltip';
 
 export interface SafeToSpendGaugeProps {
   currentBalance: number;
@@ -47,7 +41,7 @@ export function SafeToSpendGauge({
               <div className="w-4 h-4 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center text-[10px] font-bold">
                 ?
               </div>
-              <SimpleTooltip text="Solde actuel - Charges à venir ce mois-ci" />
+              <Tooltip text="Solde actuel - Charges à venir ce mois-ci" />
             </div>
           </div>
           <div className={`text-6xl font-black tracking-tighter ${statusColor}`}>
@@ -78,16 +72,16 @@ export function SafeToSpendGauge({
             style={{ width: `${fixedPct}%` }}
             className="h-full bg-slate-300 relative group border-r border-white/50"
           >
-            <SimpleTooltip text={`Réservé pour factures à venir: ${formatCurrency(upcomingFixed)}`} />
+            <Tooltip text={`Réservé pour factures à venir: ${formatCurrency(upcomingFixed)}`} />
           </div>
           <div
             style={{ width: `${savingsPct}%` }}
             className="h-full bg-indigo-300 relative group border-r border-white/50"
           >
-            <SimpleTooltip text={`Réservé pour épargne: ${formatCurrency(upcomingSavings)}`} />
+            <Tooltip text={`Réservé pour épargne: ${formatCurrency(upcomingSavings)}`} />
           </div>
           <div style={{ width: `${safePct}%` }} className={`h-full ${barColor} relative group`}>
-            <SimpleTooltip text={`Libre pour le plaisir: ${formatCurrency(safeToSpend)}`} />
+            <Tooltip text={`Libre pour le plaisir: ${formatCurrency(safeToSpend)}`} />
           </div>
         </div>
         <div className="flex justify-between text-[10px] font-bold text-slate-400 uppercase tracking-wider px-1">

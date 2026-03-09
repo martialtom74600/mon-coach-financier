@@ -34,9 +34,11 @@ const nextConfig = {
 const withPWA = require("@ducanh2912/next-pwa").default({
   dest: "public",
   // IMPORTANT : On désactive le PWA en mode développement pour éviter les bugs de cache
-  disable: process.env.NODE_ENV === "development", 
+  disable: process.env.NODE_ENV === "development",
   register: true,
   skipWaiting: true,
+  // I.3 — Custom worker pour push notifications
+  customWorkerSrc: "worker",
 });
 
 // E.5 — Sentry : wrap après PWA pour instrumenter le build final

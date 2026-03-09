@@ -11,6 +11,7 @@ import {
   createAssetSchema,
   createGoalSchema,
   createDecisionSchema,
+  listDecisionsQuerySchema,
   updateDecisionSchema,
   updateProfileSchema,
   validateId,
@@ -22,6 +23,7 @@ import {
   successResponseSchema,
   profileAPIResponseSchema,
   parseAPIResponse,
+  pushSubscriptionSchema,
 } from '@/app/lib/validations';
 
 // ============================================================================
@@ -157,6 +159,35 @@ describe('createDecisionSchema — Tests adverses', () => {
       type: 'TYPE_INVENTE',
       paymentMode: 'CASH_CURRENT',
     });
+    expect(result.success).toBe(false);
+  });
+});
+
+// ============================================================================
+// listDecisionsQuerySchema — H.2 Pagination cursor-based
+// ============================================================================
+
+describe('listDecisionsQuerySchema — H.2', () => {
+  it('accepte cursor CUID et limit valide', () => {
+    const result = listDecisionsQuerySchema.safeParse({
+      cursor: 'clxxxxxxxxxxxxxxxxxxxxxxxxxx',
+      limit: 20,
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('accepte objet vide (première page)', () => {
+    const result = listDecisionsQuerySchema.safeParse({});
+    expect(result.success).toBe(true);
+  });
+
+  it('rejette cursor invalide (non-CUID)', () => {
+    const result = listDecisionsQuerySchema.safeParse({ cursor: 'invalid' });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejette limit hors bornes', () => {
+    const result = listDecisionsQuerySchema.safeParse({ limit: 500 });
     expect(result.success).toBe(false);
   });
 });
@@ -453,6 +484,46 @@ describe('profileAPIResponseSchema — Bouclier (assets array corrompue)', () =>
       annualExpenses: [],
     };
     const result = profileAPIResponseSchema.safeParse(corrupted);
+    expect(result.success).toBe(false);
+  });
+});
+
+// ============================================================================
+// I.3 — pushSubscriptionSchema (Web Push)
+// ============================================================================
+
+describe('pushSubscriptionSchema — I.3 Notifications PWA', () => {
+  const validSubscription = {
+    endpoint: 'https://fcm.googleapis.com/fcm/send/abc123',
+    keys: { p256dh: 'BHx...', auth: 'xyz...' },
+  };
+
+  it('accepte subscription valide', () => {
+    const result = pushSubscriptionSchema.safeParse(validSubscription);
+    expect(result.success).toBe(true);
+  });
+
+  it('rejette endpoint invalide (non-URL)', () => {
+    const result = pushSubscriptionSchema.safeParse({
+      ...validSubscription,
+      endpoint: 'not-a-url',
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejette keys manquantes', () => {
+    const result = pushSubscriptionSchema.safeParse({
+      endpoint: validSubscription.endpoint,
+      keys: {},
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejette p256dh vide', () => {
+    const result = pushSubscriptionSchema.safeParse({
+      endpoint: validSubscription.endpoint,
+      keys: { p256dh: '', auth: 'xyz' },
+    });
     expect(result.success).toBe(false);
   });
 });

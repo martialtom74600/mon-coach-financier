@@ -6,14 +6,22 @@ import { computeFinancialPlan, formatCurrency, simulateGoalScenario } from '@/ap
 import { GoalCategory, Goal, GoalScenarioInput } from '@/app/lib/definitions';
 import { Target, Plus, ArrowLeft, LayoutGrid } from 'lucide-react';
 import Button from '@/app/components/ui/Button';
+import { useToast } from '@/app/components/ui/Toast';
+import ConfirmDialog from '@/app/components/ui/ConfirmDialog';
+import PageLoader from '@/app/components/ui/PageLoader';
+import ProfileEmptyPrompt from '@/app/components/ui/ProfileEmptyPrompt';
+import { useConfirmDelete } from '@/app/hooks/useConfirmDelete';
 import { GoalForm, type GoalFormData } from '@/app/components/goals/GoalForm';
 import { GoalSimulation } from '@/app/components/goals/GoalSimulation';
 import { GoalItemCard } from '@/app/components/goals/GoalItemCard';
 import { GoalBudgetSidebar } from '@/app/components/goals/GoalBudgetSidebar';
+import EmptyListState from '@/app/components/ui/EmptyListState';
 import { applyStrategyToForm } from '@/app/components/goals/applyStrategyToForm';
 
 export default function GoalsPage() {
   const { profile, isLoaded, saveGoal, deleteGoal } = useFinancialData();
+  const showToast = useToast();
+  const { state: confirmDelete, openConfirm, closeConfirm, wrapConfirm } = useConfirmDelete();
 
   const stats = useMemo(() => {
     if (!profile)
@@ -110,29 +118,27 @@ export default function GoalsPage() {
       });
     } catch (error) {
       console.error("Erreur sauvegarde objectif", error);
-      alert("Impossible de sauvegarder l'objectif.");
+      showToast("Impossible de sauvegarder l'objectif.");
     } finally {
       setIsSaving(false);
     }
   };
 
-  const handleDeleteGoal = async (id: string) => {
-    if (!confirm('Supprimer cet objectif ?')) return;
+  const handleDeleteGoal = (id: string) => openConfirm(id);
+
+  const handleConfirmDelete = wrapConfirm(async (id) => {
     try {
       await deleteGoal(id);
     } catch (e) {
       console.error(e);
-      alert('Erreur lors de la suppression');
+      showToast('Erreur lors de la suppression');
     }
-  };
+  });
 
-  if (!isLoaded)
-    return (
-      <div className="min-h-[50vh] flex items-center justify-center">
-        <div className="animate-pulse h-12 w-12 bg-slate-200 rounded-full"></div>
-      </div>
-    );
-  if (isProfileEmpty) return <div className="p-10 text-center">Profil manquant...</div>;
+  if (!isLoaded) return <PageLoader />;
+  if (isProfileEmpty) {
+    return <ProfileEmptyPrompt variant="minimal" message="Profil manquant..." />;
+  }
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start animate-fade-in pb-20">
@@ -191,20 +197,16 @@ export default function GoalsPage() {
         {step === 'list' && (
           <div className="space-y-4 animate-fade-in">
             {!hasGoals ? (
-              <div className="text-center py-12 bg-white rounded-xl border border-dashed border-slate-300">
-                <LayoutGrid className="mx-auto text-slate-300 mb-3" size={48} />
-                <p className="text-slate-500 font-medium">Aucun objectif pour le moment.</p>
-                <Button
-                  variant="outline"
-                  className="mt-4"
-                  onClick={() => {
-                    setStep('input');
-                    setInputStep('form');
-                  }}
-                >
-                  Créer mon premier objectif
-                </Button>
-              </div>
+              <EmptyListState
+                variant="compact"
+                icon={LayoutGrid}
+                message="Aucun objectif pour le moment."
+                buttonLabel="Créer mon premier objectif"
+                onAction={() => {
+                  setStep('input');
+                  setInputStep('form');
+                }}
+              />
             ) : (
               (profile?.goals || []).map((goal: Goal) => (
                 <GoalItemCard key={goal.id} goal={goal} onDelete={handleDeleteGoal} />
@@ -214,6 +216,16 @@ export default function GoalsPage() {
         )}
       </div>
 
+      <ConfirmDialog
+        open={confirmDelete.open}
+        title="Supprimer cet objectif ?"
+        message="Cette action est irréversible."
+        confirmLabel="Supprimer"
+        cancelLabel="Annuler"
+        variant="danger"
+        onConfirm={handleConfirmDelete}
+        onCancel={closeConfirm}
+      />
       <GoalBudgetSidebar
         monthlyIncome={stats.monthlyIncome}
         capacityToSave={stats.capacityToSave}

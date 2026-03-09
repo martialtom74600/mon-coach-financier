@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useMemo, useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { useFinancialData } from '@/app/hooks/useFinancialData';
 import { computeFinancialPlan as runSimulation } from '@/app/lib/engine';
 import { calculateListTotal } from '@/app/lib/definitions';
@@ -9,6 +10,7 @@ import { HousingStatus } from '@/app/lib/definitions';
 import { Frequency } from '@/app/lib/definitions';
 import Card from '@/app/components/ui/Card';
 import Button from '@/app/components/ui/Button';
+import { useToast } from '@/app/components/ui/Toast';
 import ProgressBar from '@/app/components/ui/ProgressBar';
 import { Loader2 } from 'lucide-react';
 import type { FormProfile, FormItem } from './ProfileWizard.types';
@@ -22,7 +24,9 @@ import { StepAssets } from './steps/StepAssets';
 import { StepStrategy } from './steps/StepStrategy';
 
 export default function ProfileWizard() {
+  const router = useRouter();
   const { profile, isLoaded } = useFinancialData();
+  const showToast = useToast();
   const [currentStep, setCurrentStep] = useState(1);
   const [formData, setFormData] = useState<FormProfile | null>(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -205,11 +209,11 @@ export default function ProfileWizard() {
         headers: { 'Content-Type': 'application/json' },
       });
       if (!response.ok) throw new Error('Erreur API');
-      window.location.href = '/';
+      router.push('/');
     } catch (e) {
       console.error(e);
       setIsSaving(false);
-      alert('Erreur lors de la sauvegarde.');
+      showToast('Erreur lors de la sauvegarde.');
     }
   };
 

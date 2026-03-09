@@ -1,64 +1,11 @@
 'use client';
 
-import {
-  History,
-  CheckCircle,
-  AlertTriangle,
-  XCircle,
-  Trash2,
-  ThumbsUp,
-  ThumbsDown,
-  RotateCcw,
-} from 'lucide-react';
+import { Trash2, ThumbsUp, ThumbsDown, RotateCcw } from 'lucide-react';
 import Card from '@/app/components/ui/Card';
 import Badge from '@/app/components/ui/Badge';
 import { formatCurrency } from '@/app/lib/definitions';
-
-const getTheme = (verdict: string) => {
-  switch (verdict) {
-    case 'green':
-      return {
-        icon: CheckCircle,
-        color: 'text-emerald-600',
-        bg: 'bg-emerald-50',
-        border: 'border-emerald-100',
-        badge: 'bg-emerald-100 text-emerald-700',
-      };
-    case 'orange':
-      return {
-        icon: AlertTriangle,
-        color: 'text-amber-600',
-        bg: 'bg-amber-50',
-        border: 'border-amber-100',
-        badge: 'bg-amber-100 text-amber-700',
-      };
-    case 'red':
-      return {
-        icon: XCircle,
-        color: 'text-rose-600',
-        bg: 'bg-rose-50',
-        border: 'border-rose-100',
-        badge: 'bg-rose-100 text-rose-700',
-      };
-    default:
-      return {
-        icon: History,
-        color: 'text-slate-500',
-        bg: 'bg-slate-50',
-        border: 'border-slate-100',
-        badge: 'bg-slate-100 text-slate-600',
-      };
-  }
-};
-
-const formatDate = (dateString: string) => {
-  if (!dateString) return '-';
-  return new Date(dateString).toLocaleDateString('fr-FR', {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-  });
-};
+import { formatDate } from '@/app/lib/format';
+import { getVerdictTheme } from '@/app/lib/themeUtils';
 
 interface HistoryItem {
   id: string;
@@ -86,7 +33,8 @@ export function HistoryItemCard({
   onOutcome,
 }: HistoryItemCardProps) {
   const outcome = item.outcome;
-  const theme = outcome === 'SATISFIED' ? getTheme('green') : outcome === 'REGRETTED' ? getTheme('red') : getTheme('default');
+  const verdict = outcome === 'SATISFIED' ? 'green' : outcome === 'REGRETTED' ? 'red' : 'default';
+  const theme = getVerdictTheme(verdict);
   const Icon = theme.icon;
 
   return (
@@ -106,13 +54,13 @@ export function HistoryItemCard({
       </button>
 
       <div className="flex items-center gap-4 sm:w-1/4">
-        <div className={`p-3 rounded-xl ${theme.bg} ${theme.color} shrink-0`}>
+        <div className={`p-3 rounded-xl ${theme.bg} ${theme.text} shrink-0`}>
           <Icon size={24} />
         </div>
         <div className="flex flex-col">
           <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Date</span>
           <span className="text-sm font-bold text-slate-700">
-            {formatDate(item.date.toString())}
+            {formatDate(item.date.toString(), 'short')}
           </span>
         </div>
       </div>

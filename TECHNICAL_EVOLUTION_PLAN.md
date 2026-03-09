@@ -222,9 +222,9 @@ Le modèle `AssetHistory` avec son index composite `[assetId, date]` est prêt p
 | Risque | Fichier | Sévérité | Description |
 |--------|---------|----------|-------------|
 | Pages monolithiques | `profile/page.tsx` (643 lignes), `page.tsx` (419 lignes), `goals/page.tsx` (428 lignes) | **MOYENNE** | Mélange de layout, logique, et UI dans un seul fichier. Difficile à tester, à reviewer, et à maintenir. |
-| `alert()` / `confirm()` | `goals/page.tsx`, `simulator/page.tsx`, `history/page.tsx` | **FAIBLE** | Bloquent le thread, non-stylisables, incompatibles avec le PWA feel. |
-| `window.location.href = '/'` | `profile/page.tsx` | **FAIBLE** | Full reload après sauvegarde du profil au lieu de navigation client. Perte de tout l'état en mémoire. |
-| Composants dupliqués | `Badge` dans `page.tsx` (inline) vs `components/ui/Badge.tsx` | **FAIBLE** | Deux implémentations avec des APIs différentes. |
+| ~~`alert()` / `confirm()`~~ | ~~`goals/page.tsx`, `simulator/page.tsx`, `history/page.tsx`~~ | ~~**FAIBLE**~~ | ~~Bloquent le thread, non-stylisables, incompatibles avec le PWA feel.~~ [TERMINÉ G.2] |
+| ~~`window.location.href = '/'`~~ | ~~`profile/page.tsx`~~ | ~~**FAIBLE**~~ | [TERMINÉ G.3] Remplacé par `router.push` dans ProfileWizard. |
+| Composants dupliqués | `Badge` (DashboardClient, EducationalModal), `ContextToggle` (GoalForm, SimulatorForm), `PageLoader` (goals, history, simulator) | **FAIBLE** | Plusieurs implémentations inline. Voir G.4, G.5, G.6. |
 
 ---
 
@@ -600,26 +600,72 @@ Chaque étape est **atomique** : elle peut être livrée indépendamment, testé
 - **Impact** : Aucun changement fonctionnel. Meilleure lisibilité, possibilité de tester chaque composant.
 - **Fichiers touchés** : `app/page.tsx`, `goals/page.tsx`, `profile/page.tsx`, `simulator/page.tsx`, `history/page.tsx`, `DashboardClient.tsx`, nouveaux fichiers composants.
 
-#### G.2 — Remplacer `alert()` / `confirm()` par un système de toast/modal
+#### G.2 — [TERMINÉ] Remplacer `alert()` / `confirm()` par un système de toast/modal
 
 - **Quoi** : Créer un composant `Toast` et un `ConfirmDialog` réutilisables.
 - **Pourquoi** : `alert()` et `confirm()` bloquent le thread, ne sont pas stylisables, et cassent l'expérience PWA. Un toast non-bloquant avec undo est supérieur pour les suppressions.
-- **Impact** : `goals/page.tsx`, `simulator/page.tsx`, `history/page.tsx`, `GoalCard.tsx`.
-- **Fichiers touchés** : Nouveaux `components/ui/Toast.tsx`, `components/ui/ConfirmDialog.tsx`, modification des pages.
+- **Implémentation réalisée** : `Toast.tsx` (ToastProvider + useToast, auto-dismiss 4,5s, variants error/success/info) ; `ConfirmDialog.tsx` (modal contrôlé, variant danger) ; remplacement dans `goals/page.tsx`, `simulator/page.tsx`, `history/page.tsx`, `GoalCard.tsx`, `ProfileWizard.tsx` ; ToastProvider dans `layout.tsx`.
+- **Impact** : `goals/page.tsx`, `simulator/page.tsx`, `history/page.tsx`, `GoalCard.tsx`, `ProfileWizard.tsx`.
+- **Fichiers touchés** : Nouveaux `components/ui/Toast.tsx`, `components/ui/ConfirmDialog.tsx`, modification des pages, `layout.tsx`, `tailwind.config.ts` (animation fade-in).
 
-#### G.3 — Remplacer `window.location.href` par `router.push`
+#### G.3 — [TERMINÉ] Remplacer `window.location.href` par `router.push`
 
 - **Quoi** : Utiliser `useRouter().push('/')` au lieu de `window.location.href = '/'` dans `profile/page.tsx`.
 - **Pourquoi** : Le full reload détruit tout le state React, force un re-téléchargement du JS, et produit un flash blanc. La navigation client préserve le state et est instantanée.
 - **Impact** : `profile/page.tsx` (1 ligne).
-- **Fichiers touchés** : `profile/page.tsx`.
+- **Fichiers touchés** : `app/components/profile/ProfileWizard.tsx` (code extrait lors de G.1).
 
-#### G.4 — Unifier le composant `Badge`
+#### G.4 — [TERMINÉ] Unifier le composant `Badge`
 
-- **Quoi** : Supprimer le `Badge` inline dans `page.tsx` et utiliser exclusivement `components/ui/Badge.tsx`.
-- **Pourquoi** : Deux implémentations = deux surfaces de maintenance. L'inline dans `page.tsx` a une API différente du composant partagé.
-- **Impact** : `app/page.tsx`, `components/ui/Badge.tsx`.
-- **Fichiers touchés** : `app/page.tsx`.
+- **Quoi** : Supprimer le `Badge` inline dans `DashboardClient.tsx` et `EducationalModal.tsx` et utiliser exclusivement `components/ui/Badge.tsx`.
+- **Pourquoi** : Deux implémentations = deux surfaces de maintenance. L'inline a une API différente (tokens sémantiques indigo/emerald/rose/amber) du composant partagé.
+- **Impact** : Étendre `Badge.tsx` pour accepter les tokens sémantiques ; supprimer les définitions inline.
+- **Fichiers touchés** : `components/ui/Badge.tsx`, `DashboardClient.tsx`, `EducationalModal.tsx`.
+- **Implémentation réalisée** : `Badge.tsx` étendu avec `SEMANTIC_COLORS` (indigo, emerald, rose, amber) ; style pill (`rounded-full`) pour les tokens sémantiques ; rétrocompatibilité préservée pour les classes Tailwind brutes (HistoryItemCard, etc.). 125 tests au vert.
+
+#### G.5 — [TERMINÉ] Unifier le composant `ContextToggle`
+
+- **Quoi** : Extraire le `ContextToggle` dupliqué dans `GoalForm.tsx` et `SimulatorForm.tsx` vers `components/ui/ContextToggle.tsx`.
+- **Pourquoi** : Même structure, seule la couleur diffère (emerald vs indigo). Une seule surface de maintenance.
+- **Implémentation** : Créer `ContextToggle.tsx` avec prop `variant?: 'emerald' | 'indigo'`.
+- **Fichiers touchés** : Nouveau `components/ui/ContextToggle.tsx`, `GoalForm.tsx`, `SimulatorForm.tsx`.
+- **Implémentation réalisée** : `ContextToggle.tsx` avec `VARIANT_STYLES` (emerald, indigo). GoalForm utilise `variant="emerald"`, SimulatorForm utilise le défaut `indigo`. 125 tests au vert.
+
+#### G.6 — [TERMINÉ] Unifier le composant `PageLoader`
+
+- **Quoi** : Extraire le spinner de chargement répété dans `goals/page.tsx`, `history/page.tsx`, `simulator/page.tsx` vers `components/ui/PageLoader.tsx`.
+- **Pourquoi** : Même bloc `animate-pulse h-12 w-12 bg-slate-200 rounded-full` copié-collé trois fois.
+- **Fichiers touchés** : Nouveau `components/ui/PageLoader.tsx`, `goals/page.tsx`, `history/page.tsx`, `simulator/page.tsx`.
+- **Implémentation réalisée** : `PageLoader.tsx` avec `min-h-[50vh]` et spinner. 125 tests au vert.
+
+#### G.7 — [TERMINÉ] Centraliser `formatDate` dans `lib/format.ts`
+
+- **Quoi** : Créer un module `lib/format.ts` avec des presets de formatage de dates (short, long, monthYear, etc.) et remplacer les usages dispersés.
+- **Pourquoi** : `toLocaleDateString` et `format` (date-fns) sont utilisés de façon incohérente dans HistoryItemCard, GoalCard, GoalItemCard, GoalProjectionChart, CalendarView, AssetChart.
+- **Implémentation** : `formatDate(date: Date | string, preset: 'short' | 'long' | 'monthYear' | 'weekday')` avec locale fr-FR.
+- **Fichiers touchés** : Nouveau `lib/format.ts`, `HistoryItemCard.tsx`, `GoalCard.tsx`, `GoalItemCard.tsx`, `GoalProjectionChart.tsx`, `CalendarView.tsx`, `AssetChart.tsx`.
+- **Implémentation réalisée** : `lib/format.ts` avec 6 presets (short, long, monthYear, monthYear2Digit, monthLongYear, weekdayShort). AssetChart n'utilise plus date-fns pour le formatage. 125 tests au vert.
+
+#### G.8 — [TERMINÉ] Extraire `GlassCard` dans `components/ui/`
+
+- **Quoi** : Extraire le composant `GlassCard` défini inline dans `DashboardClient.tsx` vers `components/ui/GlassCard.tsx`.
+- **Pourquoi** : Réutilisable pour d'autres écrans nécessitant le même style (bordure, ombre, hover).
+- **Fichiers touchés** : Nouveau `components/ui/GlassCard.tsx`, `DashboardClient.tsx`.
+- **Implémentation réalisée** : `GlassCard.tsx` avec props `children`, `className`, `onClick`. 125 tests au vert.
+
+#### G.9 — [TERMINÉ] Extraire `SimpleTooltip` dans `components/ui/Tooltip.tsx`
+
+- **Quoi** : Extraire le `SimpleTooltip` défini dans `SafeToSpendGauge.tsx` vers `components/ui/Tooltip.tsx`.
+- **Pourquoi** : Réutilisable pour toute infobulle (icône "?" ou autre) dans l'application.
+- **Fichiers touchés** : Nouveau `components/ui/Tooltip.tsx`, `SafeToSpendGauge.tsx`.
+- **Implémentation réalisée** : `Tooltip.tsx` avec prop `text`. Le parent doit avoir `group relative` pour le hover. 125 tests au vert.
+
+#### G.10 — [TERMINÉ] Extraire `LoadingState` et `EmptyState` dans `components/ui/`
+
+- **Quoi** : Extraire les composants `LoadingState` et `EmptyState` définis dans `CalendarView.tsx` vers `components/ui/LoadingState.tsx` et `EmptyState.tsx`.
+- **Pourquoi** : Réutilisables pour toute vue nécessitant un état de chargement ou vide (liste, calendrier, etc.).
+- **Fichiers touchés** : Nouveaux `components/ui/LoadingState.tsx`, `components/ui/EmptyState.tsx`, `CalendarView.tsx`.
+- **Implémentation réalisée** : `LoadingState.tsx` (prop `message`), `EmptyState.tsx` (prop `message` optionnelle). 125 tests au vert.
 
 ---
 
@@ -627,19 +673,21 @@ Chaque étape est **atomique** : elle peut être livrée indépendamment, testé
 
 > Priorité : **MOYENNE** (devient HAUTE au-delà de 1 000 utilisateurs).
 
-#### H.1 — Ajouter les index manquants
+#### H.1 — [TERMINÉ] Ajouter les index manquants
 
 - **Quoi** : Ajouter `@@index([profileId, deadline])` sur `FinancialGoal` et `@@index([profileId, date])` sur `PurchaseDecision`.
 - **Pourquoi** : Les requêtes de tri par date (objectifs proches, historique récent) font un full scan de la table sans index.
 - **Impact** : Migration Prisma, aucun changement de code applicatif.
 - **Fichiers touchés** : `schema.prisma`.
+- **Implémentation réalisée** : Index composites ajoutés dans `schema.prisma`. Migration `20260309120000_add_missing_indexes` créée. 125 tests au vert. **Note** : Si `prisma migrate deploy` échoue (historique désynchronisé), appliquer manuellement le SQL de la migration ou baseliner la DB.
 
-#### H.2 — Implémenter la pagination cursor-based sur les décisions
+#### H.2 — [TERMINÉ] Implémenter la pagination cursor-based sur les décisions
 
 - **Quoi** : Modifier `GET /api/decisions` pour supporter `?cursor=xxx&limit=20`.
 - **Pourquoi** : Un utilisateur avec 500 décisions charge tout en un seul GET via `getFullUserProfile`. La pagination réduit la charge DB et le temps de transfert.
 - **Impact** : `services/decisionService.ts` (nouveau `listDecisions`), `api/decisions/route.ts` (GET handler), `history/page.tsx` (infinite scroll).
 - **Fichiers touchés** : `decisionService.ts`, `api/decisions/route.ts`, `history/page.tsx`.
+- **Implémentation réalisée** : `listDecisions(userId, { cursor?, limit? })` et `getDecisionsStats(userId)` dans `decisionService.ts` ; GET handler avec `listDecisionsQuerySchema` ; `history/page.tsx` avec fetch paginé, infinite scroll (IntersectionObserver), stats depuis l'API, mises à jour optimistes sur delete/outcome. Tests Blind & Logic dans `decisionService.test.ts` et `validations.test.ts`. 135 tests au vert.
 
 ---
 
@@ -647,7 +695,7 @@ Chaque étape est **atomique** : elle peut être livrée indépendamment, testé
 
 > Priorité : **BASSE** (valeur produit très élevée, effort important).
 
-#### I.1 — Créer `app/lib/proactive.ts`
+#### I.1 — [TERMINÉ] Créer `app/lib/proactive.ts`
 
 - **Quoi** : Un module qui analyse le profil et génère des insights datés :
   - `detectDanger(profile, budget)` → alertes de découvert imminent
@@ -665,12 +713,13 @@ Chaque étape est **atomique** : elle peut être livrée indépendamment, testé
 - **Impact** : `proactive.ts`, notifications PWA via le service worker existant.
 - **Fichiers touchés** : `proactive.ts`, `public/sw.js` (push notifications).
 
-#### I.3 — Notifications PWA
+#### I.3 — [TERMINÉ] Notifications PWA
 
 - **Quoi** : Envoyer des push notifications via le service worker pour les alertes proactives.
 - **Pourquoi** : Le service worker (`public/sw.js`) est déjà configuré mais ne gère que le cache. L'ajout de push notifications ferme la boucle proactive.
 - **Impact** : `sw.js`, nouveau `api/notifications/route.ts`, subscription management côté client.
 - **Fichiers touchés** : `sw.js`, nouveau route API, `layout.tsx` (demande de permission).
+- **Implémentation réalisée** : `worker/index.ts` (custom worker next-pwa) — écoute `push` et `notificationclick` ; `api/notifications/route.ts` — GET (clé VAPID publique), POST (subscription) ; `notificationService.ts` — savePushSubscription, sendPushForInsight (web-push) ; modèle Prisma `PushSubscription` ; `PushNotificationPrompt.tsx` — demande permission, subscribe, POST ; intégration dans `insightService.storeInsights` (envoi push pour nouvel insight). Variables : `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` (générer avec `npx web-push generate-vapid-keys`). Tests : `notificationService.test.ts`, `pushSubscriptionSchema` dans validations.test.ts. 158 tests au vert.
 
 ---
 

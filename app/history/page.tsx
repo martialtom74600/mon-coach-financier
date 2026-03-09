@@ -1,79 +1,171 @@
 'use client';
 
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { History, Calendar as CalendarIcon, List, LayoutGrid, ArrowRight } from 'lucide-react';
+import { History, Calendar as CalendarIcon, List, LayoutGrid } from 'lucide-react';
 import { useFinancialData } from '@/app/hooks/useFinancialData';
 import { generateTimeline } from '@/app/lib/logic';
-import Button from '@/app/components/ui/Button';
+import ConfirmDialog from '@/app/components/ui/ConfirmDialog';
+import PageLoader from '@/app/components/ui/PageLoader';
+import { useConfirmDelete } from '@/app/hooks/useConfirmDelete';
 import CalendarView from '@/app/components/CalendarView';
 import { HistoryStats } from '@/app/components/history/HistoryStats';
 import { HistoryItemCard } from '@/app/components/history/HistoryItemCard';
+import EmptyListState from '@/app/components/ui/EmptyListState';
+import ViewModeToggle from '@/app/components/ui/ViewModeToggle';
+import { decisionsListResponseSchema, parseAPIResponse } from '@/app/lib/validations';
+
+interface DecisionItem {
+  id: string;
+  name: string;
+  amount: number;
+  date: string;
+  type: string;
+  paymentMode: string;
+  outcome?: string;
+}
+
+interface DecisionsStats {
+  total: number;
+  accepted: number;
+  rejected: number;
+  amountTotal: number;
+}
 
 export default function HistoryPage() {
   const router = useRouter();
   const { profile, isLoaded, deleteDecision, updateDecisionOutcome } = useFinancialData();
-  const history = useMemo(() => profile?.decisions || [], [profile?.decisions]);
+  const historyForTimeline = useMemo(() => profile?.decisions || [], [profile?.decisions]);
 
   const [viewMode, setViewMode] = useState<'list' | 'calendar'>('calendar');
+  const [decisions, setDecisions] = useState<DecisionItem[]>([]);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [stats, setStats] = useState<DecisionsStats>({ total: 0, accepted: 0, rejected: 0, amountTotal: 0 });
+  const [isLoadingDecisions, setIsLoadingDecisions] = useState(true);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
   const [updatingOutcome, setUpdatingOutcome] = useState<string | null>(null);
+  const loadMoreRef = useRef<HTMLDivElement>(null);
+  const { state: confirmDelete, openConfirm, closeConfirm, wrapConfirm } = useConfirmDelete();
+
+  const fetchDecisions = useCallback(async (cursor?: string) => {
+    const url = cursor ? `/api/decisions?cursor=${cursor}&limit=20` : '/api/decisions?limit=20';
+    const res = await fetch(url);
+    if (!res.ok) return;
+    const raw = await res.json();
+    const validated = parseAPIResponse(decisionsListResponseSchema, raw, 'GET /api/decisions');
+    if (!validated) return;
+    return validated;
+  }, []);
+
+  useEffect(() => {
+    if (!isLoaded) return;
+    setIsLoadingDecisions(true);
+    fetchDecisions().then((data) => {
+      if (data) {
+        setDecisions(data.decisions as DecisionItem[]);
+        setNextCursor(data.nextCursor);
+        setStats(data.stats);
+      }
+      setIsLoadingDecisions(false);
+    });
+  }, [isLoaded, fetchDecisions]);
+
+  useEffect(() => {
+    if (!nextCursor || isLoadingMore) return;
+    const el = loadMoreRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (!entries[0]?.isIntersecting) return;
+        setIsLoadingMore(true);
+        fetchDecisions(nextCursor).then((data) => {
+          if (data) {
+            setDecisions((prev) => [...prev, ...(data.decisions as DecisionItem[])]);
+            setNextCursor(data.nextCursor);
+            if (data.stats) setStats(data.stats);
+          }
+          setIsLoadingMore(false);
+        });
+      },
+      { rootMargin: '100px', threshold: 0.1 },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [nextCursor, isLoadingMore, fetchDecisions]);
 
   const timeline = useMemo(() => {
     if (!profile) return [];
     try {
-      return generateTimeline(profile, Array.isArray(history) ? history : [], [], 730);
+      return generateTimeline(profile, Array.isArray(historyForTimeline) ? historyForTimeline : [], [], 730);
     } catch (e) {
       console.error('Erreur Timeline History:', e);
       return [];
     }
-  }, [profile, history]);
+  }, [profile, historyForTimeline]);
 
-  const sortedHistory = useMemo(() => {
-    return [...history].sort((a, b) => {
-      const dateA = new Date(a.date).getTime();
-      const dateB = new Date(b.date).getTime();
-      return dateB - dateA;
-    });
-  }, [history]);
-
-  const stats = useMemo(() => {
-    const total = sortedHistory.length;
-    const amountTotal = sortedHistory.reduce((acc, h) => acc + (h.amount || 0), 0);
-    const accepted = sortedHistory.filter((h) => (h as { outcome?: string }).outcome === 'SATISFIED').length;
-    const rejected = sortedHistory.filter((h) => (h as { outcome?: string }).outcome === 'REGRETTED').length;
-    return { total, accepted, rejected, amountTotal };
-  }, [sortedHistory]);
-
-  const handleDelete = async (id: string, e: React.MouseEvent) => {
+  const handleDelete = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (window.confirm('Veux-tu vraiment supprimer cette simulation ?')) {
-      setIsDeleting(id);
-      try {
-        await deleteDecision(id);
-      } catch (error) {
-        console.error('Erreur suppression', error);
-      } finally {
-        setIsDeleting(null);
-      }
-    }
+    openConfirm(id);
   };
 
+  const handleConfirmDelete = wrapConfirm(async (id) => {
+    const item = decisions.find((d) => d.id === id);
+    setIsDeleting(id);
+    setDecisions((prev) => prev.filter((d) => d.id !== id));
+    if (item) {
+      setStats((prev) => ({
+        ...prev,
+        total: Math.max(0, prev.total - 1),
+        amountTotal: Math.max(0, prev.amountTotal - (item.amount || 0)),
+      }));
+    }
+    try {
+      await deleteDecision(id);
+    } catch (error) {
+      console.error('Erreur suppression', error);
+      fetchDecisions().then((data) => {
+        if (data) {
+          setDecisions(data.decisions as DecisionItem[]);
+          setNextCursor(data.nextCursor);
+          setStats(data.stats);
+        }
+      });
+    } finally {
+      setIsDeleting(null);
+    }
+  });
+
   const handleOutcome = async (id: string, outcome: 'SATISFIED' | 'REGRETTED' | null) => {
+    const item = decisions.find((d) => d.id === id);
+    const prevOutcome = item?.outcome;
     setUpdatingOutcome(id);
+    setDecisions((prev) =>
+      prev.map((d) => (d.id === id ? { ...d, outcome: outcome ?? undefined } : d)),
+    );
+    if (item) {
+      setStats((prev) => {
+        let accepted = prev.accepted;
+        let rejected = prev.rejected;
+        if (prevOutcome === 'SATISFIED') accepted--;
+        if (prevOutcome === 'REGRETTED') rejected--;
+        if (outcome === 'SATISFIED') accepted++;
+        if (outcome === 'REGRETTED') rejected++;
+        return { ...prev, accepted, rejected };
+      });
+    }
     try {
       await updateDecisionOutcome(id, outcome);
+    } catch {
+      fetchDecisions().then((data) => {
+        if (data) setStats(data.stats);
+      });
     } finally {
       setUpdatingOutcome(null);
     }
   };
 
-  if (!isLoaded)
-    return (
-      <div className="min-h-[50vh] flex items-center justify-center">
-        <div className="animate-pulse h-12 w-12 bg-slate-200 rounded-full"></div>
-      </div>
-    );
+  if (!isLoaded) return <PageLoader />;
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start animate-fade-in pb-12">
@@ -82,58 +174,69 @@ export default function HistoryPage() {
           <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
             <History className="text-indigo-500" /> Vision Financière
           </h2>
-          <div className="bg-white p-1 rounded-xl border border-slate-200 flex gap-1 self-start sm:self-auto shadow-sm">
-            <button
-              onClick={() => setViewMode('calendar')}
-              className={`px-3 py-2 rounded-lg text-sm font-bold flex items-center gap-2 transition-all ${viewMode === 'calendar' ? 'bg-indigo-50 text-indigo-600 shadow-sm' : 'text-slate-500 hover:bg-slate-50'}`}
-            >
-              <CalendarIcon size={16} /> Calendrier
-            </button>
-            <button
-              onClick={() => setViewMode('list')}
-              className={`px-3 py-2 rounded-lg text-sm font-bold flex items-center gap-2 transition-all ${viewMode === 'list' ? 'bg-indigo-50 text-indigo-600 shadow-sm' : 'text-slate-500 hover:bg-slate-50'}`}
-            >
-              <List size={16} /> Historique
-            </button>
-          </div>
+          <ViewModeToggle
+            value={viewMode}
+            onChange={(v) => setViewMode(v)}
+            options={[
+              { value: 'calendar', label: 'Calendrier', icon: CalendarIcon },
+              { value: 'list', label: 'Historique', icon: List },
+            ]}
+            className="self-start sm:self-auto"
+          />
         </div>
 
         {viewMode === 'calendar' && <CalendarView timeline={timeline} />}
 
         {viewMode === 'list' && (
           <div className="space-y-4 animate-fade-in">
-            {sortedHistory.length === 0 ? (
-              <div className="text-center py-20 opacity-60 bg-white rounded-3xl border border-slate-200 border-dashed">
-                <div className="bg-slate-50 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6">
-                  <LayoutGrid size={32} className="text-slate-400" />
-                </div>
-                <h3 className="text-xl font-bold text-slate-800 mb-2">{"C'est encore vide ici"}</h3>
-                <p className="text-slate-500 max-w-xs mx-auto mb-8">
-                  {"Tes futures simulations s'afficheront ici."}
-                </p>
-                <Button onClick={() => router.push('/simulator')}>
-                  Faire une simulation <ArrowRight size={18} />
-                </Button>
-              </div>
+            {isLoadingDecisions ? (
+              <PageLoader />
+            ) : decisions.length === 0 ? (
+              <EmptyListState
+                icon={LayoutGrid}
+                title="C'est encore vide ici"
+                message="Tes futures simulations s'afficheront ici."
+                buttonLabel="Faire une simulation"
+                onAction={() => router.push('/simulator')}
+              />
             ) : (
-              sortedHistory.map((item) => (
-                <HistoryItemCard
-                  key={item.id}
-                  item={{
-                    ...item,
-                    outcome: (item as { outcome?: string }).outcome,
-                  }}
-                  isDeleting={isDeleting === item.id}
-                  isUpdating={updatingOutcome === item.id}
-                  onDelete={handleDelete}
-                  onOutcome={handleOutcome}
-                />
-              ))
+              <>
+                {decisions.map((item) => (
+                  <HistoryItemCard
+                    key={item.id}
+                    item={{
+                      ...item,
+                      outcome: item.outcome,
+                    }}
+                    isDeleting={isDeleting === item.id}
+                    isUpdating={updatingOutcome === item.id}
+                    onDelete={handleDelete}
+                    onOutcome={handleOutcome}
+                  />
+                ))}
+                {nextCursor && (
+                  <div ref={loadMoreRef} className="flex justify-center py-4">
+                    {isLoadingMore && (
+                      <div className="h-8 w-8 animate-spin rounded-full border-2 border-indigo-500 border-t-transparent" />
+                    )}
+                  </div>
+                )}
+              </>
             )}
           </div>
         )}
       </div>
 
+      <ConfirmDialog
+        open={confirmDelete.open}
+        title="Supprimer cette simulation ?"
+        message="Veux-tu vraiment supprimer cette simulation ?"
+        confirmLabel="Supprimer"
+        cancelLabel="Annuler"
+        variant="danger"
+        onConfirm={handleConfirmDelete}
+        onCancel={closeConfirm}
+      />
       <div className="lg:col-span-4 space-y-6 lg:sticky lg:top-24">
         <HistoryStats
           total={stats.total}
