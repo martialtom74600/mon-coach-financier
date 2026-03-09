@@ -587,16 +587,18 @@ Chaque étape est **atomique** : elle peut être livrée indépendamment, testé
 
 > Priorité : **MOYENNE**. Maintenabilité et testabilité.
 
-#### G.1 — Découper les pages monolithiques
+#### G.1 — [TERMINÉ] Découper les pages monolithiques
 
 - **Quoi** : Extraire les sous-composants des pages > 400 lignes.
 - **Pourquoi** : `profile/page.tsx` (643 lignes) contient 6 steps de wizard, chacun étant un composant implicite. `page.tsx` (419 lignes) contient le dashboard, le gauge, le score, les cards — tous en ligne.
 - **Plan de découpe** :
   - `profile/page.tsx` → `ProfileWizard.tsx` + `steps/StepIdentity.tsx`, `StepSituation.tsx`, `StepFixedCosts.tsx`, `StepDailyLife.tsx`, `StepAssets.tsx`, `StepStrategy.tsx`
-  - `page.tsx` → `DashboardClient.tsx` + `SafeToSpendGauge.tsx`, `HealthScoreCard.tsx`, `OpportunityList.tsx`, `WealthChart.tsx`
-  - `goals/page.tsx` → `GoalsPage.tsx` + `GoalForm.tsx`, `GoalSimulation.tsx`, `GoalBudgetSidebar.tsx`
+  - `DashboardClient.tsx` → `SafeToSpendGauge.tsx`, `WealthChart.tsx`, `EducationalModal.tsx`
+  - `goals/page.tsx` → `GoalForm.tsx`, `GoalSimulation.tsx`, `GoalBudgetSidebar.tsx`, `GoalItemCard.tsx`, `GoalProjectionChart.tsx`
+  - `simulator/page.tsx` → `SimulatorForm.tsx`, `PurchaseRecap.tsx`, `DiagnosticCard.tsx`
+  - `history/page.tsx` → `HistoryStats.tsx`, `HistoryItemCard.tsx`
 - **Impact** : Aucun changement fonctionnel. Meilleure lisibilité, possibilité de tester chaque composant.
-- **Fichiers touchés** : `app/page.tsx`, `goals/page.tsx`, `profile/page.tsx`, nouveaux fichiers composants.
+- **Fichiers touchés** : `app/page.tsx`, `goals/page.tsx`, `profile/page.tsx`, `simulator/page.tsx`, `history/page.tsx`, `DashboardClient.tsx`, nouveaux fichiers composants.
 
 #### G.2 — Remplacer `alert()` / `confirm()` par un système de toast/modal
 

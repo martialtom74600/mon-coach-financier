@@ -2,207 +2,59 @@
 
 import React, { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { 
-  AreaChart, Area, XAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer 
-} from 'recharts';
-
 import { Profile } from '@/app/lib/definitions';
-import { 
-  computeFinancialPlan, 
-  analyzeProfileHealth, 
+import {
+  computeFinancialPlan,
+  analyzeProfileHealth,
   DeepAnalysis,
   OptimizationOpportunity,
-  ActionGuide,
-  formatCurrency
+  formatCurrency,
 } from '@/app/lib/logic';
 import { generateTimeline } from '@/app/lib/scenarios';
+import { TrendingUp, ArrowRight, Target, ShieldCheck, Zap, Crown } from 'lucide-react';
+import { SafeToSpendGauge } from '@/app/components/dashboard/SafeToSpendGauge';
+import { WealthChart } from '@/app/components/dashboard/WealthChart';
+import { EducationalModal } from '@/app/components/dashboard/EducationalModal';
+import type { ActionGuide } from '@/app/lib/definitions';
 
-import {
-  TrendingUp, ArrowRight, Target,
-  ShieldCheck, Zap, Crown,
-  X, BookOpen, CheckSquare, Lightbulb, AlertTriangle
-} from 'lucide-react';
-
-// ============================================================================
-// 0. UI MICRO-COMPONENTS
-// ============================================================================
-
-interface GlassCardProps {
+const GlassCard = ({
+  children,
+  className = '',
+  onClick,
+}: {
   children: React.ReactNode;
   className?: string;
   onClick?: () => void;
-}
-
-const GlassCard = ({ children, className = "", onClick }: GlassCardProps) => (
-  <div onClick={onClick} className={`bg-white border border-slate-100 shadow-sm rounded-3xl p-6 transition-all duration-300 hover:shadow-xl hover:border-indigo-100 hover:-translate-y-0.5 ${className}`}>
+}) => (
+  <div
+    onClick={onClick}
+    className={`bg-white border border-slate-100 shadow-sm rounded-3xl p-6 transition-all duration-300 hover:shadow-xl hover:border-indigo-100 hover:-translate-y-0.5 ${className}`}
+  >
     {children}
   </div>
 );
 
-const Badge = ({ children, color = "indigo" }: { children: React.ReactNode, color?: "indigo"|"emerald"|"rose"|"amber" }) => {
-    const colors = {
-        indigo: "bg-indigo-50 text-indigo-700 border-indigo-100",
-        emerald: "bg-emerald-50 text-emerald-700 border-emerald-100",
-        rose: "bg-rose-50 text-rose-700 border-rose-100",
-        amber: "bg-amber-50 text-amber-700 border-amber-100",
-    };
-    return (
-        <span className={`px-2.5 py-1 rounded-full text-[11px] font-bold uppercase tracking-wider border ${colors[color]}`}>
-            {children}
-        </span>
-    );
+const Badge = ({
+  children,
+  color = 'indigo',
+}: {
+  children: React.ReactNode;
+  color?: 'indigo' | 'emerald' | 'rose' | 'amber';
+}) => {
+  const colors = {
+    indigo: 'bg-indigo-50 text-indigo-700 border-indigo-100',
+    emerald: 'bg-emerald-50 text-emerald-700 border-emerald-100',
+    rose: 'bg-rose-50 text-rose-700 border-rose-100',
+    amber: 'bg-amber-50 text-amber-700 border-amber-100',
+  };
+  return (
+    <span
+      className={`px-2.5 py-1 rounded-full text-[11px] font-bold uppercase tracking-wider border ${colors[color]}`}
+    >
+      {children}
+    </span>
+  );
 };
-
-const SimpleTooltip = ({ text }: { text: string }) => (
-    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 px-3 py-1.5 bg-slate-800 text-white text-xs font-bold rounded-lg opacity-0 group-hover:opacity-100 transition-all duration-200 transform group-hover:translate-y-0 translate-y-1 whitespace-nowrap pointer-events-none z-20 shadow-xl">
-        {text}
-        <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-slate-800"></div>
-    </div>
-);
-
-// ============================================================================
-// 1. BUSINESS COMPONENTS
-// ============================================================================
-
-interface SafeToSpendGaugeProps {
-  currentBalance: number;
-  upcomingFixed: number;
-  upcomingSavings: number;
-  safeToSpend: number;
-  endOfMonthProjection: number;
-}
-
-const SafeToSpendGauge = ({ currentBalance, upcomingFixed, upcomingSavings, safeToSpend, endOfMonthProjection }: SafeToSpendGaugeProps) => {
-    const total = Math.max(currentBalance, 1); 
-    const fixedPct = Math.min((upcomingFixed / total) * 100, 100);
-    const safePct = Math.max(0, 100 - fixedPct - ((upcomingSavings / total) * 100));
-    const savingsPct = Math.min((upcomingSavings / total) * 100, 100 - fixedPct);
-
-    const statusColor = safeToSpend < 0 ? 'text-rose-600' : (safeToSpend < 200 ? 'text-amber-600' : 'text-emerald-600');
-    const barColor = safeToSpend < 0 ? 'bg-rose-500' : (safeToSpend < 200 ? 'bg-amber-400' : 'bg-emerald-400');
-
-    return (
-        <div className="w-full">
-            <div className="flex flex-col sm:flex-row sm:items-end justify-between mb-6 gap-4">
-                <div>
-                    <div className="flex items-center gap-2 mb-1">
-                        <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Disponible Sécurisé</span>
-                        <div className="group relative cursor-help">
-                            <div className="w-4 h-4 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center text-[10px] font-bold">?</div>
-                            <SimpleTooltip text="Solde actuel - Charges à venir ce mois-ci" />
-                        </div>
-                    </div>
-                    <div className={`text-6xl font-black tracking-tighter ${statusColor}`}>
-                        {formatCurrency(safeToSpend)}
-                    </div>
-                    <div className="flex items-center gap-2 mt-2">
-                        {endOfMonthProjection < 0 ? (
-                            <span className="text-xs font-bold text-rose-600 bg-rose-50 px-2 py-1 rounded-lg flex items-center gap-1">
-                                <AlertTriangle size={12}/> Fin de mois à découvert ({formatCurrency(endOfMonthProjection)})
-                            </span>
-                        ) : (
-                            <span className="text-xs font-medium text-slate-400">
-                                Projection fin de mois : <span className="font-bold text-slate-600">{formatCurrency(endOfMonthProjection)}</span>
-                            </span>
-                        )}
-                    </div>
-                </div>
-                <div className="text-right p-3 bg-slate-50 rounded-xl border border-slate-100 min-w-[140px]">
-                    <div className="text-[10px] font-bold text-slate-400 uppercase mb-1">Solde Banque (J)</div>
-                    <div className="font-black text-slate-900 text-xl">{formatCurrency(currentBalance)}</div>
-                </div>
-            </div>
-            <div className="space-y-2">
-                <div className="h-4 w-full bg-slate-100 rounded-full overflow-hidden flex relative">
-                    <div style={{ width: `${fixedPct}%` }} className="h-full bg-slate-300 relative group border-r border-white/50">
-                         <SimpleTooltip text={`Réservé pour factures à venir: ${formatCurrency(upcomingFixed)}`} />
-                    </div>
-                    <div style={{ width: `${savingsPct}%` }} className="h-full bg-indigo-300 relative group border-r border-white/50">
-                         <SimpleTooltip text={`Réservé pour épargne: ${formatCurrency(upcomingSavings)}`} />
-                    </div>
-                    <div style={{ width: `${safePct}%` }} className={`h-full ${barColor} relative group`}>
-                         <SimpleTooltip text={`Libre pour le plaisir: ${formatCurrency(safeToSpend)}`} />
-                    </div>
-                </div>
-                <div className="flex justify-between text-[10px] font-bold text-slate-400 uppercase tracking-wider px-1">
-                    <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-slate-300"></div> Réservé (Fixe)</div>
-                    <div className="flex items-center gap-1.5"><div className={`w-2 h-2 rounded-full ${barColor}`}></div> Disponible</div>
-                </div>
-            </div>
-        </div>
-    );
-};
-
-const EducationalModal = ({ guide, onClose }: { guide: ActionGuide | null, onClose: () => void }) => {
-    if (!guide) return null;
-
-    return (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-in fade-in duration-200" onClick={onClose}>
-            <div className="bg-white rounded-[2rem] shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh] animate-in slide-in-from-bottom-8 duration-300 scale-100" onClick={e => e.stopPropagation()}>
-                <div className="bg-slate-900 p-8 text-white relative overflow-hidden shrink-0">
-                    <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/20 rounded-full blur-3xl -mr-16 -mt-16"></div>
-                    <div className="relative z-10 flex gap-5">
-                        <div className="p-3.5 bg-white/10 rounded-2xl backdrop-blur-md shrink-0 border border-white/10 shadow-inner">
-                            <BookOpen size={28} className="text-indigo-300" />
-                        </div>
-                        <div>
-                            <h3 className="text-2xl font-bold leading-tight mb-2">{guide.title}</h3>
-                            <p className="text-slate-300 text-sm leading-relaxed max-w-sm">{guide.definition}</p>
-                            <div className="flex gap-2 mt-4">
-                                {guide.difficulty && <Badge color="indigo">{guide.difficulty}</Badge>}
-                                {guide.impact && <Badge color="emerald">{guide.impact}</Badge>}
-                            </div>
-                        </div>
-                    </div>
-                    <button onClick={onClose} className="absolute top-5 right-5 p-2 text-slate-400 hover:text-white transition-colors rounded-full hover:bg-white/10">
-                        <X size={24} />
-                    </button>
-                </div>
-                <div className="overflow-y-auto custom-scrollbar p-8 space-y-8 bg-slate-50/50">
-                    <div>
-                        <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2">
-                            <CheckSquare size={16} className="text-indigo-600" /> Plan d&apos;action
-                        </h4>
-                        <div className="space-y-3">
-                            {guide.steps?.map((step: string, i: number) => (
-                                <div key={i} className="flex gap-4 p-4 bg-white rounded-xl border border-slate-100 shadow-sm group hover:border-indigo-100 transition-colors">
-                                    <span className="flex-shrink-0 w-6 h-6 rounded-full bg-indigo-50 text-indigo-600 font-bold flex items-center justify-center text-xs border border-indigo-100 group-hover:bg-indigo-600 group-hover:text-white transition-colors">
-                                        {i + 1}
-                                    </span>
-                                    <span className="text-sm text-slate-700 font-medium leading-relaxed pt-0.5">{step}</span>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                    {guide.tips && guide.tips.length > 0 && (
-                        <div className="bg-amber-50 p-6 rounded-2xl border border-amber-100 shadow-sm">
-                            <h4 className="text-xs font-bold text-amber-700 uppercase tracking-widest mb-4 flex items-center gap-2">
-                                <Lightbulb size={16} /> Le Conseil Pro
-                            </h4>
-                            <ul className="space-y-3">
-                                {guide.tips.map((tip: string, i: number) => (
-                                    <li key={i} className="flex gap-3 text-sm text-slate-700">
-                                        <div className="w-1.5 h-1.5 rounded-full bg-amber-400 mt-1.5 shrink-0" />
-                                        {tip}
-                                    </li>
-                                ))}
-                            </ul>
-                        </div>
-                    )}
-                </div>
-                <div className="p-5 border-t border-slate-100 bg-white flex justify-end shrink-0">
-                    <button onClick={onClose} className="px-8 py-3.5 bg-slate-900 hover:bg-indigo-600 text-white rounded-xl font-bold text-sm transition-all shadow-lg hover:shadow-xl hover:-translate-y-0.5">
-                        C&apos;est noté, je m&apos;y mets
-                    </button>
-                </div>
-            </div>
-        </div>
-    );
-};
-
-// ============================================================================
-// 2. DASHBOARD CLIENT (Server-fed profile)
-// ============================================================================
 
 interface DashboardClientProps {
   profile: Profile | null;
@@ -406,28 +258,7 @@ export default function DashboardClient({ profile, firstName }: DashboardClientP
                                 <div className="text-sm font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded-lg inline-block mt-1">+5% / an (Simulé)</div>
                             </div>
                         </div>
-                        
-                        <div className="h-[200px] w-full">
-                             <ResponsiveContainer width="100%" height="100%">
-                                <AreaChart data={chartData}>
-                                    <defs>
-                                        <linearGradient id="colorWealthGray" x1="0" y1="0" x2="0" y2="1">
-                                            <stop offset="5%" stopColor="#6366f1" stopOpacity={0.1}/>
-                                            <stop offset="95%" stopColor="#6366f1" stopOpacity={0}/>
-                                        </linearGradient>
-                                    </defs>
-                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                                    <XAxis dataKey="year" axisLine={false} tickLine={false} tick={{fontSize: 12, fill: '#94a3b8'}} dy={10} />
-                                    <RechartsTooltip 
-                                        contentStyle={{borderRadius: '16px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)', padding: '12px'}}
-                                        formatter={(val) => [<span key="wealth" className="font-bold text-indigo-600">{formatCurrency(Number(val))}</span>, "Patrimoine"]}
-                                        labelStyle={{display:'none'}}
-                                        cursor={{ stroke: '#6366f1', strokeWidth: 2 }}
-                                    />
-                                    <Area type="monotone" dataKey="amount" stroke="#6366f1" strokeWidth={3} fill="url(#colorWealthGray)" animationDuration={1500} />
-                                </AreaChart>
-                            </ResponsiveContainer>
-                        </div>
+                        <WealthChart data={chartData} />
                     </div>
 
                 </div>

@@ -2,57 +2,38 @@
 
 import React, { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import {
-  History, 
-  Calendar as CalendarIcon, 
-  CheckCircle, 
-  AlertTriangle, 
-  XCircle, 
-  TrendingDown, 
-  ArrowRight, 
-  List,
-  LayoutGrid,
-  Trash2,
-  ThumbsUp,
-  ThumbsDown,
-  RotateCcw
-} from 'lucide-react';
+import { History, Calendar as CalendarIcon, List, LayoutGrid, ArrowRight } from 'lucide-react';
 import { useFinancialData } from '@/app/hooks/useFinancialData';
-import { formatCurrency, generateTimeline } from '@/app/lib/logic'; // Utilise le nouvel export unifié
-
-import Card from '@/app/components/ui/Card';
+import { generateTimeline } from '@/app/lib/logic';
 import Button from '@/app/components/ui/Button';
-import Badge from '@/app/components/ui/Badge';
-import ProgressBar from '@/app/components/ui/ProgressBar';
 import CalendarView from '@/app/components/CalendarView';
+import { HistoryStats } from '@/app/components/history/HistoryStats';
+import { HistoryItemCard } from '@/app/components/history/HistoryItemCard';
 
 export default function HistoryPage() {
   const router = useRouter();
   const { profile, isLoaded, deleteDecision, updateDecisionOutcome } = useFinancialData();
   const history = useMemo(() => profile?.decisions || [], [profile?.decisions]);
-  
+
   const [viewMode, setViewMode] = useState<'list' | 'calendar'>('calendar');
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
   const [updatingOutcome, setUpdatingOutcome] = useState<string | null>(null);
 
-  // --- TIMELINE (Génération sécurisée) ---
   const timeline = useMemo(() => {
     if (!profile) return [];
     try {
-        // On passe l'historique complet pour générer la vue globale
-        return generateTimeline(profile, Array.isArray(history) ? history : [], [], 730);
+      return generateTimeline(profile, Array.isArray(history) ? history : [], [], 730);
     } catch (e) {
-        console.error("Erreur Timeline History:", e);
-        return [];
+      console.error('Erreur Timeline History:', e);
+      return [];
     }
   }, [profile, history]);
 
-  // Tris
   const sortedHistory = useMemo(() => {
     return [...history].sort((a, b) => {
-        const dateA = new Date(a.date).getTime();
-        const dateB = new Date(b.date).getTime();
-        return dateB - dateA;
+      const dateA = new Date(a.date).getTime();
+      const dateB = new Date(b.date).getTime();
+      return dateB - dateA;
     });
   }, [history]);
 
@@ -64,32 +45,17 @@ export default function HistoryPage() {
     return { total, accepted, rejected, amountTotal };
   }, [sortedHistory]);
 
-  // ACTION SUPPRESSION
   const handleDelete = async (id: string, e: React.MouseEvent) => {
-      e.stopPropagation(); 
-      if (window.confirm("Veux-tu vraiment supprimer cette simulation ?")) {
-          setIsDeleting(id);
-          try {
-            await deleteDecision(id);
-          } catch (error) {
-            console.error("Erreur suppression", error);
-          } finally {
-            setIsDeleting(null);
-          }
+    e.stopPropagation();
+    if (window.confirm('Veux-tu vraiment supprimer cette simulation ?')) {
+      setIsDeleting(id);
+      try {
+        await deleteDecision(id);
+      } catch (error) {
+        console.error('Erreur suppression', error);
+      } finally {
+        setIsDeleting(null);
       }
-  };
-
-  const formatDate = (dateString: string) => {
-    if (!dateString) return '-';
-    return new Date(dateString).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' });
-  };
-
-  const getTheme = (verdict: string) => {
-    switch (verdict) {
-      case 'green': return { icon: CheckCircle, color: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-emerald-100', badge: 'bg-emerald-100 text-emerald-700' };
-      case 'orange': return { icon: AlertTriangle, color: 'text-amber-600', bg: 'bg-amber-50', border: 'border-amber-100', badge: 'bg-amber-100 text-amber-700' };
-      case 'red': return { icon: XCircle, color: 'text-rose-600', bg: 'bg-rose-50', border: 'border-rose-100', badge: 'bg-rose-100 text-rose-700' };
-      default: return { icon: History, color: 'text-slate-500', bg: 'bg-slate-50', border: 'border-slate-100', badge: 'bg-slate-100 text-slate-600' };
     }
   };
 
@@ -102,160 +68,79 @@ export default function HistoryPage() {
     }
   };
 
-  if (!isLoaded) return <div className="min-h-[50vh] flex items-center justify-center"><div className="animate-pulse h-12 w-12 bg-slate-200 rounded-full"></div></div>;
+  if (!isLoaded)
+    return (
+      <div className="min-h-[50vh] flex items-center justify-center">
+        <div className="animate-pulse h-12 w-12 bg-slate-200 rounded-full"></div>
+      </div>
+    );
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start animate-fade-in pb-12">
-      
       <div className="lg:col-span-8 space-y-6">
-        
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
-                <History className="text-indigo-500" /> Vision Financière
-            </h2>
-            
-            <div className="bg-white p-1 rounded-xl border border-slate-200 flex gap-1 self-start sm:self-auto shadow-sm">
-                <button onClick={() => setViewMode('calendar')} className={`px-3 py-2 rounded-lg text-sm font-bold flex items-center gap-2 transition-all ${viewMode === 'calendar' ? 'bg-indigo-50 text-indigo-600 shadow-sm' : 'text-slate-500 hover:bg-slate-50'}`}><CalendarIcon size={16} /> Calendrier</button>
-                <button onClick={() => setViewMode('list')} className={`px-3 py-2 rounded-lg text-sm font-bold flex items-center gap-2 transition-all ${viewMode === 'list' ? 'bg-indigo-50 text-indigo-600 shadow-sm' : 'text-slate-500 hover:bg-slate-50'}`}><List size={16} /> Historique</button>
-            </div>
+          <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
+            <History className="text-indigo-500" /> Vision Financière
+          </h2>
+          <div className="bg-white p-1 rounded-xl border border-slate-200 flex gap-1 self-start sm:self-auto shadow-sm">
+            <button
+              onClick={() => setViewMode('calendar')}
+              className={`px-3 py-2 rounded-lg text-sm font-bold flex items-center gap-2 transition-all ${viewMode === 'calendar' ? 'bg-indigo-50 text-indigo-600 shadow-sm' : 'text-slate-500 hover:bg-slate-50'}`}
+            >
+              <CalendarIcon size={16} /> Calendrier
+            </button>
+            <button
+              onClick={() => setViewMode('list')}
+              className={`px-3 py-2 rounded-lg text-sm font-bold flex items-center gap-2 transition-all ${viewMode === 'list' ? 'bg-indigo-50 text-indigo-600 shadow-sm' : 'text-slate-500 hover:bg-slate-50'}`}
+            >
+              <List size={16} /> Historique
+            </button>
+          </div>
         </div>
 
-        {viewMode === 'calendar' && (
-            <CalendarView timeline={timeline} />
-        )}
+        {viewMode === 'calendar' && <CalendarView timeline={timeline} />}
 
         {viewMode === 'list' && (
-            <div className="space-y-4 animate-fade-in">
-                {sortedHistory.length === 0 ? (
-                <div className="text-center py-20 opacity-60 bg-white rounded-3xl border border-slate-200 border-dashed">
-                    <div className="bg-slate-50 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6"><LayoutGrid size={32} className="text-slate-400" /></div>
-                    <h3 className="text-xl font-bold text-slate-800 mb-2">{"C'est encore vide ici"}</h3>
-                    <p className="text-slate-500 max-w-xs mx-auto mb-8">{"Tes futures simulations s'afficheront ici."}</p>
-                    <Button onClick={() => router.push('/simulator')}>Faire une simulation <ArrowRight size={18} /></Button>
+          <div className="space-y-4 animate-fade-in">
+            {sortedHistory.length === 0 ? (
+              <div className="text-center py-20 opacity-60 bg-white rounded-3xl border border-slate-200 border-dashed">
+                <div className="bg-slate-50 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6">
+                  <LayoutGrid size={32} className="text-slate-400" />
                 </div>
-                ) : (
-                sortedHistory.map((item) => {
-                    const outcome = (item as { outcome?: string }).outcome;
-                    const theme = outcome === 'SATISFIED' ? getTheme('green') : outcome === 'REGRETTED' ? getTheme('red') : getTheme('default');
-                    const Icon = theme.icon;
-                    const isUpdating = updatingOutcome === item.id;
-                    
-                    return (
-                    <Card key={item.id} className={`p-5 flex flex-col sm:flex-row gap-4 sm:items-center transition-all hover:shadow-md border-l-4 ${theme.border.replace('border', 'border-l')} relative group`}>
-                        
-                        <button 
-                            onClick={(e) => handleDelete(item.id, e)}
-                            className="absolute top-4 right-4 p-2 bg-white text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-full transition-all opacity-0 group-hover:opacity-100 shadow-sm border border-slate-100"
-                            title="Supprimer cette simulation"
-                        >
-                            {isDeleting === item.id ? <div className="animate-spin h-4 w-4 border-2 border-rose-500 border-t-transparent rounded-full"></div> : <Trash2 size={16} />}
-                        </button>
-
-                        <div className="flex items-center gap-4 sm:w-1/4">
-                            <div className={`p-3 rounded-xl ${theme.bg} ${theme.color} shrink-0`}><Icon size={24} /></div>
-                            <div className="flex flex-col">
-                                <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Date</span>
-                                <span className="text-sm font-bold text-slate-700">{formatDate(item.date.toString())}</span>
-                            </div>
-                        </div>
-
-                        <div className="flex-1">
-                            <h3 className="font-bold text-slate-800 text-lg mb-1">{item.name}</h3>
-                            <div className="flex flex-wrap gap-2">
-                                <Badge color="bg-slate-100 text-slate-600 border border-slate-200">
-                                    {item.type === 'NEED' ? 'Besoin' : item.type === 'OPPORTUNITY' ? 'Utile' : 'Envie'}
-                                </Badge>
-                                <Badge color="bg-slate-100 text-slate-600 border border-slate-200">
-                                    {item.paymentMode === 'CASH_SAVINGS' ? 'Épargne' : 
-                                     item.paymentMode === 'CREDIT' ? 'Crédit' : 'Compte courant'}
-                                </Badge>
-                            </div>
-                            <div className="flex items-center gap-3 mt-3">
-                                <span className="text-xs text-slate-500 font-medium">Cet achat valait le coup ?</span>
-                                <div className="flex items-center gap-1 p-0.5 rounded-xl bg-slate-100/80 border border-slate-200/80">
-                                    <button
-                                        onClick={() => handleOutcome(item.id, 'SATISFIED')}
-                                        disabled={isUpdating}
-                                        title="J'ai bien fait"
-                                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all disabled:opacity-60 disabled:cursor-not-allowed ${outcome === 'SATISFIED' ? 'bg-emerald-500 text-white shadow-sm' : 'text-slate-500 hover:bg-white hover:text-emerald-600'}`}
-                                    >
-                                        <ThumbsUp size={14} strokeWidth={2.5} /><span className="hidden sm:inline">Oui</span>
-                                    </button>
-                                    <button
-                                        onClick={() => handleOutcome(item.id, 'REGRETTED')}
-                                        disabled={isUpdating}
-                                        title="Je regrette"
-                                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all disabled:opacity-60 disabled:cursor-not-allowed ${outcome === 'REGRETTED' ? 'bg-rose-500 text-white shadow-sm' : 'text-slate-500 hover:bg-white hover:text-rose-600'}`}
-                                    >
-                                        <ThumbsDown size={14} strokeWidth={2.5} /><span className="hidden sm:inline">Non</span>
-                                    </button>
-                                    {outcome && (
-                                        <button
-                                            onClick={() => handleOutcome(item.id, null)}
-                                            disabled={isUpdating}
-                                            title="Réinitialiser"
-                                            className="ml-1 p-1.5 rounded-lg text-slate-400 hover:bg-slate-200/60 hover:text-slate-600 transition-colors"
-                                        >
-                                            <RotateCcw size={12} />
-                                        </button>
-                                    )}
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className="text-right flex flex-col items-end gap-1 sm:pr-12">
-                            <div className="font-black text-slate-900 text-xl tracking-tight">
-                                {formatCurrency(item.amount)}
-                            </div>
-                            <Badge color={outcome === 'SATISFIED' ? 'bg-emerald-100 text-emerald-700' : outcome === 'REGRETTED' ? 'bg-rose-100 text-rose-700' : 'bg-slate-100 text-slate-600'}>
-                                {outcome === 'SATISFIED' ? 'Satisfait' : outcome === 'REGRETTED' ? 'Regretté' : 'À évaluer'}
-                            </Badge>
-                        </div>
-                    </Card>
-                    );
-                })
-                )}
-            </div>
+                <h3 className="text-xl font-bold text-slate-800 mb-2">{"C'est encore vide ici"}</h3>
+                <p className="text-slate-500 max-w-xs mx-auto mb-8">
+                  {"Tes futures simulations s'afficheront ici."}
+                </p>
+                <Button onClick={() => router.push('/simulator')}>
+                  Faire une simulation <ArrowRight size={18} />
+                </Button>
+              </div>
+            ) : (
+              sortedHistory.map((item) => (
+                <HistoryItemCard
+                  key={item.id}
+                  item={{
+                    ...item,
+                    outcome: (item as { outcome?: string }).outcome,
+                  }}
+                  isDeleting={isDeleting === item.id}
+                  isUpdating={updatingOutcome === item.id}
+                  onDelete={handleDelete}
+                  onOutcome={handleOutcome}
+                />
+              ))
+            )}
+          </div>
         )}
       </div>
 
-      {/* --- COLONNE DROITE (STATS) --- */}
       <div className="lg:col-span-4 space-y-6 lg:sticky lg:top-24">
-        <Card className="p-6 border-indigo-100 bg-indigo-50/30">
-          <h3 className="font-bold text-indigo-900 mb-6 flex items-center gap-2 text-lg"><TrendingDown size={20} /> Résumé Global</h3>
-          
-          <div className="grid grid-cols-2 gap-4 mb-8">
-            <div className="bg-white p-4 rounded-2xl shadow-sm border border-indigo-50">
-                <div className="text-[10px] text-slate-400 uppercase font-bold mb-1">Total Projets</div>
-                <div className="text-3xl font-black text-slate-800">{stats.total}</div>
-            </div>
-            <div className="bg-white p-4 rounded-2xl shadow-sm border border-indigo-50">
-                <div className="text-[10px] text-slate-400 uppercase font-bold mb-1">Volume Cumulé</div>
-                <div className="text-xl font-black text-indigo-600 break-words">{formatCurrency(stats.amountTotal)}</div>
-            </div>
-          </div>
-
-          <div className="space-y-6">
-            <div>
-                <div className="flex justify-between text-sm mb-2">
-                    <span className="text-emerald-700 font-bold flex items-center gap-1"><CheckCircle size={14} /> Feux verts</span>
-                    <span className="font-bold text-slate-700">{stats.accepted} <span className="text-slate-400 font-normal">/ {stats.total}</span></span>
-                </div>
-                <ProgressBar value={stats.accepted} max={stats.total || 1} colorClass="bg-emerald-500" />
-            </div>
-            
-            {stats.rejected > 0 && (
-                <div className="pt-4 border-t border-indigo-100">
-                    <div className="flex justify-between text-sm mb-1">
-                        <span className="text-rose-700 font-bold flex items-center gap-1"><XCircle size={14} /> Projets risqués</span>
-                        <span className="font-bold text-rose-600">{stats.rejected}</span>
-                    </div>
-                    <ProgressBar value={stats.rejected} max={stats.total || 1} colorClass="bg-rose-500" />
-                    <p className="text-xs text-slate-500 mt-2 italic">Ces achats ont été marqués comme regrettés.</p>
-                </div>
-            )}
-          </div>
-        </Card>
+        <HistoryStats
+          total={stats.total}
+          accepted={stats.accepted}
+          rejected={stats.rejected}
+          amountTotal={stats.amountTotal}
+        />
       </div>
     </div>
   );
