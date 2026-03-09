@@ -1,20 +1,15 @@
-import { Suspense } from 'react';
+import { redirect } from 'next/navigation';
 import { revalidateTag } from 'next/cache';
 import { auth, currentUser } from '@clerk/nextjs/server';
 import { userService, insightService, profileService } from '@/app/services';
 import { computeFinancialPlan, analyzeProfileHealth } from '@/app/lib/logic';
 import DashboardClient from '@/app/components/DashboardClient';
-import AuthScreen from '@/app/components/AuthScreen';
 import type { StoredInsight } from '@/app/components/dashboard/ProactiveInsightsCard';
 
 export default async function Home() {
   const { userId } = await auth();
   if (!userId) {
-    return (
-      <Suspense fallback={<div className="h-screen bg-white"></div>}>
-        <AuthScreen />
-      </Suspense>
-    );
+    redirect('/sign-in');
   }
 
   const [profileRaw, user] = await Promise.all([

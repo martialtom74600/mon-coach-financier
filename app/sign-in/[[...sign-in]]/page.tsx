@@ -1,15 +1,38 @@
-import { SignIn } from "@clerk/nextjs";
-import { clerkAppearance } from "@/app/config/clerk-theme"; // On importe ton thème
+import Link from 'next/link';
+import { SignIn } from '@clerk/nextjs';
+import AuthLayout from '@/app/components/AuthLayout';
+import { clerkAppearanceHybrid } from '@/app/config/clerk-theme';
 
-export default function Page() {
+export default function SignInPage() {
   return (
-    <div className="flex items-center justify-center min-h-screen w-full bg-slate-50 p-4">
+    <AuthLayout>
       <SignIn
         routing="path"
         path="/sign-in"
         signUpUrl="/sign-up"
-        appearance={clerkAppearance} // Et hop, tout le style est appliqué ici !
+        afterSignInUrl="/"
+        appearance={{
+          variables: clerkAppearanceHybrid.variables,
+          layout: { socialButtonsPlacement: 'bottom' },
+          elements: {
+            ...clerkAppearanceHybrid.elements,
+            card: 'shadow-none p-0',
+            formButtonPrimary:
+              'bg-slate-900 hover:bg-slate-800 py-3 text-base shadow-lg shadow-slate-200',
+            footerActionLink: 'hidden',
+            headerTitle: 'text-2xl font-bold',
+            headerSubtitle: 'text-slate-500',
+          },
+        }}
       />
-    </div>
+      <div className="text-center text-sm pt-4 border-t border-slate-100">
+        <p className="text-slate-500">
+          Nouveau ici ?{' '}
+          <Link href="/sign-up" className="font-bold text-indigo-600 hover:underline ml-1">
+            Créer un compte
+          </Link>
+        </p>
+      </div>
+    </AuthLayout>
   );
 }
