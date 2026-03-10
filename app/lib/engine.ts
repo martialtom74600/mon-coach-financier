@@ -10,7 +10,7 @@ import {
   UserPersona,
   HousingStatus
 } from './definitions';
-import { detectDrift, detectMilestones } from './proactive';
+import { detectDrift, detectMilestones, detectCalendarAlerts } from './proactive';
 
 // ============================================================================
 // 1. CONFIGURATION & ACTION GUIDES
@@ -597,15 +597,25 @@ export const analyzeProfileHealth = (
   else if (wantsRatio > 40) tags.push("Cigale");
   if (invested > savings * 0.5) tags.push("Investisseur");
 
-  // --- DÉRIVE & MILESTONES (proactif) ---
+  // --- DÉRIVE, MILESTONES & CALENDAR ALERTS (proactif) ---
   const driftInsights = detectDrift(profile, context, previousBudget ?? null);
   const milestoneInsights = detectMilestones(profile, context);
+  const calendarInsights = detectCalendarAlerts(profile, context);
   for (const i of driftInsights) {
     opps.push({
       id: i.id,
       type: 'SAVINGS',
       level: i.severity === 'critical' ? 'CRITICAL' : i.severity === 'warning' ? 'WARNING' : 'INFO',
       title: 'Dérive',
+      message: i.message,
+    });
+  }
+  for (const i of calendarInsights) {
+    opps.push({
+      id: i.id,
+      type: 'BUDGET',
+      level: 'WARNING',
+      title: 'Alerte calendaire',
       message: i.message,
     });
   }

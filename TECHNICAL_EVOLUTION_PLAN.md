@@ -705,13 +705,14 @@ Chaque étape est **atomique** : elle peut être livrée indépendamment, testé
 - **Impact** : Nouveau fichier `proactive.ts`, stockage des insights en DB (nouveau modèle `Insight`), affichage dans le dashboard.
 - **Fichiers touchés** : Nouveau `proactive.ts`, `schema.prisma`, `page.tsx`.
 
-#### I.2 — Alertes calendaires
+#### I.2 — [TERMINÉ] Alertes calendaires
 
 - **Quoi** : "Dans 5 jours, 3 prélèvements pour 850€. Solde projeté : 210€."
 - **Pourquoi** : La timeline génère déjà les projections jour par jour. L'alerte n'est que la lecture de la timeline avec un seuil.
 - **Implémentation** : Filtrer les jours à J+7 où `balance < matelas * 0.3` et générer un message.
-- **Impact** : `proactive.ts`, notifications PWA via le service worker existant.
-- **Fichiers touchés** : `proactive.ts`, `public/sw.js` (push notifications).
+- **Implémentation réalisée** : `detectCalendarAlerts(profile, budget)` dans `proactive.ts` — appelle `generateTimeline`, parcourt J+1 à J+7, alerte si solde projeté < 30% matelas avec prélèvements. Intégré dans `engine.ts` (analyzeProfileHealth) comme `detectDrift`/`detectMilestones`. Invariant Survie : pas d'alerte si danger critique. Tests Blind & Logic dans `proactive.test.ts`.
+- **Impact** : `proactive.ts`, notifications PWA via le flux existant (insightService.storeInsights).
+- **Fichiers touchés** : `proactive.ts`, `engine.ts`, `__tests__/lib/proactive.test.ts`.
 
 #### I.3 — [TERMINÉ] Notifications PWA
 

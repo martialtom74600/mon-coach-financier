@@ -5,13 +5,17 @@
  * - detectDanger : alertes de découvert imminent
  * - detectDrift : dérive par rapport à la projection précédente
  * - detectMilestones : jalons atteints (matelas, objectifs)
+ * - detectCalendarAlerts : alertes calendaires (J+7, solde < 30% matelas)
  *
  * Invariants métier : Survie > Sécurité > Croissance (aligné sur engine.ts)
  */
 
+import { addDays, format, differenceInDays } from 'date-fns';
 import type { Profile, BudgetResult } from './definitions';
 import { safeFloat, formatCurrency } from './definitions';
 import { UserPersona } from '@prisma/client';
+import { generateTimeline } from './scenarios';
+import type { TimelineDay } from './scenarios';
 
 // ============================================================================
 // 1. TYPES & CONSTANTES
@@ -21,9 +25,10 @@ const THRESHOLDS = {
   SURVIVAL_BUFFER: 1000,
   DANGER_BALANCE_RATIO: 0.3, // alerte si solde projeté < 30% du matelas
   DRIFT_THRESHOLD: 0.15, // dérive > 15% par rapport à la projection
+  CALENDAR_ALERT_HORIZON_DAYS: 7,
 };
 
-export type InsightType = 'DANGER' | 'DRIFT' | 'MILESTONE';
+export type InsightType = 'DANGER' | 'DRIFT' | 'MILESTONE' | 'CALENDAR';
 export type InsightSeverity = 'critical' | 'warning' | 'info' | 'success';
 
 export interface ProactiveInsight {
@@ -257,7 +262,84 @@ export function detectMilestones(
 }
 
 // ============================================================================
-// 5. AGGREGATE — Tous les insights
+// 5. DETECT CALENDAR ALERTS — I.2 Alertes calendaires
+// ============================================================================
+
+/**
+ * Détecte les alertes calendaires : jours à J+1..J+7 où le solde projeté
+ * tombe sous 30% du matelas avec des prélèvements prévus.
+ * Message : "Dans X jours, Y prélèvements pour Z€. Solde projeté : W€."
+ * Invariant : pas d'alerte si danger critique (Survie > Sécurité).
+ */
+export function detectCalendarAlerts(
+  profile: Profile,
+  budget: BudgetResult
+): ProactiveInsight[] {
+  const insights: ProactiveInsight[] = [];
+  const now = new Date();
+  now.setHours(12, 0, 0, 0);
+
+  const matelas = safeFloat(budget.matelas);
+  const endOfMonthBalance = budget.endOfMonthBalance;
+  const rawCapacity = budget.rawCapacity;
+
+  // Invariant Survie : pas d'alerte calendaire si danger critique
+  if (endOfMonthBalance < 0 && rawCapacity < 0) return insights;
+  if (endOfMonthBalance < 0 && rawCapacity >= 0) return insights;
+  if (matelas < THRESHOLDS.SURVIVAL_BUFFER) return insights;
+
+  const minSafeBalance = matelas * THRESHOLDS.DANGER_BALANCE_RATIO;
+  const horizon = THRESHOLDS.CALENDAR_ALERT_HORIZON_DAYS;
+
+  const timeline = generateTimeline(
+    profile,
+    profile.decisions || [],
+    [],
+    horizon + 7
+  );
+
+  const todayKey = format(now, 'yyyy-MM-dd');
+  const windowStart = addDays(now, 1);
+  const windowEnd = addDays(now, horizon);
+
+  const allDays: TimelineDay[] = timeline.flatMap((m) => m.days);
+
+  for (const day of allDays) {
+    const dayDate = new Date(day.date);
+    dayDate.setHours(12, 0, 0, 0);
+    if (dayDate < windowStart || dayDate > windowEnd) continue;
+    if (day.balance === null) continue;
+    if (day.balance >= minSafeBalance) continue;
+
+    const withdrawals = day.events.filter((e) => e.amount < 0);
+    if (withdrawals.length === 0) continue;
+
+    const totalWithdrawals = Math.round(
+      Math.abs(withdrawals.reduce((s, e) => s + e.amount, 0))
+    );
+    const daysAhead = differenceInDays(dayDate, now);
+
+    insights.push({
+      id: `calendar_alert_${format(dayDate, 'yyyy-MM-dd')}`,
+      type: 'CALENDAR',
+      severity: 'warning',
+      message: `Dans ${daysAhead} jour${daysAhead > 1 ? 's' : ''}, ${withdrawals.length} prélèvement${withdrawals.length > 1 ? 's' : ''} pour ${formatCurrency(totalWithdrawals)}. Solde projeté : ${formatCurrency(Math.round(day.balance))}.`,
+      date: format(now, 'yyyy-MM-dd'),
+      metadata: {
+        dayDate: day.date,
+        daysAhead,
+        withdrawalCount: withdrawals.length,
+        totalWithdrawals,
+        projectedBalance: day.balance,
+      },
+    });
+  }
+
+  return insights;
+}
+
+// ============================================================================
+// 6. AGGREGATE — Tous les insights
 // ============================================================================
 
 /**
@@ -271,11 +353,11 @@ export function generateProactiveInsights(
   const danger = detectDanger(profile, budget);
   const drift = detectDrift(profile, budget, previousBudget);
   const milestones = detectMilestones(profile, budget);
+  const calendar = detectCalendarAlerts(profile, budget);
 
-  // Priorité : DANGER > DRIFT > MILESTONE
-  // Si danger, on ne noie pas avec des milestones
+  // Priorité : DANGER > DRIFT > CALENDAR > MILESTONE
   if (danger.length > 0) {
     return [...danger];
   }
-  return [...drift, ...milestones];
+  return [...drift, ...calendar, ...milestones];
 }

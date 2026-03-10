@@ -10,11 +10,12 @@ import {
   detectDanger,
   detectDrift,
   detectMilestones,
+  detectCalendarAlerts,
   generateProactiveInsights,
 } from '@/app/lib/proactive';
 import type { Profile, BudgetResult } from '@/app/lib/definitions';
 import { INITIAL_PROFILE, EMPTY_BUDGET_RESULT } from '@/app/lib/definitions';
-import { UserPersona } from '@prisma/client';
+import { UserPersona, ItemCategory } from '@prisma/client';
 
 // ============================================================================
 // FACTORIES
@@ -251,6 +252,115 @@ describe('detectMilestones', () => {
     expect(result).toHaveLength(1);
     expect(result[0].id).toBe('milestone_matelas');
     expect(result[0].message).toContain('6 mois');
+  });
+});
+
+// ============================================================================
+// detectCalendarAlerts — I.2 Alertes calendaires (Blind & Logic)
+// ============================================================================
+
+describe('detectCalendarAlerts', () => {
+  const MARCH_10 = new Date('2026-03-10T12:00:00Z');
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(MARCH_10);
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('jour J+2 avec prélèvement, solde < 30% matelas → 1 alerte', () => {
+    // Calcul manuel : today = 10 mars. Matelas 6000, minSafeBalance = 1800.
+    // Profil : currentBalance 2000, loyer 600€ le 12. Timeline : anchor 10 mars, balance 2000.
+    // J+1 (11 mars) : pas d'événement, balance 2000. J+2 (12 mars) : -600, balance 1400 < 1800.
+    const profile = makeProfile({
+      updatedAt: MARCH_10.toISOString(),
+      currentBalance: 2000,
+      fixedCosts: [{ id: 'f1', name: 'Loyer', amount: 600, dayOfMonth: 12, category: ItemCategory.FIXED_COST }],
+      variableCosts: [],
+      decisions: [],
+    });
+    const budget = makeBudget({
+      matelas: 6000,
+      endOfMonthBalance: 500,
+      rawCapacity: 700,
+    });
+    const result = detectCalendarAlerts(profile, budget);
+    expect(result).toHaveLength(1);
+    expect(result[0].type).toBe('CALENDAR');
+    expect(result[0].severity).toBe('warning');
+    expect(result[0].id).toContain('calendar_alert_');
+    expect(result[0].message).toMatch(/Dans 2 jours/);
+    expect(result[0].message).toMatch(/1 prélèvement/);
+    expect(result[0].message).toMatch(/600/);
+    expect(result[0].message).toMatch(/1[\s\u202F]*400/);
+  });
+
+  it('danger critique (déficit) → 0 alerte calendaire (invariant Survie)', () => {
+    const profile = makeProfile({
+      updatedAt: MARCH_10.toISOString(),
+      currentBalance: 2000,
+      fixedCosts: [{ id: 'f1', name: 'Loyer', amount: 600, dayOfMonth: 12, category: ItemCategory.FIXED_COST }],
+      variableCosts: [],
+    });
+    const budget = makeBudget({
+      matelas: 6000,
+      endOfMonthBalance: -100,
+      rawCapacity: -500,
+    });
+    const result = detectCalendarAlerts(profile, budget);
+    expect(result).toHaveLength(0);
+  });
+
+  it('matelas < 1000 → 0 alerte calendaire', () => {
+    const profile = makeProfile({
+      updatedAt: MARCH_10.toISOString(),
+      currentBalance: 500,
+      fixedCosts: [{ id: 'f1', name: 'Loyer', amount: 600, dayOfMonth: 12, category: ItemCategory.FIXED_COST }],
+      variableCosts: [],
+    });
+    const budget = makeBudget({
+      matelas: 500,
+      endOfMonthBalance: 100,
+      rawCapacity: 200,
+    });
+    const result = detectCalendarAlerts(profile, budget);
+    expect(result).toHaveLength(0);
+  });
+
+  it('solde projeté >= 30% matelas → 0 alerte', () => {
+    // currentBalance 5000, loyer 600 le 12 → balance 4400 > 1800
+    const profile = makeProfile({
+      updatedAt: MARCH_10.toISOString(),
+      currentBalance: 5000,
+      fixedCosts: [{ id: 'f1', name: 'Loyer', amount: 600, dayOfMonth: 12, category: ItemCategory.FIXED_COST }],
+      variableCosts: [],
+    });
+    const budget = makeBudget({
+      matelas: 6000,
+      endOfMonthBalance: 500,
+      rawCapacity: 700,
+    });
+    const result = detectCalendarAlerts(profile, budget);
+    expect(result).toHaveLength(0);
+  });
+
+  it('jour sans prélèvement (balance basse mais pas d\'events) → 0 alerte', () => {
+    // Balance basse mais pas d'événements ce jour-là : on n'alerte pas (pas de prélèvement prévu)
+    const profile = makeProfile({
+      updatedAt: MARCH_10.toISOString(),
+      currentBalance: 1000,
+      fixedCosts: [], // pas de prélèvement
+      variableCosts: [],
+    });
+    const budget = makeBudget({
+      matelas: 6000,
+      endOfMonthBalance: 500,
+      rawCapacity: 700,
+    });
+    const result = detectCalendarAlerts(profile, budget);
+    expect(result).toHaveLength(0);
   });
 });
 
