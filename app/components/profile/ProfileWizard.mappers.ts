@@ -179,11 +179,21 @@ export const mapSectionToPayload = (
       };
     case 'charges': {
       const full = mapFormToPayload(formData, funBudget ?? formData.funBudget ?? 0);
-      return { items: full.items };
+      const validItems = full.items.filter(
+        (i) => typeof i.name === 'string' && i.name.trim().length > 0 && !Number.isNaN(i.amount) && Number.isFinite(i.amount),
+      );
+      return { items: validItems };
     }
     case 'assets': {
       const full = mapFormToPayload(formData, funBudget ?? formData.funBudget ?? 0);
-      return { assets: full.assets };
+      const validAssets = full.assets.filter(
+        (a) =>
+          typeof a.name === 'string' &&
+          a.name.trim().length > 0 &&
+          !Number.isNaN(a.currentValue) &&
+          Number.isFinite(a.currentValue),
+      );
+      return { assets: validAssets };
     }
     case 'strategy':
       return {

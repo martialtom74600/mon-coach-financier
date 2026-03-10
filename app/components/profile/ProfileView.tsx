@@ -1,22 +1,29 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import {
   User,
   Wallet,
-  Target,
-  Pencil,
-  Home,
-  Users,
+  Banknote,
+  CreditCard,
+  PiggyBank,
   ChevronDown,
+  ArrowRight,
   Loader2,
+  Flag,
   Briefcase,
   Building,
   GraduationCap,
   Armchair,
   CheckCircle,
   HeartHandshake,
+  Home,
+  Users,
+  Zap,
+  Calendar,
+  ShoppingCart,
+  AlertCircle,
 } from 'lucide-react';
 import GlassCard from '@/app/components/ui/GlassCard';
 import Button from '@/app/components/ui/Button';
@@ -27,18 +34,23 @@ import {
   PERSONA_PRESETS,
   HousingStatus,
   safeFloat,
-  GOAL_CATEGORIES,
   UserPersona,
 } from '@/app/lib/definitions';
-import type { GoalCategory } from '@prisma/client';
 import { useToast } from '@/app/components/ui/Toast';
 import InputGroup from '@/app/components/ui/InputGroup';
+import AccordionSection from '@/app/components/AccordionSection';
 import { SelectionTile, CounterControl } from './ProfileWizardLayout';
 import {
   mapProfileToForm,
   mapSectionToPayload,
+  mapFormToEngineProfile,
+  generateIdHelper,
 } from './ProfileWizard.mappers';
-import type { FormProfile } from './ProfileWizard.types';
+import type { FormProfile, FormItem } from './ProfileWizard.types';
+import { StepAssets } from './steps/StepAssets';
+import { StepStrategy } from './steps/StepStrategy';
+import { computeFinancialPlan } from '@/app/lib/engine';
+
 const HOUSING_LABELS: Record<string, string> = {
   [HousingStatus.TENANT]: 'Locataire',
   [HousingStatus.OWNER_LOAN]: 'Propriétaire (crédit)',
@@ -46,11 +58,106 @@ const HOUSING_LABELS: Record<string, string> = {
   [HousingStatus.FREE]: 'Hébergé / Sans loyer',
 };
 
+type ExpandableSection = 'identity' | 'revenues' | 'charges' | 'assets' | 'strategy' | null;
+
+function ExpandableCard({
+  section,
+  title,
+  icon: Icon,
+  iconBg,
+  summary,
+  children,
+  onSave,
+  expandedSection,
+  onToggleExpand,
+  formData,
+  error,
+  onClearError,
+  isSaving,
+}: {
+  section: ExpandableSection;
+  title: string;
+  icon: React.ElementType;
+  iconBg: string;
+  summary: React.ReactNode;
+  children: React.ReactNode;
+  onSave: () => void;
+  expandedSection: ExpandableSection;
+  onToggleExpand: (s: ExpandableSection) => void;
+  formData: FormProfile | null;
+  error: string | null;
+  onClearError: () => void;
+  isSaving: boolean;
+}) {
+  const isExpanded = expandedSection === section;
+  return (
+    <GlassCard
+      className={`overflow-hidden transition-all duration-300 ${isExpanded ? 'ring-2 ring-indigo-200' : ''}`}
+    >
+      <button
+        type="button"
+        onClick={() => onToggleExpand(section)}
+        className="w-full text-left flex items-start justify-between p-0 bg-transparent border-none cursor-pointer"
+      >
+        <div className="flex items-center gap-3">
+          <div className={`p-2.5 rounded-xl ${iconBg}`}>
+            <Icon className="text-inherit" size={20} />
+          </div>
+          <div>
+            <h2 className="font-bold text-slate-800">{title}</h2>
+            {summary}
+          </div>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          <span className="text-xs text-slate-400 hidden sm:inline">
+            {isExpanded ? 'Réduire' : 'Modifier'}
+          </span>
+          <ChevronDown
+            size={18}
+            className={`text-slate-400 transition-transform duration-300 ${isExpanded ? 'rotate-180' : ''}`}
+          />
+        </div>
+      </button>
+
+      <div
+        className="grid transition-[grid-template-rows] duration-300 ease-in-out"
+        style={{ gridTemplateRows: isExpanded ? '1fr' : '0fr' }}
+      >
+        <div className="min-h-0 overflow-hidden">
+          <div className="pt-6 mt-6 border-t border-slate-100 animate-in slide-in-from-top-2 duration-300 flex flex-col">
+            <div className="max-h-[55vh] overflow-y-auto overscroll-contain pr-1 -mr-1">
+              {formData && children}
+              {error && (
+                <div className="mb-4 p-4 bg-rose-50 border border-rose-200 rounded-xl text-rose-700 text-sm font-bold">
+                  {error}
+                </div>
+              )}
+            </div>
+            <div className="flex items-center justify-end gap-3 pt-4 shrink-0 border-t border-slate-100 mt-4">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  onToggleExpand(null);
+                  onClearError();
+                }}
+              >
+                Annuler
+              </Button>
+              <Button size="sm" onClick={onSave} disabled={isSaving}>
+                {isSaving ? <Loader2 className="animate-spin" size={18} /> : 'Enregistrer'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </GlassCard>
+  );
+}
+
 export interface ProfileViewProps {
   profile: Profile;
-  refreshData: () => Promise<void>;
-  /** Clic crayon sur la carte Objectifs → page objectifs */
-  onEditGoals?: () => void;
+  refreshData?: () => Promise<void>;
 }
 
 export function isProfileComplete(profile: Profile | null): boolean {
@@ -60,20 +167,18 @@ export function isProfileComplete(profile: Profile | null): boolean {
   return !!(hasId && hasIdentity);
 }
 
-export default function ProfileView({
-  profile,
-  refreshData,
-  onEditGoals,
-}: ProfileViewProps) {
+export default function ProfileView({ profile, refreshData }: ProfileViewProps) {
   const { showToast } = useToast();
   const [formData, setFormData] = useState<FormProfile | null>(null);
-  const [expandedSection, setExpandedSection] = useState<'identity' | 'situation' | null>(null);
+  const [expandedSection, setExpandedSection] = useState<ExpandableSection>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
   useEffect(() => {
     if (profile) {
       setFormData(mapProfileToForm(profile));
+      setHasUnsavedChanges(false);
     }
   }, [profile]);
 
@@ -87,23 +192,71 @@ export default function ProfileView({
     : '-';
   const housingCost = safeFloat(profile.housing?.monthlyCost ?? profile.housingCost ?? 0);
 
-  const monthlyIncome =
-    profile.monthlyIncome ??
-    calculateListTotal(profile.incomes || []);
+  const monthlyIncome = formData
+    ? calculateListTotal(formData.incomes || [])
+    : (profile.monthlyIncome ?? calculateListTotal(profile.incomes || []));
   const fixedTotal = calculateListTotal(profile.fixedCosts || []);
   const variableTotal = calculateListTotal(profile.variableCosts || []);
   const totalCharges = fixedTotal + variableTotal;
-
   const totalAssets = (profile.assets || []).reduce(
     (sum, a) => sum + safeFloat(a.currentValue),
     0
   );
   const assetCount = (profile.assets || []).length;
-  const goals = profile.goals || [];
+
+  const wizardStats = useMemo(() => {
+    if (!formData) return null;
+    const simulation = computeFinancialPlan(mapFormToEngineProfile(formData));
+    const { budget } = simulation;
+    const monthlyInvestments = formData.assetsUi
+      .filter((a) => a.type !== 'CC' && a.type !== 'cc')
+      .reduce((sum, item) => sum + (item.monthlyFlow || 0), 0);
+    const monthlyVariable = calculateListTotal(formData.variableCosts || []);
+    const totalEngaged = budget.mandatoryExpenses + monthlyInvestments + monthlyVariable;
+    const remaining = Math.max(0, budget.monthlyIncome - totalEngaged);
+    return {
+      income: budget.monthlyIncome,
+      fixed: budget.mandatoryExpenses,
+      variable: monthlyVariable,
+      investments: monthlyInvestments,
+      totalEngaged,
+      ratio: budget.monthlyIncome > 0 ? (totalEngaged / budget.monthlyIncome) * 100 : 0,
+      remaining,
+    };
+  }, [formData]);
 
   const updateForm = (newData: FormProfile) => {
     setFormData(newData);
+    setHasUnsavedChanges(true);
     if (error) setError(null);
+  };
+
+  const updateItem = (list: keyof FormProfile, id: string, field: string, val: string | number) => {
+    if (!formData) return;
+    const currentList = formData[list] as FormItem[];
+    updateForm({ ...formData, [list]: currentList.map((i) => (i.id === id ? { ...i, [field]: val } : i)) });
+  };
+  const addItem = (list: keyof FormProfile) => {
+    if (!formData) return;
+    const currentList = formData[list] as FormItem[];
+    const defaultDay = list === 'variableCosts' ? undefined : 1;
+    updateForm({
+      ...formData,
+      [list]: [
+        ...currentList,
+        { id: generateIdHelper(), name: '', amount: '', frequency: 'MONTHLY', dayOfMonth: defaultDay },
+      ],
+    });
+  };
+  const removeItem = (list: keyof FormProfile, id: string) => {
+    if (!formData) return;
+    const currentList = formData[list] as FormItem[];
+    updateForm({ ...formData, [list]: currentList.filter((i) => i.id !== id) });
+  };
+
+  const toggleExpand = (section: ExpandableSection) => {
+    setExpandedSection((prev) => (prev === section ? null : section));
+    setError(null);
   };
 
   const handleSaveIdentity = async () => {
@@ -127,367 +280,511 @@ export default function ProfileView({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(flat),
       });
-      if (!res.ok) throw new Error('Erreur API');
+      if (!res.ok) {
+        const errBody = await res.json().catch(() => ({}));
+        const msg = (errBody as { error?: string; details?: unknown[] })?.error || res.statusText || 'Erreur API';
+        throw new Error(msg);
+      }
       showToast('Modifications enregistrées.');
-      await refreshData();
+      setHasUnsavedChanges(false);
+      if (typeof refreshData === 'function') await refreshData();
       setExpandedSection(null);
     } catch (e) {
       console.error(e);
-      setError('Erreur lors de la sauvegarde.');
-      showToast('Erreur lors de la sauvegarde.');
+      const msg = e instanceof Error ? e.message : 'Erreur lors de la sauvegarde.';
+      setError(msg);
+      showToast(msg);
     } finally {
       setIsSaving(false);
     }
   };
 
-  const toggleExpand = (section: 'identity' | 'situation') => {
-    setExpandedSection((prev) => (prev === section ? null : section));
+  const handleSaveItems = async () => {
+    if (!formData || isSaving) return;
+    setIsSaving(true);
     setError(null);
+    try {
+      const payload = mapSectionToPayload('charges', formData);
+      const hasData = payload.items && payload.items.length > 0;
+      if (!hasData) {
+        setError('Aucune donnée à enregistrer.');
+        setIsSaving(false);
+        return;
+      }
+      const res = await fetch('/api/user', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) {
+        const errBody = await res.json().catch(() => ({}));
+        const msg = (errBody as { error?: string })?.error || res.statusText || 'Erreur API';
+        throw new Error(msg);
+      }
+      showToast('Modifications enregistrées.');
+      setHasUnsavedChanges(false);
+      if (typeof refreshData === 'function') await refreshData();
+      setExpandedSection(null);
+    } catch (e) {
+      console.error(e);
+      const msg = e instanceof Error ? e.message : 'Erreur lors de la sauvegarde.';
+      setError(msg);
+      showToast(msg);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
-  const ExpandableCard = ({
-    section,
-    title,
-    icon: Icon,
-    iconBg,
-    summary,
-    children,
-    onSave,
-  }: {
-    section: 'identity' | 'situation';
-    title: string;
-    icon: React.ElementType;
-    iconBg: string;
-    summary: React.ReactNode;
-    children: React.ReactNode;
-    onSave: () => void;
-  }) => {
-    const isExpanded = expandedSection === section;
-    return (
-      <GlassCard className={`overflow-hidden transition-all duration-300 ${isExpanded ? 'ring-2 ring-indigo-200' : ''}`}>
-        <button
-          type="button"
-          onClick={() => toggleExpand(section)}
-          className="w-full text-left flex items-start justify-between p-0 bg-transparent border-none cursor-pointer"
-        >
-          <div className="flex items-center gap-3">
-            <div className={`p-2.5 rounded-xl ${iconBg}`}>
-              <Icon className="text-inherit" size={20} />
-            </div>
-            <div>
-              <h2 className="font-bold text-slate-800">{title}</h2>
-              {summary}
-            </div>
-          </div>
-          <div className="flex items-center gap-2 shrink-0">
-            <span className="text-xs text-slate-400 hidden sm:inline">
-              {isExpanded ? 'Réduire' : 'Modifier'}
-            </span>
-            <ChevronDown
-              size={18}
-              className={`text-slate-400 transition-transform duration-300 ${isExpanded ? 'rotate-180' : ''}`}
-            />
-          </div>
-        </button>
+  const handleSaveAssets = async () => {
+    if (!formData || isSaving) return;
+    setIsSaving(true);
+    setError(null);
+    try {
+      const payload = mapSectionToPayload('assets', formData);
+      const hasData = payload.assets && payload.assets.length > 0;
+      if (!hasData) {
+        setError('Aucune donnée à enregistrer.');
+        setIsSaving(false);
+        return;
+      }
+      const res = await fetch('/api/user', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) {
+        const errBody = await res.json().catch(() => ({}));
+        const msg = (errBody as { error?: string })?.error || res.statusText || 'Erreur API';
+        throw new Error(msg);
+      }
+      showToast('Modifications enregistrées.');
+      setHasUnsavedChanges(false);
+      if (typeof refreshData === 'function') await refreshData();
+      setExpandedSection(null);
+    } catch (e) {
+      console.error(e);
+      const msg = e instanceof Error ? e.message : 'Erreur lors de la sauvegarde.';
+      setError(msg);
+      showToast(msg);
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
-        <div
-          className="grid transition-[grid-template-rows] duration-300 ease-in-out"
-          style={{ gridTemplateRows: isExpanded ? '1fr' : '0fr' }}
-        >
-          <div className="min-h-0 overflow-hidden">
-            <div className="pt-6 mt-6 border-t border-slate-100 animate-in slide-in-from-top-2 duration-300">
-              {formData && children}
-              {error && (
-                <div className="mb-4 p-4 bg-rose-50 border border-rose-200 rounded-xl flex items-start gap-3 text-rose-700 text-sm font-bold">
-                  {error}
-                </div>
-              )}
-              <div className="flex items-center justify-end gap-3 pt-4">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => {
-                    setExpandedSection(null);
-                    setError(null);
-                  }}
-                >
-                  Annuler
-                </Button>
-                <Button size="sm" onClick={onSave} disabled={isSaving}>
-                  {isSaving ? <Loader2 className="animate-spin" size={18} /> : 'Enregistrer'}
-                </Button>
-              </div>
-            </div>
-          </div>
-        </div>
-      </GlassCard>
-    );
+  const handleSaveStrategy = async (funBudget?: number) => {
+    if (isSaving || !formData) return;
+    const value = funBudget ?? formData.funBudget ?? 0;
+    setIsSaving(true);
+    setError(null);
+    try {
+      const res = await fetch('/api/profile', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ funBudget: value }),
+      });
+      if (!res.ok) {
+        const errBody = await res.json().catch(() => ({}));
+        const msg = (errBody as { error?: string })?.error || res.statusText || 'Erreur API';
+        throw new Error(msg);
+      }
+      showToast('Modifications enregistrées.');
+      setHasUnsavedChanges(false);
+      setFormData({ ...formData, funBudget: value });
+      if (typeof refreshData === 'function') await refreshData();
+      setExpandedSection(null);
+    } catch (e) {
+      console.error(e);
+      const msg = e instanceof Error ? e.message : 'Erreur lors de la sauvegarde.';
+      setError(msg);
+      showToast(msg);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
     <div className="w-full animate-fade-in pb-20 md:pb-0">
       <div className="space-y-6">
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-      {/* Identité */}
-      <ExpandableCard
-        section="identity"
-        title="Identité"
-        icon={User}
-        iconBg="bg-indigo-100 text-indigo-600"
-        onSave={handleSaveIdentity}
-        summary={
-          <>
-            <p className="text-sm text-slate-600 mt-1">
-              {age} • {personaLabel}
-            </p>
-            <div className="flex items-center gap-4 mt-2 text-sm text-slate-500">
-              <span className="flex items-center gap-1">
-                <Home size={14} />
-                {housingLabel}
-                {housingCost > 0 && ` (${formatCurrency(housingCost)}/mois)`}
-              </span>
-              <span className="flex items-center gap-1">
-                <Users size={14} />
-                {profile.household?.adults ?? profile.adults ?? 1} adulte
-                {(profile.household?.children ?? profile.children ?? 0) > 0 &&
-                  `, ${profile.household?.children ?? profile.children} enfant(s)`}
-              </span>
-            </div>
-          </>
-        }
-      >
-        <div className="space-y-6">
-          <div>
-            <InputGroup
-              label="Prénom"
-              placeholder="Ex: Thomas"
-              value={formData?.firstName || ''}
-              onChange={(val: string) => formData && updateForm({ ...formData, firstName: val })}
-            />
-            <InputGroup
-              label="Âge"
-              type="number"
-              placeholder="30"
-              value={formData?.age || ''}
-              onChange={(val: string) => formData && updateForm({ ...formData, age: val as unknown as number })}
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-bold text-slate-500 uppercase mb-3">Statut Pro</label>
-            <div className="grid grid-cols-2 gap-2">
-              <SelectionTile
-                icon={Briefcase}
-                title="Salarié"
-                desc="CDI / CDD"
-                selected={formData?.persona === UserPersona.SALARIED}
-                onClick={() => formData && updateForm({ ...formData, persona: UserPersona.SALARIED })}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+          {/* Identité */}
+          <ExpandableCard
+            section="identity"
+            title="Identité"
+            icon={User}
+            iconBg="bg-indigo-100 text-indigo-600"
+            onSave={handleSaveIdentity}
+            expandedSection={expandedSection}
+            onToggleExpand={toggleExpand}
+            formData={formData}
+            error={error}
+            onClearError={() => setError(null)}
+            isSaving={isSaving}
+            summary={
+              <>
+                <p className="text-sm text-slate-600 mt-1">
+                  {age} • {personaLabel}
+                </p>
+                <div className="flex items-center gap-4 mt-2 text-sm text-slate-500 flex-wrap">
+                  <span className="flex items-center gap-1">
+                    <Home size={14} />
+                    {housingLabel}
+                    {housingCost > 0 && ` (${formatCurrency(housingCost)}/mois)`}
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <Users size={14} />
+                    {profile.household?.adults ?? profile.adults ?? 1} adulte
+                    {(profile.household?.children ?? profile.children ?? 0) > 0 &&
+                      `, ${profile.household?.children ?? profile.children} enfant(s)`}
+                  </span>
+                </div>
+              </>
+            }
+          >
+            <div className="space-y-6">
+              <InputGroup
+                label="Prénom"
+                placeholder="Ex: Thomas"
+                value={formData?.firstName || ''}
+                onChange={(val: string) => formData && updateForm({ ...formData, firstName: val })}
               />
-              <SelectionTile
-                icon={GraduationCap}
-                title="Étudiant"
-                desc="Études"
-                selected={formData?.persona === UserPersona.STUDENT}
-                onClick={() => formData && updateForm({ ...formData, persona: UserPersona.STUDENT })}
+              <InputGroup
+                label="Âge"
+                type="number"
+                placeholder="30"
+                value={formData?.age || ''}
+                onChange={(val: string) => formData && updateForm({ ...formData, age: val as unknown as number })}
               />
-              <SelectionTile
-                icon={Briefcase}
-                title="Indépendant"
-                desc="Freelance"
-                selected={formData?.persona === UserPersona.FREELANCE}
-                onClick={() => formData && updateForm({ ...formData, persona: UserPersona.FREELANCE })}
-              />
-              <SelectionTile
-                icon={Armchair}
-                title="Retraité"
-                desc="Pension"
-                selected={formData?.persona === UserPersona.RETIRED}
-                onClick={() => formData && updateForm({ ...formData, persona: UserPersona.RETIRED })}
-              />
-            </div>
-          </div>
-          <div>
-            <label className="block text-xs font-bold text-slate-500 uppercase mb-3">Logement</label>
-            <div className="grid grid-cols-2 gap-2">
-              <SelectionTile
-                icon={Building}
-                title="Locataire"
-                desc="Loyer"
-                selected={formData?.housing?.status === HousingStatus.TENANT}
-                onClick={() => formData && updateForm({ ...formData, housing: { ...formData.housing, status: HousingStatus.TENANT } })}
-              />
-              <SelectionTile
-                icon={Home}
-                title="Propriétaire"
-                desc="Crédit"
-                selected={formData?.housing?.status === HousingStatus.OWNER_LOAN}
-                onClick={() => formData && updateForm({ ...formData, housing: { ...formData.housing, status: HousingStatus.OWNER_LOAN } })}
-              />
-              <SelectionTile
-                icon={CheckCircle}
-                title="Propriétaire"
-                desc="Payé"
-                selected={formData?.housing?.status === HousingStatus.OWNER_PAID}
-                onClick={() => formData && updateForm({ ...formData, housing: { ...formData.housing, status: HousingStatus.OWNER_PAID, monthlyCost: 0 } })}
-              />
-              <SelectionTile
-                icon={HeartHandshake}
-                title="Gratuit"
-                desc="Hébergé"
-                selected={formData?.housing?.status === HousingStatus.FREE}
-                onClick={() => formData && updateForm({ ...formData, housing: { ...formData.housing, status: HousingStatus.FREE, monthlyCost: 0 } })}
-              />
-            </div>
-          </div>
-          {(formData?.housing?.status === HousingStatus.TENANT || formData?.housing?.status === HousingStatus.OWNER_LOAN) && (
-            <div className="flex gap-4">
-              <div className="flex-1">
-                <InputGroup
-                  label="Montant mensuel"
-                  type="number"
-                  placeholder="800"
-                  value={formData?.housing?.monthlyCost || ''}
-                  onChange={(val: string) =>
-                    formData && updateForm({
-                      ...formData,
-                      housing: { ...formData.housing, monthlyCost: parseFloat(val) || 0 },
-                    })
-                  }
-                  suffix="€"
-                />
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase mb-3">Statut Pro</label>
+                <div className="grid grid-cols-2 gap-2">
+                  <SelectionTile
+                    icon={Briefcase}
+                    title="Salarié"
+                    desc="CDI / CDD"
+                    selected={formData?.persona === UserPersona.SALARIED}
+                    onClick={() => formData && updateForm({ ...formData, persona: UserPersona.SALARIED })}
+                  />
+                  <SelectionTile
+                    icon={GraduationCap}
+                    title="Étudiant"
+                    desc="Études"
+                    selected={formData?.persona === UserPersona.STUDENT}
+                    onClick={() => formData && updateForm({ ...formData, persona: UserPersona.STUDENT })}
+                  />
+                  <SelectionTile
+                    icon={Briefcase}
+                    title="Indépendant"
+                    desc="Freelance"
+                    selected={formData?.persona === UserPersona.FREELANCE}
+                    onClick={() => formData && updateForm({ ...formData, persona: UserPersona.FREELANCE })}
+                  />
+                  <SelectionTile
+                    icon={Armchair}
+                    title="Retraité"
+                    desc="Pension"
+                    selected={formData?.persona === UserPersona.RETIRED}
+                    onClick={() => formData && updateForm({ ...formData, persona: UserPersona.RETIRED })}
+                  />
+                </div>
               </div>
-              <div className="w-24">
-                <InputGroup
-                  label="Jour"
-                  type="number"
-                  placeholder="5"
-                  value={formData?.housing?.paymentDay || ''}
-                  onChange={(val: string) =>
-                    formData && updateForm({
-                      ...formData,
-                      housing: { ...formData.housing, paymentDay: parseInt(val) || 1 },
-                    })
-                  }
-                />
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase mb-3">Logement</label>
+                <div className="grid grid-cols-2 gap-2">
+                  <SelectionTile
+                    icon={Building}
+                    title="Locataire"
+                    desc="Loyer"
+                    selected={formData?.housing?.status === HousingStatus.TENANT}
+                    onClick={() =>
+                      formData && updateForm({ ...formData, housing: { ...formData.housing, status: HousingStatus.TENANT } })
+                    }
+                  />
+                  <SelectionTile
+                    icon={Home}
+                    title="Propriétaire"
+                    desc="Crédit"
+                    selected={formData?.housing?.status === HousingStatus.OWNER_LOAN}
+                    onClick={() =>
+                      formData &&
+                      updateForm({ ...formData, housing: { ...formData.housing, status: HousingStatus.OWNER_LOAN } })
+                    }
+                  />
+                  <SelectionTile
+                    icon={CheckCircle}
+                    title="Propriétaire"
+                    desc="Payé"
+                    selected={formData?.housing?.status === HousingStatus.OWNER_PAID}
+                    onClick={() =>
+                      formData &&
+                      updateForm({
+                        ...formData,
+                        housing: { ...formData.housing, status: HousingStatus.OWNER_PAID, monthlyCost: 0 },
+                      })
+                    }
+                  />
+                  <SelectionTile
+                    icon={HeartHandshake}
+                    title="Gratuit"
+                    desc="Hébergé"
+                    selected={formData?.housing?.status === HousingStatus.FREE}
+                    onClick={() =>
+                      formData &&
+                      updateForm({
+                        ...formData,
+                        housing: { ...formData.housing, status: HousingStatus.FREE, monthlyCost: 0 },
+                      })
+                    }
+                  />
+                </div>
+              </div>
+              {(formData?.housing?.status === HousingStatus.TENANT ||
+                formData?.housing?.status === HousingStatus.OWNER_LOAN) && (
+                <div className="flex gap-4">
+                  <div className="flex-1">
+                    <InputGroup
+                      label="Montant mensuel"
+                      type="number"
+                      placeholder="800"
+                      value={formData?.housing?.monthlyCost || ''}
+                      onChange={(val: string) =>
+                        formData &&
+                        updateForm({
+                          ...formData,
+                          housing: { ...formData.housing, monthlyCost: parseFloat(val) || 0 },
+                        })
+                      }
+                      suffix="€"
+                    />
+                  </div>
+                  <div className="w-24">
+                    <InputGroup
+                      label="Jour"
+                      type="number"
+                      placeholder="5"
+                      value={formData?.housing?.paymentDay || ''}
+                      onChange={(val: string) =>
+                        formData &&
+                        updateForm({
+                          ...formData,
+                          housing: { ...formData.housing, paymentDay: parseInt(val) || 1 },
+                        })
+                      }
+                    />
+                  </div>
+                </div>
+              )}
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase mb-3">Foyer</label>
+                <div className="flex gap-4">
+                  <CounterControl
+                    label="Adultes"
+                    value={formData?.household?.adults || 1}
+                    onChange={(v: number) =>
+                      formData && updateForm({ ...formData, household: { ...formData.household, adults: v } })
+                    }
+                  />
+                  <CounterControl
+                    label="Enfants"
+                    value={formData?.household?.children || 0}
+                    onChange={(v: number) =>
+                      formData && updateForm({ ...formData, household: { ...formData.household, children: v } })
+                    }
+                  />
+                </div>
               </div>
             </div>
-          )}
-          <div>
-            <label className="block text-xs font-bold text-slate-500 uppercase mb-3">Foyer</label>
-            <div className="flex gap-4">
-              <CounterControl
-                label="Adultes"
-                value={formData?.household?.adults || 1}
-                onChange={(v: number) => formData && updateForm({ ...formData, household: { ...formData.household, adults: v } })}
-              />
-              <CounterControl
-                label="Enfants"
-                value={formData?.household?.children || 0}
-                onChange={(v: number) => formData && updateForm({ ...formData, household: { ...formData.household, children: v } })}
-              />
-            </div>
-          </div>
-        </div>
-      </ExpandableCard>
+          </ExpandableCard>
 
-      {/* Situation financière - pour l'instant redirige vers la page edit (formulaire trop complexe) */}
-      <GlassCard>
-        <div className="flex items-start justify-between">
-          <div className="flex items-center gap-3">
-            <div className="p-2.5 bg-emerald-100 rounded-xl">
-              <Wallet className="text-emerald-600" size={20} />
-            </div>
-            <div>
-              <h2 className="font-bold text-slate-800">Situation financière</h2>
-              <div className="mt-2 space-y-1 text-sm">
-                <p className="text-slate-600">
-                  <span className="text-slate-500">Revenus :</span>{' '}
-                  {formatCurrency(monthlyIncome)}/mois
-                </p>
-                <p className="text-slate-600">
-                  <span className="text-slate-500">Charges :</span>{' '}
-                  {formatCurrency(totalCharges)}/mois
-                </p>
-                <p className="text-slate-600">
-                  <span className="text-slate-500">Patrimoine :</span>{' '}
-                  {formatCurrency(totalAssets)} ({assetCount} actif
-                  {assetCount > 1 ? 's' : ''})
-                </p>
+          {/* Revenus */}
+          <ExpandableCard
+            section="revenues"
+            title="Revenus"
+            icon={Banknote}
+            iconBg="bg-emerald-100 text-emerald-600"
+            onSave={handleSaveItems}
+            expandedSection={expandedSection}
+            onToggleExpand={toggleExpand}
+            formData={formData}
+            error={error}
+            onClearError={() => setError(null)}
+            isSaving={isSaving}
+            summary={
+              <p className="text-sm text-slate-600 mt-1">
+                {formatCurrency(monthlyIncome)}/mois
+              </p>
+            }
+          >
+            <AccordionSection
+              mode="expert"
+              defaultOpen={true}
+              title="Revenus (Net)"
+              icon={Banknote}
+              colorClass="text-emerald-600"
+              items={formData?.incomes || []}
+              onItemChange={(id, f, v) => updateItem('incomes', id, f as string, v)}
+              onItemAdd={() => addItem('incomes')}
+              onItemRemove={(id) => removeItem('incomes', id)}
+            />
+          </ExpandableCard>
+
+          {/* Charges */}
+          <ExpandableCard
+            section="charges"
+            title="Charges"
+            icon={CreditCard}
+            iconBg="bg-amber-100 text-amber-600"
+            onSave={handleSaveItems}
+            expandedSection={expandedSection}
+            onToggleExpand={toggleExpand}
+            formData={formData}
+            error={error}
+            onClearError={() => setError(null)}
+            isSaving={isSaving}
+            summary={
+              <p className="text-sm text-slate-600 mt-1">
+                {formatCurrency(totalCharges)}/mois
+              </p>
+            }
+          >
+            <div className="space-y-4">
+              <AccordionSection
+                mode="expert"
+                defaultOpen={false}
+                title="Factures Fixes"
+                icon={CreditCard}
+                colorClass="text-slate-600"
+                items={formData?.fixedCosts || []}
+                onItemChange={(id, f, v) => updateItem('fixedCosts', id, f as string, v)}
+                onItemAdd={() => addItem('fixedCosts')}
+                onItemRemove={(id) => removeItem('fixedCosts', id)}
+              />
+              <AccordionSection
+                mode="expert"
+                defaultOpen={false}
+                title="Abonnements"
+                icon={Zap}
+                colorClass="text-purple-500"
+                items={formData?.subscriptions || []}
+                onItemChange={(id, f, v) => updateItem('subscriptions', id, f as string, v)}
+                onItemAdd={() => addItem('subscriptions')}
+                onItemRemove={(id) => removeItem('subscriptions', id)}
+              />
+              <AccordionSection
+                mode="expert"
+                defaultOpen={false}
+                title="Dépenses Annuelles"
+                icon={Calendar}
+                colorClass="text-orange-500"
+                items={formData?.annualExpenses || []}
+                onItemChange={(id, f, v) => updateItem('annualExpenses', id, f as string, v)}
+                onItemAdd={() => addItem('annualExpenses')}
+                onItemRemove={(id) => removeItem('annualExpenses', id)}
+              />
+              <AccordionSection
+                mode="expert"
+                defaultOpen={false}
+                title="Crédits Conso"
+                icon={AlertCircle}
+                colorClass="text-rose-500"
+                items={formData?.credits || []}
+                onItemChange={(id, f, v) => updateItem('credits', id, f as string, v)}
+                onItemAdd={() => addItem('credits')}
+                onItemRemove={(id) => removeItem('credits', id)}
+              />
+              <div className="p-4 bg-yellow-50 rounded-xl text-sm text-yellow-800 border border-yellow-100 flex items-start gap-3">
+                <AlertCircle className="shrink-0 mt-0.5" size={18} />
+                <span>Dépenses variables lissées sur le mois.</span>
               </div>
+              <AccordionSection
+                mode="expert"
+                hideDate={true}
+                defaultOpen={false}
+                title="Dépenses Courantes & Loisirs"
+                icon={ShoppingCart}
+                colorClass="text-indigo-600"
+                items={formData?.variableCosts || []}
+                onItemChange={(id, f, v) => updateItem('variableCosts', id, f as string, v)}
+                onItemAdd={() => addItem('variableCosts')}
+                onItemRemove={(id) => removeItem('variableCosts', id)}
+              />
             </div>
-          </div>
-          <Link href="/profile/edit?section=finances">
-            <Button variant="ghost" size="sm" title="Modifier la situation financière">
-              <Pencil size={14} />
-            </Button>
+          </ExpandableCard>
+
+          {/* Patrimoine */}
+          <ExpandableCard
+            section="assets"
+            title="Patrimoine"
+            icon={PiggyBank}
+            iconBg="bg-indigo-100 text-indigo-600"
+            onSave={handleSaveAssets}
+            expandedSection={expandedSection}
+            onToggleExpand={toggleExpand}
+            formData={formData}
+            error={error}
+            onClearError={() => setError(null)}
+            isSaving={isSaving}
+            summary={
+              <p className="text-sm text-slate-600 mt-1">
+                {formatCurrency(totalAssets)} ({assetCount} actif{assetCount > 1 ? 's' : ''})
+              </p>
+            }
+          >
+            <StepAssets
+              formData={formData!}
+              updateForm={updateForm}
+              addItem={addItem}
+              removeItem={removeItem}
+              updateItem={updateItem}
+              editMode
+              isSaving={isSaving}
+            />
+          </ExpandableCard>
+
+          {/* Stratégie / Budget Plaisir */}
+          <ExpandableCard
+            section="strategy"
+            title="Budget Plaisir"
+            icon={Flag}
+            iconBg="bg-emerald-100 text-emerald-600"
+            onSave={() => handleSaveStrategy()}
+            expandedSection={expandedSection}
+            onToggleExpand={toggleExpand}
+            formData={formData}
+            error={error}
+            onClearError={() => setError(null)}
+            isSaving={isSaving}
+            summary={
+              <p className="text-sm text-slate-600 mt-1">
+                {wizardStats ? formatCurrency(wizardStats.remaining) : '-'} disponible / {formatCurrency(formData?.funBudget ?? profile.funBudget ?? 0)} alloué
+              </p>
+            }
+          >
+            {wizardStats && (
+              <StepStrategy
+                formData={formData!}
+                updateForm={updateForm}
+                onSave={handleSaveStrategy}
+                isSaving={isSaving}
+                stats={wizardStats}
+                editMode
+                hideFooter
+              />
+            )}
+          </ExpandableCard>
+        </div>
+
+        <div className="pt-4 text-center flex flex-wrap justify-center gap-4">
+          <Link
+            href="/"
+            className="inline-flex items-center gap-1.5 text-indigo-600 font-medium hover:text-indigo-700 hover:underline text-sm"
+          >
+            Découvrir mon verdict
+            <ArrowRight size={16} />
+          </Link>
+          <Link href="/profile?edit=1" className="text-slate-500 font-medium hover:underline text-sm">
+            Refaire tout le wizard →
           </Link>
         </div>
-      </GlassCard>
-
-      {/* Objectifs */}
-      <GlassCard>
-        <div className="flex items-start justify-between">
-          <div className="flex items-center gap-3">
-            <div className="p-2.5 bg-amber-100 rounded-xl">
-              <Target className="text-amber-600" size={20} />
-            </div>
-            <div className="flex-1 min-w-0">
-              <h2 className="font-bold text-slate-800">Objectifs</h2>
-              {goals.length === 0 ? (
-                <p className="text-sm text-slate-500 mt-1">
-                  Aucun objectif défini
-                </p>
-              ) : (
-                <ul className="mt-2 space-y-2">
-                  {goals.slice(0, 3).map((g) => {
-                    const cat = GOAL_CATEGORIES[g.category as GoalCategory];
-                    return (
-                      <li
-                        key={g.id}
-                        className="flex items-center justify-between gap-2 text-sm"
-                      >
-                        <span className="flex items-center gap-2 truncate">
-                          <span>{cat?.icon ?? '•'}</span>
-                          <span className="text-slate-700 truncate">{g.name}</span>
-                        </span>
-                        <span className="text-slate-600 shrink-0">
-                          {formatCurrency(safeFloat(g.targetAmount))}
-                        </span>
-                      </li>
-                    );
-                  })}
-                  {goals.length > 3 && (
-                    <li className="text-sm text-slate-500">
-                      +{goals.length - 3} autre(s)
-                    </li>
-                  )}
-                </ul>
-              )}
-            </div>
-          </div>
-          {onEditGoals && (
-            <Button variant="ghost" size="sm" onClick={onEditGoals} title="Gérer les objectifs">
-              <Pencil size={14} />
-            </Button>
-          )}
-        </div>
-      </GlassCard>
-
-      </div>
-
-      <div className="pt-4 text-center flex flex-wrap justify-center gap-4">
-        <Link
-          href="/profile/edit"
-          className="text-indigo-600 font-medium hover:underline text-sm"
-        >
-          Modifier par section →
-        </Link>
-        <Link
-          href="/profile?edit=1"
-          className="text-slate-500 font-medium hover:underline text-sm"
-        >
-          Refaire tout le wizard →
-        </Link>
-      </div>
       </div>
     </div>
   );

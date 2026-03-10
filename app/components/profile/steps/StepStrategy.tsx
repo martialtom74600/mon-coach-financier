@@ -8,7 +8,7 @@ import { formatCurrency } from '@/app/lib/definitions';
 import { getInputValue, parseNumber } from '../ProfileWizard.mappers';
 import type { StepProps } from '../ProfileWizard.types';
 
-export function StepStrategy({ formData, onConfirm, isSaving, onPrev, stats, editMode, onSave }: StepProps) {
+export function StepStrategy({ formData, updateForm, onConfirm, isSaving, onPrev, stats, editMode, onSave, hideFooter }: StepProps) {
   const [lifestyleInput, setLifestyleInput] = useState<string | number>('');
 
   useEffect(() => {
@@ -19,6 +19,11 @@ export function StepStrategy({ formData, onConfirm, isSaving, onPrev, stats, edi
   const userLifestyle = parseNumber(lifestyleInput);
   const cashSavingsCapacity = theoreticalRest - userLifestyle;
 
+  const handleInputChange = (val: string | number) => {
+    setLifestyleInput(val);
+    if (updateForm) updateForm({ ...formData, funBudget: parseNumber(val) });
+  };
+
   return (
     <WizardLayout
       title="Le Verdict"
@@ -26,7 +31,7 @@ export function StepStrategy({ formData, onConfirm, isSaving, onPrev, stats, edi
       icon={Flag}
       compact={editMode}
       footer={
-        editMode && onSave ? (
+        hideFooter ? undefined : editMode && onSave ? (
           <Button
             onClick={() => onSave(userLifestyle)}
             disabled={isSaving}
@@ -83,7 +88,7 @@ export function StepStrategy({ formData, onConfirm, isSaving, onPrev, stats, edi
                   className="block w-full rounded-xl border-slate-200 bg-slate-50 p-4 pr-12 text-2xl font-bold text-slate-900 focus:border-indigo-500 focus:ring-indigo-500"
                   placeholder="0"
                   value={lifestyleInput}
-                  onChange={(e) => setLifestyleInput(getInputValue(e) as string)}
+                  onChange={(e) => handleInputChange(getInputValue(e) as string)}
                 />
                 <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-4">
                   <span className="text-slate-400 font-bold">€</span>

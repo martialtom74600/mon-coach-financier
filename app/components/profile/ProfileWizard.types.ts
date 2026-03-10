@@ -86,4 +86,6 @@ export interface StepProps {
   editMode?: boolean;
   /** Callback de sauvegarde. Pour StepStrategy, reçoit le funBudget (lifestyle). */
   onSave?: (lifestyle?: number) => void | Promise<void>;
+  /** Masque le footer (pour utiliser celui de la carte parente, ex. ExpandableCard) */
+  hideFooter?: boolean;
 }
