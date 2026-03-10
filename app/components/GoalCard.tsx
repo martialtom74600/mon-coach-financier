@@ -102,7 +102,7 @@ export default function GoalCard({ goal, onDelete }: GoalCardProps) {
           <div className={`text-sm font-bold ${theme.text} mb-0.5`}>
             {status === 'DONE' ? 'Objectif atteint !' : 
              status === 'POSSIBLE' ? `Épargne requise : ${Math.round(goal.monthlyNeed || 0)}€ / mois` : 
-             'Attention : Objectif difficile'}
+             'Objectif ambitieux'}
           </div>
           <p className="text-xs text-slate-600 leading-relaxed opacity-90">{mainMessage}</p>
         </div>

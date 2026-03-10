@@ -50,7 +50,7 @@ const HousingStatusEnum = z.enum([
 const amount = z.coerce.number().finite();
 const positiveAmount = z.coerce.number().finite().min(0);
 const dayOfMonth = z.coerce.number().int().min(1).max(31);
-const shortText = z.string().trim().min(1, 'Ce champ est requis').max(200);
+const shortText = z.string().trim().min(1, 'Ce champ est obligatoire').max(200);
 
 // ============================================================================
 // ITEMS (revenus, charges, crédits, abonnements…)

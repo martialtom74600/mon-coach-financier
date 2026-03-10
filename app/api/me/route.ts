@@ -7,7 +7,7 @@ import { logger } from '@/app/lib/logger';
 /** DELETE — Suppression du compte (RGPD, droit à l'effacement) */
 export async function DELETE() {
   const { userId } = await auth();
-  if (!userId) return new NextResponse('Non autorisé', { status: 401 });
+  if (!userId) return new NextResponse('Tu n\'as pas accès à ça.', { status: 401 });
 
   try {
     const profile = await prisma.financialProfile.findUnique({
@@ -39,7 +39,7 @@ export async function DELETE() {
     }
     logger.error('API_DELETE_ME', { userId }, error);
     return new NextResponse(
-      JSON.stringify({ error: 'Erreur lors de la suppression' }),
+      JSON.stringify({ error: 'La suppression a coincé. Tu réessaies ?' }),
       { status: 500, headers: { 'Content-Type': 'application/json' } }
     );
   }

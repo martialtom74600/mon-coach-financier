@@ -9,15 +9,15 @@ import type { StepProps } from '../ProfileWizard.types';
 export function StepSituation({ formData, updateForm, onNext, onPrev, error, editMode, onSave, isSaving }: StepProps) {
   return (
     <WizardLayout
-      title="Votre Situation"
-      subtitle="Adaptons la stratégie à votre profil."
+      title="Ta situation"
+      subtitle="On adapte la stratégie à ton profil."
       icon={Briefcase}
       error={error}
       compact={editMode}
       footer={
         editMode && onSave ? (
           <Button onClick={() => onSave?.()} disabled={isSaving} className="w-full sm:w-auto">
-            {isSaving ? <Loader2 className="animate-spin" /> : 'Enregistrer'}
+            {isSaving ? <Loader2 className="animate-spin" /> : 'C\'est bon'}
           </Button>
         ) : (
           <>
@@ -33,7 +33,7 @@ export function StepSituation({ formData, updateForm, onNext, onPrev, error, edi
     >
       <div className="space-y-8">
         <div>
-          <label className="block text-xs font-bold text-slate-500 uppercase mb-3">Statut Pro</label>
+          <label className="block text-xs font-bold text-slate-500 uppercase mb-3">Tu bosses comment ?</label>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <SelectionTile
               icon={Briefcase}
@@ -66,7 +66,7 @@ export function StepSituation({ formData, updateForm, onNext, onPrev, error, edi
           </div>
         </div>
         <div>
-          <label className="block text-xs font-bold text-slate-500 uppercase mb-3">Logement</label>
+          <label className="block text-xs font-bold text-slate-500 uppercase mb-3">Tu loges où ?</label>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <SelectionTile
               icon={Building}
@@ -111,7 +111,7 @@ export function StepSituation({ formData, updateForm, onNext, onPrev, error, edi
           </div>
         </div>
         <div>
-          <label className="block text-xs font-bold text-slate-500 uppercase mb-3">Foyer</label>
+          <label className="block text-xs font-bold text-slate-500 uppercase mb-3">Tu vis seul ou à plusieurs ?</label>
           <div className="flex gap-4">
             <CounterControl
               label="Adultes"

@@ -8,7 +8,7 @@ import { logger } from '@/app/lib/logger';
 /** GET — Export RGPD : toutes les données du profil en JSON (ou minimal si pas de profil) */
 export async function GET() {
   const { userId } = await auth();
-  if (!userId) return new NextResponse('Non autorisé', { status: 401 });
+  if (!userId) return new NextResponse('Tu n\'as pas accès à ça.', { status: 401 });
 
   try {
     const [user, profile] = await Promise.all([
@@ -29,7 +29,7 @@ export async function GET() {
     ]);
 
     if (!user) {
-      return new NextResponse('Données non trouvées', { status: 404 });
+      return new NextResponse('Aucune donnée à exporter.', { status: 404 });
     }
 
     const prefs = profile ? await preferencesService.getPreferences(profile.id).catch(() => null) : null;
@@ -76,7 +76,7 @@ export async function GET() {
             createdAt: user.createdAt.toISOString(),
           },
           profile: null,
-          message: 'Profil financier non complété',
+          message: 'Ton profil n\'est pas encore complet.',
         };
 
     return new NextResponse(JSON.stringify(exportData, null, 2), {
@@ -87,6 +87,6 @@ export async function GET() {
     });
   } catch (error) {
     logger.error('API_GET_ME_EXPORT', { userId }, error);
-    return new NextResponse('Erreur lors de l\'export', { status: 500 });
+    return new NextResponse('L\'export a coincé. Tu réessaies ?', { status: 500 });
   }
 }

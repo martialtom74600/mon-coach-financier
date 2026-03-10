@@ -70,7 +70,7 @@ export function GoalSimulation({
   return (
     <div className="animate-fade-in space-y-6">
       <BackLink
-        label="Modifier les données"
+        label="Modifier"
         onClick={onBack}
         variant="emerald"
       />
@@ -201,7 +201,7 @@ export function GoalSimulation({
             </Button>
             {simulation.diagnosis.status === 'IMPOSSIBLE' && (
               <p className="text-center text-xs text-slate-400 mt-2">
-                Attention : Votre budget sera en négatif.
+                Attention : ton budget passerait en négatif.
               </p>
             )}
           </div>

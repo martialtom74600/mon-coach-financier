@@ -7,7 +7,7 @@ import { profileService, ServiceError } from '@/app/services';
 
 export async function PATCH(req: Request) {
   const { userId } = auth();
-  if (!userId) return new NextResponse("Non autorisé", { status: 401 });
+  if (!userId) return new NextResponse("Tu n'as pas accès à ça.", { status: 401 });
 
   try {
     const body = await req.json();
@@ -23,6 +23,6 @@ export async function PATCH(req: Request) {
       return new NextResponse(error.message, { status: error.status });
     }
     logger.error("API_PATCH_PROFILE", { userId }, error);
-    return new NextResponse("Erreur interne", { status: 500 });
+    return new NextResponse("Oups, petit bug. Réessaie ?", { status: 500 });
   }
 }

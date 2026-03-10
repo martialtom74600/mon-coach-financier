@@ -16,12 +16,12 @@ export function HistoryStats({ total, accepted, rejected, amountTotal }: History
   return (
     <Card className="p-6 border-indigo-100 bg-indigo-50/30">
       <h3 className="font-bold text-indigo-900 mb-6 flex items-center gap-2 text-lg">
-        <TrendingDown size={20} /> Résumé Global
+        <TrendingDown size={20} /> Résumé
       </h3>
 
       <div className="grid grid-cols-2 gap-4 mb-8">
         <div className="bg-white p-4 rounded-2xl shadow-sm border border-indigo-50">
-          <div className="text-[10px] text-slate-400 uppercase font-bold mb-1">Total Projets</div>
+          <div className="text-[10px] text-slate-400 uppercase font-bold mb-1">Projets</div>
           <div className="text-3xl font-black text-slate-800">{total}</div>
         </div>
         <div className="bg-white p-4 rounded-2xl shadow-sm border border-indigo-50">
@@ -53,7 +53,7 @@ export function HistoryStats({ total, accepted, rejected, amountTotal }: History
             </div>
             <ProgressBar value={rejected} max={total || 1} colorClass="bg-rose-500" />
             <p className="text-xs text-slate-500 mt-2 italic">
-              Ces achats ont été marqués comme regrettés.
+              Achats que t&apos;as regrettés.
             </p>
           </div>
         )}

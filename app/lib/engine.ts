@@ -46,7 +46,7 @@ const FINANCIAL_KNOWLEDGE = {
 const ACTION_GUIDES: Record<string, ActionGuide> = {
   // --- BASICS ---
   BUDGET_CUT: { 
-    title: "Optimiser les Charges Fixes", 
+    title: "Optimiser les charges fixes", 
     definition: "Récupérer du pouvoir d'achat sans baisser son niveau de vie.", 
     steps: ["Lister les abonnements.", "Utiliser la loi Hamon (Assurances).", "Renégocier Mobile/Internet."], 
     tips: ["Supprimez ce qui n'est pas utilisé depuis 30j."], difficulty: 'Facile', impact: 'Immédiat' 
@@ -60,15 +60,15 @@ const ACTION_GUIDES: Record<string, ActionGuide> = {
   
   // --- LIVRETS & CASH ---
   LIVRET_OPEN: { 
-    title: "Constituer un Matelas de Sécurité", 
-    definition: "Votre pare-feu contre les imprévus (panne, santé).", 
+title: "Constituer un matelas de sécu",
+    definition: "Ton pare-feu contre les imprévus (panne, santé).",
     steps: ["Ouvrir un Livret A ou LDDS.", "Viser 3 mois de charges.", "Automatiser 50€/mois."], 
-    tips: ["Ne touchez jamais à cet argent pour le plaisir."], difficulty: 'Facile', impact: 'Immédiat' 
+    tips: ["Ne touche jamais à cet argent pour le plaisir."], difficulty: 'Facile', impact: 'Immédiat' 
   },
   LIVRET_BOOST: { 
-    title: "Renforcer votre Sécurité", 
-    definition: "Votre épargne de précaution est un peu faible.", 
-    steps: ["Augmenter le virement mensuel vers vos livrets.", "Vérifier si vous avez atteint le plafond (22 950€)."], 
+    title: "Renforcer ta sécu", 
+    definition: "Ton épargne de précaution est un peu faible.", 
+    steps: ["Augmente le virement mensuel vers tes livrets.", "Vérifie si t'as atteint le plafond (22 950€)."], 
     tips: ["Dormir tranquille n'a pas de prix."], difficulty: 'Facile', impact: 'Immédiat' 
   },
   LEP_OPEN: { 
@@ -83,12 +83,12 @@ const ACTION_GUIDES: Record<string, ActionGuide> = {
     title: "Ouvrir un PEA", 
     definition: "La meilleure niche fiscale pour investir en Bourse.", 
     steps: ["Choisir banque en ligne (frais < 0.5%).", "Prendre date (compteur 5 ans).", "Acheter un ETF Monde."], 
-    tips: ["Évitez les banques traditionnelles."], difficulty: 'Moyen', impact: 'Long terme' 
+    tips: ["Évite les banques traditionnelles."], difficulty: 'Moyen', impact: 'Long terme' 
   },
   PEA_BOOST: { 
-    title: "Optimiser votre PEA", 
-    definition: "Vous avez l'outil, maintenant il faut le remplir.", 
-    steps: ["Augmenter le DCA (versement mensuel).", "Vérifier que vous n'avez pas trop de liquidités non investies.", "Viser le plafond 150k€."], 
+    title: "Optimiser ton PEA", 
+    definition: "T'as l'outil, maintenant il faut le remplir.", 
+    steps: ["Augmente le DCA (versement mensuel).", "Vérifie que t'as pas trop de liquidités non investies.", "Vise le plafond 150k€."], 
     tips: ["L'argent sur le compte espèce ne rapporte rien."], difficulty: 'Facile', impact: 'Long terme' 
   },
 
@@ -97,13 +97,13 @@ const ACTION_GUIDES: Record<string, ActionGuide> = {
     title: "Ouvrir une Assurance Vie",
     definition: "Le couteau suisse de l'épargne (Projets & Succession).",
     steps: ["Choisir contrat sans frais d'entrée.", "Mixer Fonds Euros (Sécurité) et UC (Performance)."],
-    tips: ["Ouvrez pour prendre date."], difficulty: 'Moyen', impact: 'Long terme'
+    tips: ["Ouvre pour prendre date."], difficulty: 'Moyen', impact: 'Long terme'
   },
   AV_BOOST: {
-    title: "Dynamiser votre Assurance Vie",
-    definition: "Votre AV dort peut-être sur un fonds euros peu performant.",
-    steps: ["Vérifier les frais de gestion (<0.6%).", "Arbitrer une partie vers des ETF ou SCPI si horizon long.", "Vérifier la clause bénéficiaire."],
-    tips: ["Si votre contrat a > 8 ans, profitez des abattements."], difficulty: 'Moyen', impact: 'Long terme'
+    title: "Dynamiser ton Assurance Vie",
+    definition: "Ton AV dort peut-être sur un fonds euros peu performant.",
+    steps: ["Vérifie les frais de gestion (<0.6%).", "Arbitre une partie vers des ETF ou SCPI si horizon long.", "Vérifie la clause bénéficiaire."],
+    tips: ["Si ton contrat a > 8 ans, profite des abattements."], difficulty: 'Moyen', impact: 'Long terme'
   },
 
   // --- CRYPTO ---
@@ -114,9 +114,9 @@ const ACTION_GUIDES: Record<string, ActionGuide> = {
     tips: ["Not your keys, not your coins."], difficulty: 'Difficile', impact: 'Long terme'
   },
   CRYPTO_BOOST: {
-    title: "Sécuriser vos Cryptos",
-    definition: "Vous avez des cryptos, pensez à sécuriser vos gains.",
-    steps: ["Avez-vous un Ledger (Cold Wallet) ?", "Rebalencez si ça dépasse 10% de votre patrimoine.", "Déclarez vos comptes aux impôts."],
+    title: "Sécuriser tes cryptos",
+    definition: "T'as des cryptos, pense à sécuriser tes gains.",
+    steps: ["T'as un Ledger (Cold Wallet) ?", "Rebalance si ça dépasse 10% de ton patrimoine.", "Déclare tes comptes aux impôts."],
     tips: ["Prendre des profits n'a jamais tué personne."], difficulty: 'Moyen', impact: 'Long terme'
   },
 
@@ -128,9 +128,9 @@ const ACTION_GUIDES: Record<string, ActionGuide> = {
     tips: ["Placement long terme (8 ans min)."], difficulty: 'Moyen', impact: 'Long terme'
   },
   SCPI_BOOST: {
-    title: "Réinvestir vos loyers SCPI",
-    definition: "Faites rouler la boule de neige immobilière.",
-    steps: ["Optez pour le réinvestissement automatique des dividendes.", "Vérifiez la fiscalité (TMI)."],
+    title: "Réinvestir tes loyers SCPI",
+    definition: "Fais rouler la boule de neige immobilière.",
+    steps: ["Opte pour le réinvestissement automatique des dividendes.", "Vérifie la fiscalité (TMI)."],
     tips: ["Attention à la fiscalité des revenus fonciers."], difficulty: 'Facile', impact: 'Long terme'
   },
 
@@ -143,8 +143,8 @@ const ACTION_GUIDES: Record<string, ActionGuide> = {
   },
   PER_BOOST: {
     title: "Maximiser le plafond PER",
-    definition: "Utilisez votre plafond fiscal non utilisé des 3 dernières années.",
-    steps: ["Regarder avis d'imposition (Plafond Retraite).", "Faire un versement exceptionnel."],
+    definition: "Utilise ton plafond fiscal non utilisé des 3 dernières années.",
+    steps: ["Regarde avis d'imposition (Plafond Retraite).", "Fais un versement exceptionnel."],
     tips: ["C'est le moment de gommer une grosse année fiscale."], difficulty: 'Moyen', impact: 'Long terme'
   }
 };
@@ -247,8 +247,8 @@ export const analyzeGoalStrategies = (goal: Goal, effort: number, capacity: numb
     let color = 'green';
     const strategies: GoalStrategy[] = [];
 
-    if (effort > income) { status = 'IMPOSSIBLE'; color = 'black'; mainMessage = "Impossible."; }
-    else if (gap > 0) { status = 'HARD'; color = 'red'; mainMessage = `Manque ${Math.round(gap)}€/mois.`; }
+    if (effort > income) { status = 'IMPOSSIBLE'; color = 'black'; mainMessage = "Pas possible."; }
+    else if (gap > 0) { status = 'HARD'; color = 'red'; mainMessage = `Il manque ${Math.round(gap)}€/mois.`; }
 
     if (inflationGap > target * 0.05) strategies.push({ type: 'INCOME', title: 'Inflation', message: `Coût réel futur : +${Math.round(inflationGap)}€.` });
 
@@ -437,7 +437,7 @@ export const analyzeProfileHealth = (
       } else {
           return {
               globalScore: 30, tags: ["SURCHAUFFE"], ratios: { needs: 60, wants: 20, savings: 20 }, projections: { wealth10y: 0, wealth20y: 0, fireYear: 99 },
-              opportunities: [{ id: 'OVER_INVEST', type: 'INVESTMENT', level: 'CRITICAL', title: 'Surchauffe', message: `Vous investissez trop (${formatCurrency(context.profitableExpenses)}) par rapport à vos moyens.`, guide: ACTION_GUIDES.BUDGET_CUT }]
+              opportunities: [{ id: 'OVER_INVEST', type: 'INVESTMENT', level: 'CRITICAL', title: 'Surchauffe', message: `Tu investis trop (${formatCurrency(context.profitableExpenses)}) par rapport à tes moyens.`, guide: ACTION_GUIDES.BUDGET_CUT }]
           };
       }
   }
@@ -452,20 +452,20 @@ export const analyzeProfileHealth = (
   if (savings < FINANCIAL_KNOWLEDGE.THRESHOLDS.SURVIVAL_BUFFER) {
     opps.push({
       id: 'safety_danger', type: 'SAVINGS', level: 'CRITICAL',
-      title: 'Zone Rouge', message: `Pas d'épargne de précaution.`,
+      title: 'Zone rouge', message: `Pas de matelas de sécu.`,
       guide: ACTION_GUIDES.LIVRET_OPEN 
     });
   } else if (savings < idealSafety) {
     if (hasAsset(profile, ['livret', 'ldd', 'ldds', 'lep'])) {
       opps.push({
         id: 'safety_boost', type: 'SAVINGS', level: isFreelance ? 'CRITICAL' : 'WARNING',
-        title: 'Sécurité Fragile', message: `Renforcez vos livrets pour atteindre ${targetMonths} mois (${formatCurrency(idealSafety)}).`,
+        title: 'Sécu fragile', message: `Renforce tes livrets pour atteindre ${targetMonths} mois (${formatCurrency(idealSafety)}).`,
         guide: ACTION_GUIDES.LIVRET_BOOST 
       });
     } else {
       opps.push({
         id: 'safety_build', type: 'SAVINGS', level: isFreelance ? 'CRITICAL' : 'WARNING',
-        title: 'Sécurité Fragile', message: `Visez ${targetMonths} mois (${formatCurrency(idealSafety)}).`,
+        title: 'Sécu fragile', message: `Vise ${targetMonths} mois (${formatCurrency(idealSafety)}).`,
         guide: ACTION_GUIDES.LIVRET_OPEN
       });
     }
@@ -475,7 +475,7 @@ export const analyzeProfileHealth = (
       opps.push({
           id: 'debt_alert', type: 'DEBT', level: 'WARNING',
           title: 'Surchauffe Crédit',
-          message: `Endettement à ${Math.round(engagementRate)}%. Attention au refus bancaire futur.`,
+          message: `Endettement à ${Math.round(engagementRate)}%. Fais gaffe au refus bancaire.`,
           guide: ACTION_GUIDES.DETTE
       });
   }
@@ -490,14 +490,14 @@ export const analyzeProfileHealth = (
        const overflow = cash - context.fixed * 1.5;
        
        let guideToUse = ACTION_GUIDES.PEA_OPEN; 
-       let msg = `L'inflation mange vos ${formatCurrency(overflow)}. Placez-les.`;
+       let msg = `L'inflation mange tes ${formatCurrency(overflow)}. Place-les.`;
 
        if (hasAsset(profile, ['pea'])) {
            guideToUse = ACTION_GUIDES.PEA_BOOST; 
-           msg = `Vos ${formatCurrency(overflow)} dorment. Envoyez-les vers votre PEA.`;
+           msg = `Tes ${formatCurrency(overflow)} dorment. Envoie-les vers ton PEA.`;
        } else if (hasAsset(profile, ['av'])) {
            guideToUse = ACTION_GUIDES.AV_BOOST; 
-           msg = `Vos ${formatCurrency(overflow)} dorment. Renforcez votre Assurance Vie.`;
+           msg = `Tes ${formatCurrency(overflow)} dorment. Renforce ton Assurance Vie.`;
        }
 
        opps.push({
@@ -515,7 +515,7 @@ export const analyzeProfileHealth = (
 
       opps.push({
           id: 'late_starter', type: 'INVESTMENT', level: 'WARNING',
-          title: 'Réveil nécessaire', message: `Votre argent stagne. Commencez l'investissement.`,
+          title: 'Réveil nécessaire', message: `Ton argent stagne. Commence l'investissement.`,
           guide: guideToUse
       });
   }
@@ -525,18 +525,18 @@ export const analyzeProfileHealth = (
       const annualIncome = totalIncome * 12;
       const exampleContribution = Math.max(500, Math.min(3000, Math.round(annualIncome * 0.08 / 100) * 100));
       const taxSavings = estimateTaxSavings(annualIncome, exampleContribution);
-      const savingsMsg = taxSavings > 0 ? ` Vous économisez ~${formatCurrency(taxSavings)} d'impôt sur un versement de ${formatCurrency(exampleContribution)}.` : '';
+      const savingsMsg = taxSavings > 0 ? ` Tu économises ~${formatCurrency(taxSavings)} d'impôt sur un versement de ${formatCurrency(exampleContribution)}.` : '';
       if (hasAsset(profile, ['per'])) {
           opps.push({ 
              id: 'tax_optim_boost', type: 'INVESTMENT', level: 'INFO', 
-             title: 'Défiscalisation', message: `Optimisez vos versements PER avant fin d'année.${savingsMsg}`, 
+             title: 'Défiscalisation', message: `Optimise tes versements PER avant fin d'année.${savingsMsg}`, 
              guide: ACTION_GUIDES.PER_BOOST,
              potentialGain: taxSavings
           });
       } else {
           opps.push({ 
              id: 'tax_optim_open', type: 'INVESTMENT', level: 'INFO', 
-             title: 'Trop d\'impôts ?', message: `Avec vos revenus, le PER devient très intéressant.${savingsMsg}`, 
+             title: 'Trop d\'impôts ?', message: `Avec tes revenus, le PER devient très intéressant.${savingsMsg}`, 
              guide: ACTION_GUIDES.PER_OPEN,
              potentialGain: taxSavings
           });
@@ -551,7 +551,7 @@ export const analyzeProfileHealth = (
       if (!hasAsset(profile, ['lep'])) {
           opps.push({
               id: 'lep_opp', type: 'SAVINGS', level: 'SUCCESS',
-              title: 'Droit au LEP', message: `Livret à 5% net disponible. Foncez.`,
+              title: 'Droit au LEP', message: `Livret à 5% net disponible. Fonce.`,
               guide: ACTION_GUIDES.LEP_OPEN,
               potentialGain: (10000 - savings) * 0.02
           });
@@ -563,13 +563,13 @@ export const analyzeProfileHealth = (
       if (!hasAsset(profile, ['crypto']) && (profile.age as number) < 40) {
           opps.push({
               id: 'div_crypto', type: 'INVESTMENT', level: 'INFO',
-              title: 'Diversification Crypto', message: 'Allouez 1% à 5% de votre patrimoine aux actifs numériques.',
+              title: 'Diversification Crypto', message: 'Alloue 1% à 5% de ton patrimoine aux actifs numériques.',
               guide: ACTION_GUIDES.CRYPTO_OPEN
           });
       } else if (hasAsset(profile, ['crypto'])) {
           opps.push({
               id: 'div_crypto_boost', type: 'INVESTMENT', level: 'INFO',
-              title: 'Sécuriser Crypto', message: 'Pensez à sécuriser vos gains crypto sur un Cold Wallet.',
+              title: 'Sécuriser Crypto', message: 'Pense à sécuriser tes gains crypto sur un Cold Wallet.',
               guide: ACTION_GUIDES.CRYPTO_BOOST
           });
       }
@@ -577,7 +577,7 @@ export const analyzeProfileHealth = (
       if (!hasAsset(profile, ['scpi', 'immo']) && !profile.housing?.status?.includes('OWNER')) {
           opps.push({
               id: 'div_scpi', type: 'INVESTMENT', level: 'INFO',
-              title: 'Immobilier Papier', message: 'Ajoutez de la pierre à votre patrimoine sans gestion.',
+              title: 'Immobilier Papier', message: 'Ajoute de la pierre à ton patrimoine sans gestion.',
               guide: ACTION_GUIDES.SCPI_OPEN
           });
       }

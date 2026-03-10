@@ -101,8 +101,8 @@ export function GoalBudgetSidebar({
             </div>
             <p className="text-xs text-slate-400 mt-1 leading-snug">
               {isBudgetNegative
-                ? 'Attention : Tes projets coûtent plus cher que ce que tu peux épargner.'
-                : 'Excellent : Tu finances tes projets et tu gardes une marge de sécurité.'}
+                ? 'Tes projets coûtent plus que ce que tu peux épargner.'
+                : 'Tu finances tes projets et tu gardes une marge. Bien joué.'}
             </p>
           </div>
         </div>

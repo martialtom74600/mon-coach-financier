@@ -20,32 +20,32 @@ export default function Header() {
       // C'est ici que la magie opère : Bonjour Thomas 👋
       title: `Bonjour${userName}`,
       emoji: '👋',
-      subtitle: 'Voici ton bilan financier en temps réel.',
+      subtitle: 'Ton QG financier, en direct.',
     },
     '/dashboard': { // Cas où l'utilisateur forcerait l'url /dashboard
       title: `Bonjour${userName}`,
       emoji: '👋',
-      subtitle: 'Voici ton bilan financier en temps réel.',
+      subtitle: 'Ton QG financier, en direct.',
     },
     '/profile': {
-      title: 'Mon Profil',
+      title: 'Ton Profil',
       emoji: '👤',
-      subtitle: 'Configure ta situation pour affiner le coach.',
+      subtitle: 'On a besoin de te connaître pour te conseiller au top.',
     },
     '/goals': {
-      title: 'Mes objectifs',
+      title: 'Tes objectifs',
       emoji: '🎯',
-      subtitle: 'Définis et suis tes objectifs financiers.',
+      subtitle: 'Définis où tu veux aller, on trace la route ensemble.',
     },
     '/simulator': {
       title: 'Nouveau Projet',
       emoji: '🚀',
-      subtitle: 'Analyse un achat avant de craquer.',
+      subtitle: 'Un achat qui te démange ? On décortique.',
     },
     '/history': {
-      title: 'Historique',
+      title: 'Le Rétro',
       emoji: '📜',
-      subtitle: 'Retrouve toutes tes décisions passées.',
+      subtitle: "Tout ce que t'as déjà simulé, au même endroit.",
     },
   };
 
@@ -53,7 +53,7 @@ export default function Header() {
   const content = pageContent[pathname] || {
     title: 'Coach Fi',
     emoji: '🛡️',
-    subtitle: 'Prenez le contrôle de votre budget.',
+    subtitle: 'Reprends les commandes de ton argent.',
   };
 
   return (

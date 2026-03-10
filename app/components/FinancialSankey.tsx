@@ -148,7 +148,7 @@ const MobileFlowView = ({ totals, totalIncome }: { totals: FlowItem[], totalInco
                  <div className="bg-gradient-to-br from-cyan-400 to-blue-500 rounded-2xl p-6 text-white shadow-xl shadow-cyan-200/50 relative overflow-hidden">
                       <div className="absolute top-0 right-0 p-4 opacity-10"><PiggyBank size={80} /></div>
                       <div className="relative z-10">
-                          <div className="text-cyan-100 text-xs font-bold uppercase tracking-widest mb-1">Il vous reste</div>
+                          <div className="text-cyan-100 text-xs font-bold uppercase tracking-widest mb-1">Il te reste</div>
                           <div className="text-3xl font-black">{formatCurrency(savings.value)}</div>
                           <div className="mt-2 inline-flex items-center bg-white/20 px-2 py-1 rounded-lg text-[10px] font-medium backdrop-blur-sm border border-white/10">
                              <TrendingUp size={10} className="mr-1" /> Capacité d&apos;épargne réelle

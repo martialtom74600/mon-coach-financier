@@ -27,11 +27,11 @@ export default function Error({
         </div>
         <div>
           <h2 className="text-2xl font-black text-slate-900 tracking-tight">
-            Le moteur a rencontré un problème
+            Oups, un petit bug
           </h2>
           <p className="text-slate-500 mt-3 leading-relaxed">
-            Pas de panique — vos données sont intactes. Le calcul a échoué, mais vous pouvez réessayer
-            ou revenir au tableau de bord.
+            Pas de panique — tes données sont intactes. Le calcul a coincé, mais tu peux réessayer
+            ou revenir au QG.
           </p>
         </div>
         {process.env.NODE_ENV === 'development' && (
@@ -56,7 +56,7 @@ export default function Error({
             onClick={() => router.push('/')}
             className="bg-slate-100 hover:bg-slate-200 text-slate-700 px-8 py-3.5 rounded-xl font-bold text-sm transition-all"
           >
-            Retour au tableau de bord
+            Retour au QG
           </button>
         </div>
       </div>

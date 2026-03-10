@@ -67,7 +67,7 @@ export function detectDanger(
       id: 'danger_deficit',
       type: 'DANGER',
       severity: 'critical',
-      message: `Déficit structurel de ${formatCurrency(rawCapacity)}. Vos charges dépassent vos revenus.`,
+      message: `Tes charges dépassent tes revenus (${formatCurrency(rawCapacity)}). On en parle ?`,
       date: now,
       metadata: { rawCapacity, endOfMonthBalance },
     });
@@ -80,7 +80,7 @@ export function detectDanger(
       id: 'danger_overheat',
       type: 'DANGER',
       severity: 'critical',
-      message: `Fin de mois en négatif. Vous investissez trop (${formatCurrency(budget.profitableExpenses)}) par rapport à vos moyens.`,
+      message: `Fin de mois en rouge. Tu mets trop dans l'épargne (${formatCurrency(budget.profitableExpenses)}) par rapport à ce que tu gagnes.`,
       date: now,
       metadata: { rawCapacity, endOfMonthBalance },
     });
@@ -93,7 +93,7 @@ export function detectDanger(
       id: 'danger_no_matelas',
       type: 'DANGER',
       severity: 'critical',
-      message: `Pas d'épargne de précaution (${formatCurrency(matelas)}). Visez au moins ${formatCurrency(THRESHOLDS.SURVIVAL_BUFFER)}.`,
+      message: `Pas encore de matelas de sécu (${formatCurrency(matelas)}). On vise ${formatCurrency(THRESHOLDS.SURVIVAL_BUFFER)} pour commencer ?`,
       date: now,
       metadata: { matelas, threshold: THRESHOLDS.SURVIVAL_BUFFER },
     });
@@ -107,7 +107,7 @@ export function detectDanger(
       id: 'danger_low_balance',
       type: 'DANGER',
       severity: 'warning',
-      message: `Solde courant (${formatCurrency(currentBalance)}) proche du seuil critique. Matelas : ${formatCurrency(matelas)}.`,
+      message: `Ton solde (${formatCurrency(currentBalance)}) frôle la zone rouge. Matelas : ${formatCurrency(matelas)}. On garde un œil ?`,
       date: now,
       metadata: { currentBalance, matelas, minSafeBalance },
     });
@@ -159,7 +159,7 @@ export function detectDrift(
       id: 'drift_matelas_down',
       type: 'DRIFT',
       severity: 'warning',
-      message: `Votre matelas a baissé de ${formatCurrency(prevMatelas - currMatelas)} (${Math.round(driftMatelas * 100)}% de dérive).`,
+      message: `Ton matelas a pris ${formatCurrency(prevMatelas - currMatelas)} en moins (${Math.round(driftMatelas * 100)}% de dérive). Tu sais pourquoi ?`,
       date: now,
       metadata: { prevMatelas, currMatelas, drift: driftMatelas },
     });
@@ -174,7 +174,7 @@ export function detectDrift(
       id: 'drift_balance_down',
       type: 'DRIFT',
       severity: 'warning',
-      message: `Votre solde de fin de mois a diminué (${formatCurrency(prevBalance)} → ${formatCurrency(currBalance)}).`,
+      message: `Ton solde de fin de mois a baissé (${formatCurrency(prevBalance)} → ${formatCurrency(currBalance)}). Tout va bien ?`,
       date: now,
       metadata: { prevBalance, currBalance, drift: driftBalance },
     });
@@ -189,7 +189,7 @@ export function detectDrift(
       id: 'drift_cashflow_down',
       type: 'DRIFT',
       severity: 'info',
-      message: `Votre capacité d'épargne a diminué (${formatCurrency(prevCashflow)} → ${formatCurrency(currCashflow)}).`,
+      message: `Tu épargnes moins qu'avant (${formatCurrency(prevCashflow)} → ${formatCurrency(currCashflow)}). Normal ou à surveiller ?`,
       date: now,
       metadata: { prevCashflow, currCashflow, drift: driftCashflow },
     });
@@ -228,7 +228,7 @@ export function detectMilestones(
         id: 'milestone_matelas',
         type: 'MILESTONE',
         severity: 'success',
-        message: `Ton matelas a atteint ${targetMonths} mois (${formatCurrency(matelas)}) !`,
+        message: `Ton matelas couvre ${targetMonths} mois (${formatCurrency(matelas)}) ! Tu gères.`,
         date: now,
         metadata: { matelas, targetMonths, idealSafety },
       },
@@ -240,7 +240,7 @@ export function detectMilestones(
         id: 'milestone_one_month',
         type: 'MILESTONE',
         severity: 'success',
-        message: `Ton matelas couvre 1 mois de charges (${formatCurrency(matelas)}) ! Continue vers ${targetMonths} mois.`,
+        message: `1 mois de sécu atteint (${formatCurrency(matelas)}) ! Prochaine étape : ${targetMonths} mois.`,
         date: now,
         metadata: { matelas, oneMonth },
       },
@@ -252,7 +252,7 @@ export function detectMilestones(
         id: 'milestone_survival_buffer',
         type: 'MILESTONE',
         severity: 'success',
-        message: `Tu as dépassé le seuil de sécurité de ${formatCurrency(THRESHOLDS.SURVIVAL_BUFFER)}.`,
+        message: `Tu as passé le cap des ${formatCurrency(THRESHOLDS.SURVIVAL_BUFFER)} de sécu. Bien joué.`,
         date: now,
         metadata: { matelas },
       },
@@ -323,7 +323,7 @@ export function detectCalendarAlerts(
       id: `calendar_alert_${format(dayDate, 'yyyy-MM-dd')}`,
       type: 'CALENDAR',
       severity: 'warning',
-      message: `Dans ${daysAhead} jour${daysAhead > 1 ? 's' : ''}, ${withdrawals.length} prélèvement${withdrawals.length > 1 ? 's' : ''} pour ${formatCurrency(totalWithdrawals)}. Solde projeté : ${formatCurrency(Math.round(day.balance))}.`,
+      message: `Dans ${daysAhead} jour${daysAhead > 1 ? 's' : ''} : ${withdrawals.length} prélèvement${withdrawals.length > 1 ? 's' : ''} (${formatCurrency(totalWithdrawals)}). Solde prévu : ${formatCurrency(Math.round(day.balance))}.`,
       date: format(now, 'yyyy-MM-dd'),
       metadata: {
         dayDate: day.date,

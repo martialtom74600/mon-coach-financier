@@ -74,11 +74,11 @@ export default function ProfileWizard() {
 
     if (step === 1) {
       if (!formData.firstName) {
-        setError('Veuillez renseigner votre prénom.');
+        setError('Ton prénom, c\'est quoi ?');
         return false;
       }
       if (!formData.age || parseInt(String(formData.age)) <= 0) {
-        setError('Veuillez renseigner un âge valide.');
+        setError('Ton âge, c\'est quoi ?');
         return false;
       }
     }
@@ -87,7 +87,7 @@ export default function ProfileWizard() {
       const s = formData.housing?.status;
       if (s === HousingStatus.TENANT || s === HousingStatus.OWNER_LOAN) {
         if (!formData.housing.monthlyCost || formData.housing.monthlyCost <= 0) {
-          setError('Veuillez indiquer le montant de votre loyer/crédit.');
+          setError('Combien tu paies pour te loger ?');
           return false;
         }
         if (
@@ -95,7 +95,7 @@ export default function ProfileWizard() {
           formData.housing.paymentDay < 1 ||
           formData.housing.paymentDay > 31
         ) {
-          setError('Veuillez indiquer le jour de prélèvement du logement (1-31).');
+          setError('Tu paies le combien du mois ? (1-31)');
           return false;
         }
       }
@@ -103,14 +103,14 @@ export default function ProfileWizard() {
       const checkList = (list: FormItem[], name: string) => {
         for (const item of list) {
           if (!item.name || (item.name as string).trim() === '')
-            return `Une ligne dans "${name}" n'a pas de nom.`;
+            return `Oups, une ligne sans nom dans "${name}". Donne-lui un petit nom !`;
           if (!item.amount || isNaN(Number(item.amount)))
-            return `Une ligne dans "${name}" n'a pas de montant.`;
+            return `Une ligne dans "${name}" n'a pas de montant. Tu peux compléter ?`;
           if (
             item.category !== ItemCategory.ANNUAL_EXPENSE &&
             (!item.dayOfMonth || item.dayOfMonth < 1 || item.dayOfMonth > 31)
           )
-            return `Une ligne dans "${name}" n'a pas de date de prélèvement valide.`;
+            return `Une ligne dans "${name}" n'a pas de date de prélèvement valide. Tu peux vérifier ?`;
         }
         return null;
       };
@@ -120,7 +120,7 @@ export default function ProfileWizard() {
         setError(err);
         return false;
       }
-      err = checkList(formData.fixedCosts, 'Factures Fixes');
+      err = checkList(formData.fixedCosts, 'Factures fixes');
       if (err) {
         setError(err);
         return false;
@@ -135,7 +135,7 @@ export default function ProfileWizard() {
     if (step === 4) {
       for (const item of formData.variableCosts) {
         if (!item.name || (item.name as string).trim() === '') {
-          setError("Une dépense courante n'a pas de nom.");
+          setError("Oups, une dépense sans nom. Donne-lui un petit nom !");
           return false;
         }
       }
@@ -144,16 +144,16 @@ export default function ProfileWizard() {
     if (step === 5) {
       for (const asset of formData.assetsUi) {
         if (!asset.name || asset.name.trim() === '') {
-          setError("Un de vos comptes n'a pas de nom.");
+          setError("Un compte sans nom ? On lui en trouve un ?");
           return false;
         }
         if (asset.stock === undefined || isNaN(asset.stock)) {
-          setError(`Le solde du compte "${asset.name}" est invalide.`);
+          setError(`Le solde de "${asset.name}" a l'air bizarre. Tu peux vérifier ?`);
           return false;
         }
         if (asset.type !== 'CC' && asset.type !== 'cc' && asset.monthlyFlow > 0) {
           if (!asset.transferDay || asset.transferDay < 1 || asset.transferDay > 31) {
-            setError(`Veuillez indiquer le jour du virement pour "${asset.name}".`);
+            setError(`Tu verses le combien sur "${asset.name}" ? (1-31)`);
             return false;
           }
         }
@@ -208,12 +208,12 @@ export default function ProfileWizard() {
         body: JSON.stringify(finalPayload),
         headers: { 'Content-Type': 'application/json' },
       });
-      if (!response.ok) throw new Error('Erreur API');
+      if (!response.ok) throw new Error('Oups, petit bug. Tu réessaies ?');
       router.push('/');
     } catch (e) {
       console.error(e);
       setIsSaving(false);
-      showToast('Erreur lors de la sauvegarde.');
+      showToast('Oups, petit bug. Tu réessaies ?');
     }
   };
 
@@ -292,14 +292,18 @@ export default function ProfileWizard() {
                 onConfirm={handleSaveAndExit}
                 isSaving={isSaving}
                 onPrev={goPrev}
-                stats={wizardStats!}
+                stats={wizardStats ?? { income: 0, fixed: 0, variable: 0, investments: 0, ratio: 0, remaining: 0 }}
                 error={error}
               />
             )}
           </div>
 
           <div className="hidden lg:block lg:col-span-5 xl:col-span-4">
-            <LiveSummary formData={formData} stats={wizardStats!} currentStep={currentStep} />
+            <LiveSummary
+              formData={formData}
+              stats={wizardStats ?? { income: 0, fixed: 0, variable: 0, investments: 0, ratio: 0, remaining: 0 }}
+              currentStep={currentStep}
+            />
           </div>
         </div>
       </div>

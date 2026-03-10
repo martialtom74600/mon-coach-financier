@@ -93,7 +93,7 @@ export function GoalForm({
           </div>
 
           <div className="pt-2 space-y-3">
-            <label className="block text-sm font-medium text-slate-600">Paramètres avancés</label>
+            <label className="block text-sm font-medium text-slate-600">Options avancées</label>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <ContextToggle
                 variant="emerald"

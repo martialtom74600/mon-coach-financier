@@ -1,8 +1,8 @@
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: 'Paramètres — Mon Coach Financier',
-  description: 'Notifications, emails et confidentialité',
+  title: 'Réglages — Mon Coach Financier',
+  description: 'Notifications, emails et vie privée',
 };
 
 export default function SettingsLayout({

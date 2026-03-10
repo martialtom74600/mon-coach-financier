@@ -53,7 +53,7 @@ export function useFinancialData() {
             );
 
             if (!validated) {
-              setError("Données incohérentes reçues du serveur.");
+              setError("On a reçu des données bizarres. Rafraîchis la page ?");
               return;
             }
 
@@ -83,11 +83,11 @@ export function useFinancialData() {
         }
       } else {
           console.error("Erreur HTTP", res.status);
-          setError("Impossible de charger les données.");
+          setError("On n'arrive pas à charger tes données. Tu réessaies ?");
       }
     } catch (err) {
       console.error("Erreur fetch:", err);
-      setError("Erreur de connexion.");
+      setError("Connexion perdue. Vérifie ton réseau et réessaie.");
     } finally {
       setIsLoadingData(false);
     }
@@ -117,7 +117,7 @@ export function useFinancialData() {
       if (res.ok) {
         const raw = await res.json();
         if (!parseAPIResponse(profilePatchResponseSchema, raw, 'PATCH /api/profile')) {
-          setError("Données incohérentes reçues du serveur.");
+          setError("On a reçu des données bizarres. Rafraîchis la page ?");
         }
       }
     } catch (err) {
@@ -140,7 +140,7 @@ export function useFinancialData() {
           financialItemResponseSchema, raw, 'POST /api/items',
         );
         if (!newItem) {
-          setError("Données incohérentes reçues du serveur.");
+          setError("On a reçu des données bizarres. Rafraîchis la page ?");
         }
         fetchData();
         return newItem;
@@ -166,7 +166,7 @@ export function useFinancialData() {
       if (res.ok) {
         const raw = await res.json();
         if (!parseAPIResponse(successResponseSchema, raw, 'DELETE /api/items/:id')) {
-          setError("Données incohérentes reçues du serveur.");
+          setError("On a reçu des données bizarres. Rafraîchis la page ?");
         }
       } else {
         fetchData();
@@ -188,7 +188,7 @@ export function useFinancialData() {
       if (res.ok) {
         const raw = await res.json();
         if (!parseAPIResponse(assetResponseSchema, raw, `${method} /api/assets`)) {
-          setError("Données incohérentes reçues du serveur.");
+          setError("On a reçu des données bizarres. Rafraîchis la page ?");
         }
       }
       fetchData();
@@ -201,7 +201,7 @@ export function useFinancialData() {
       if (res.ok) {
         const raw = await res.json();
         if (!parseAPIResponse(successResponseSchema, raw, 'DELETE /api/assets/:id')) {
-          setError("Données incohérentes reçues du serveur.");
+          setError("On a reçu des données bizarres. Rafraîchis la page ?");
         }
       }
       fetchData();
@@ -222,7 +222,7 @@ export function useFinancialData() {
       if (res.ok) {
         const raw = await res.json();
         if (!parseAPIResponse(financialGoalResponseSchema, raw, `${method} /api/goals`)) {
-          setError("Données incohérentes reçues du serveur.");
+          setError("On a reçu des données bizarres. Rafraîchis la page ?");
         }
       }
       fetchData();
@@ -235,7 +235,7 @@ export function useFinancialData() {
       if (res.ok) {
         const raw = await res.json();
         if (!parseAPIResponse(successResponseSchema, raw, 'DELETE /api/goals/:id')) {
-          setError("Données incohérentes reçues du serveur.");
+          setError("On a reçu des données bizarres. Rafraîchis la page ?");
         }
       }
       fetchData();
@@ -253,7 +253,7 @@ export function useFinancialData() {
       if (res.ok) {
         const raw = await res.json();
         if (!parseAPIResponse(purchaseDecisionResponseSchema, raw, 'POST /api/decisions')) {
-          setError("Données incohérentes reçues du serveur.");
+          setError("On a reçu des données bizarres. Rafraîchis la page ?");
         }
       }
       fetchData();
@@ -266,7 +266,7 @@ export function useFinancialData() {
       if (res.ok) {
         const raw = await res.json();
         if (!parseAPIResponse(successResponseSchema, raw, 'DELETE /api/decisions/:id')) {
-          setError("Données incohérentes reçues du serveur.");
+          setError("On a reçu des données bizarres. Rafraîchis la page ?");
         }
       }
       fetchData();
@@ -290,7 +290,7 @@ export function useFinancialData() {
       if (res.ok) {
         const raw = await res.json();
         if (!parseAPIResponse(purchaseDecisionResponseSchema, raw, 'PATCH /api/decisions/:id')) {
-          setError("Données incohérentes reçues du serveur.");
+          setError("On a reçu des données bizarres. Rafraîchis la page ?");
           fetchData();
         }
       } else {

@@ -86,7 +86,7 @@ export default function NotificationSection({
   return (
     <ContextToggle
       label="Notifications push"
-      subLabel="Recevez les alertes (découvert, calendrier) sur votre appareil"
+      subLabel="Reçois les alertes (découvert, calendrier) sur ton téléphone"
       icon={Bell}
       checked={pushEnabled}
       onChange={handleToggle}

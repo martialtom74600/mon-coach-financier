@@ -44,7 +44,7 @@ export function HistoryItemCard({
       <button
         onClick={(e) => onDelete(item.id, e)}
         className="absolute top-4 right-4 p-2 bg-white text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-full transition-all opacity-0 group-hover:opacity-100 shadow-sm border border-slate-100"
-        title="Supprimer cette simulation"
+        title="Supprimer"
       >
         {isDeleting ? (
           <div className="animate-spin h-4 w-4 border-2 border-rose-500 border-t-transparent rounded-full"></div>
@@ -80,7 +80,7 @@ export function HistoryItemCard({
           </Badge>
         </div>
         <div className="flex items-center gap-3 mt-3">
-          <span className="text-xs text-slate-500 font-medium">Cet achat valait le coup ?</span>
+          <span className="text-xs text-slate-500 font-medium">Tu regrettes ou pas ?</span>
           <div className="flex items-center gap-1 p-0.5 rounded-xl bg-slate-100/80 border border-slate-200/80">
             <button
               onClick={() => onOutcome(item.id, 'SATISFIED')}

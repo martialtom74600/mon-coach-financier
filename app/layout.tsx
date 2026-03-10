@@ -21,7 +21,7 @@ const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
   title: 'Mon Coach Financier',
-  description: 'Prenez le contrôle de votre budget.',
+  description: 'Reprends les commandes de ton argent.',
   manifest: '/manifest.json',
   appleWebApp: {
     capable: true,

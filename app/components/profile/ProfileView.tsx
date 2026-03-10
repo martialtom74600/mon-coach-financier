@@ -110,7 +110,7 @@ function ExpandableCard({
         </div>
         <div className="flex items-center gap-2 shrink-0">
           <span className="text-xs text-slate-400 hidden sm:inline">
-            {isExpanded ? 'Réduire' : 'Modifier'}
+            {isExpanded ? 'Fermer' : 'Modifier'}
           </span>
           <ChevronDown
             size={18}
@@ -142,10 +142,10 @@ function ExpandableCard({
                   onClearError();
                 }}
               >
-                Annuler
+                Pas grave
               </Button>
               <Button size="sm" onClick={onSave} disabled={isSaving}>
-                {isSaving ? <Loader2 className="animate-spin" size={18} /> : 'Enregistrer'}
+                {isSaving ? <Loader2 className="animate-spin" size={18} /> : 'C\'est bon'}
               </Button>
             </div>
           </div>
@@ -271,7 +271,7 @@ export default function ProfileView({ profile, refreshData }: ProfileViewProps) 
       if (identityPayload.profile) Object.assign(flat, identityPayload.profile);
       if (situationPayload.profile) Object.assign(flat, situationPayload.profile);
       if (Object.keys(flat).length === 0) {
-        setError('Aucune donnée à enregistrer.');
+        setError('Rien à sauvegarder pour l\'instant.');
         setIsSaving(false);
         return;
       }
@@ -282,16 +282,16 @@ export default function ProfileView({ profile, refreshData }: ProfileViewProps) 
       });
       if (!res.ok) {
         const errBody = await res.json().catch(() => ({}));
-        const msg = (errBody as { error?: string; details?: unknown[] })?.error || res.statusText || 'Erreur API';
+        const msg = (errBody as { error?: string; details?: unknown[] })?.error || res.statusText || 'Oups, petit bug. Tu réessaies ?';
         throw new Error(msg);
       }
-      showToast('Modifications enregistrées.');
+      showToast('C\'est enregistré !');
       setHasUnsavedChanges(false);
       if (typeof refreshData === 'function') await refreshData();
       setExpandedSection(null);
     } catch (e) {
       console.error(e);
-      const msg = e instanceof Error ? e.message : 'Erreur lors de la sauvegarde.';
+      const msg = e instanceof Error ? e.message : 'Oups, ça n\'a pas marché. Réessaie ?';
       setError(msg);
       showToast(msg);
     } finally {
@@ -299,15 +299,15 @@ export default function ProfileView({ profile, refreshData }: ProfileViewProps) 
     }
   };
 
-  const handleSaveItems = async () => {
+  const handleSaveItems = async (section: 'revenues' | 'charges' = 'charges') => {
     if (!formData || isSaving) return;
     setIsSaving(true);
     setError(null);
     try {
-      const payload = mapSectionToPayload('charges', formData);
+      const payload = mapSectionToPayload(section, formData);
       const hasData = payload.items && payload.items.length > 0;
       if (!hasData) {
-        setError('Aucune donnée à enregistrer.');
+        setError('Rien à sauvegarder pour l\'instant.');
         setIsSaving(false);
         return;
       }
@@ -318,16 +318,16 @@ export default function ProfileView({ profile, refreshData }: ProfileViewProps) 
       });
       if (!res.ok) {
         const errBody = await res.json().catch(() => ({}));
-        const msg = (errBody as { error?: string })?.error || res.statusText || 'Erreur API';
+        const msg = (errBody as { error?: string })?.error || res.statusText || 'Oups, petit bug. Tu réessaies ?';
         throw new Error(msg);
       }
-      showToast('Modifications enregistrées.');
+      showToast('C\'est enregistré !');
       setHasUnsavedChanges(false);
       if (typeof refreshData === 'function') await refreshData();
       setExpandedSection(null);
     } catch (e) {
       console.error(e);
-      const msg = e instanceof Error ? e.message : 'Erreur lors de la sauvegarde.';
+      const msg = e instanceof Error ? e.message : 'Oups, ça n\'a pas marché. Réessaie ?';
       setError(msg);
       showToast(msg);
     } finally {
@@ -343,7 +343,7 @@ export default function ProfileView({ profile, refreshData }: ProfileViewProps) 
       const payload = mapSectionToPayload('assets', formData);
       const hasData = payload.assets && payload.assets.length > 0;
       if (!hasData) {
-        setError('Aucune donnée à enregistrer.');
+        setError('Rien à sauvegarder pour l\'instant.');
         setIsSaving(false);
         return;
       }
@@ -354,16 +354,16 @@ export default function ProfileView({ profile, refreshData }: ProfileViewProps) 
       });
       if (!res.ok) {
         const errBody = await res.json().catch(() => ({}));
-        const msg = (errBody as { error?: string })?.error || res.statusText || 'Erreur API';
+        const msg = (errBody as { error?: string })?.error || res.statusText || 'Oups, petit bug. Tu réessaies ?';
         throw new Error(msg);
       }
-      showToast('Modifications enregistrées.');
+      showToast('C\'est enregistré !');
       setHasUnsavedChanges(false);
       if (typeof refreshData === 'function') await refreshData();
       setExpandedSection(null);
     } catch (e) {
       console.error(e);
-      const msg = e instanceof Error ? e.message : 'Erreur lors de la sauvegarde.';
+      const msg = e instanceof Error ? e.message : 'Oups, ça n\'a pas marché. Réessaie ?';
       setError(msg);
       showToast(msg);
     } finally {
@@ -384,17 +384,17 @@ export default function ProfileView({ profile, refreshData }: ProfileViewProps) 
       });
       if (!res.ok) {
         const errBody = await res.json().catch(() => ({}));
-        const msg = (errBody as { error?: string })?.error || res.statusText || 'Erreur API';
+        const msg = (errBody as { error?: string })?.error || res.statusText || 'Oups, petit bug. Tu réessaies ?';
         throw new Error(msg);
       }
-      showToast('Modifications enregistrées.');
+      showToast('C\'est enregistré !');
       setHasUnsavedChanges(false);
       setFormData({ ...formData, funBudget: value });
       if (typeof refreshData === 'function') await refreshData();
       setExpandedSection(null);
     } catch (e) {
       console.error(e);
-      const msg = e instanceof Error ? e.message : 'Erreur lors de la sauvegarde.';
+      const msg = e instanceof Error ? e.message : 'Oups, ça n\'a pas marché. Réessaie ?';
       setError(msg);
       showToast(msg);
     } finally {
@@ -455,7 +455,7 @@ export default function ProfileView({ profile, refreshData }: ProfileViewProps) 
                 onChange={(val: string) => formData && updateForm({ ...formData, age: val as unknown as number })}
               />
               <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase mb-3">Statut Pro</label>
+                <label className="block text-xs font-bold text-slate-500 uppercase mb-3">Ton statut</label>
                 <div className="grid grid-cols-2 gap-2">
                   <SelectionTile
                     icon={Briefcase}
@@ -488,7 +488,7 @@ export default function ProfileView({ profile, refreshData }: ProfileViewProps) 
                 </div>
               </div>
               <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase mb-3">Logement</label>
+                <label className="block text-xs font-bold text-slate-500 uppercase mb-3">Ton logement</label>
                 <div className="grid grid-cols-2 gap-2">
                   <SelectionTile
                     icon={Building}
@@ -574,7 +574,7 @@ export default function ProfileView({ profile, refreshData }: ProfileViewProps) 
                 </div>
               )}
               <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase mb-3">Foyer</label>
+                <label className="block text-xs font-bold text-slate-500 uppercase mb-3">Ton foyer</label>
                 <div className="flex gap-4">
                   <CounterControl
                     label="Adultes"
@@ -601,7 +601,7 @@ export default function ProfileView({ profile, refreshData }: ProfileViewProps) 
             title="Revenus"
             icon={Banknote}
             iconBg="bg-emerald-100 text-emerald-600"
-            onSave={handleSaveItems}
+            onSave={() => handleSaveItems('revenues')}
             expandedSection={expandedSection}
             onToggleExpand={toggleExpand}
             formData={formData}
@@ -630,10 +630,10 @@ export default function ProfileView({ profile, refreshData }: ProfileViewProps) 
           {/* Charges */}
           <ExpandableCard
             section="charges"
-            title="Charges"
+            title="Mes dépenses"
             icon={CreditCard}
             iconBg="bg-amber-100 text-amber-600"
-            onSave={handleSaveItems}
+            onSave={() => handleSaveItems('charges')}
             expandedSection={expandedSection}
             onToggleExpand={toggleExpand}
             formData={formData}
@@ -650,7 +650,7 @@ export default function ProfileView({ profile, refreshData }: ProfileViewProps) 
               <AccordionSection
                 mode="expert"
                 defaultOpen={false}
-                title="Factures Fixes"
+                title="Factures fixes"
                 icon={CreditCard}
                 colorClass="text-slate-600"
                 items={formData?.fixedCosts || []}
@@ -672,7 +672,7 @@ export default function ProfileView({ profile, refreshData }: ProfileViewProps) 
               <AccordionSection
                 mode="expert"
                 defaultOpen={false}
-                title="Dépenses Annuelles"
+                title="Dépenses annuelles"
                 icon={Calendar}
                 colorClass="text-orange-500"
                 items={formData?.annualExpenses || []}
@@ -693,13 +693,13 @@ export default function ProfileView({ profile, refreshData }: ProfileViewProps) 
               />
               <div className="p-4 bg-yellow-50 rounded-xl text-sm text-yellow-800 border border-yellow-100 flex items-start gap-3">
                 <AlertCircle className="shrink-0 mt-0.5" size={18} />
-                <span>Dépenses variables lissées sur le mois.</span>
+                <span>Courses, sorties, tout ce qui bouge chaque mois.</span>
               </div>
               <AccordionSection
                 mode="expert"
                 hideDate={true}
                 defaultOpen={false}
-                title="Dépenses Courantes & Loisirs"
+                title="Courses & loisirs"
                 icon={ShoppingCart}
                 colorClass="text-indigo-600"
                 items={formData?.variableCosts || []}
@@ -713,7 +713,7 @@ export default function ProfileView({ profile, refreshData }: ProfileViewProps) 
           {/* Patrimoine */}
           <ExpandableCard
             section="assets"
-            title="Patrimoine"
+            title="Mon argent"
             icon={PiggyBank}
             iconBg="bg-indigo-100 text-indigo-600"
             onSave={handleSaveAssets}
@@ -737,13 +737,14 @@ export default function ProfileView({ profile, refreshData }: ProfileViewProps) 
               updateItem={updateItem}
               editMode
               isSaving={isSaving}
+              hideFooter
             />
           </ExpandableCard>
 
           {/* Stratégie / Budget Plaisir */}
           <ExpandableCard
             section="strategy"
-            title="Budget Plaisir"
+            title="Mon budget sorties"
             icon={Flag}
             iconBg="bg-emerald-100 text-emerald-600"
             onSave={() => handleSaveStrategy()}
@@ -778,11 +779,11 @@ export default function ProfileView({ profile, refreshData }: ProfileViewProps) 
             href="/"
             className="inline-flex items-center gap-1.5 text-indigo-600 font-medium hover:text-indigo-700 hover:underline text-sm"
           >
-            Découvrir mon verdict
+            Voir où t&apos;en es
             <ArrowRight size={16} />
           </Link>
           <Link href="/profile?edit=1" className="text-slate-500 font-medium hover:underline text-sm">
-            Refaire tout le wizard →
+            Tout reprendre depuis le début →
           </Link>
         </div>
       </div>

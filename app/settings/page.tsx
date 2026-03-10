@@ -47,12 +47,12 @@ export default function SettingsPage() {
             setLoading(false);
             return;
           }
-          throw new Error('Erreur chargement');
+          throw new Error('Oups, petit bug. Réessaie ?');
         }
         const data = await res.json();
         setPrefs(data);
       } catch {
-        showToast('Impossible de charger les paramètres', 'error');
+        showToast('On n\'arrive pas à charger tes réglages. Rafraîchis ?', 'error');
       } finally {
         setLoading(false);
       }
@@ -70,12 +70,12 @@ export default function SettingsPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updates),
       });
-      if (!res.ok) throw new Error('Erreur');
+      if (!res.ok) throw new Error('Oups, petit bug. Réessaie ?');
       const data = await res.json();
       setPrefs(data);
-      showToast('Paramètres enregistrés', 'success');
+      showToast('C\'est enregistré !', 'success');
     } catch {
-      showToast('Erreur lors de l\'enregistrement', 'error');
+      showToast('Oups, ça n\'a pas marché. Réessaie ?', 'error');
     } finally {
       setSaving(false);
     }
@@ -89,7 +89,7 @@ export default function SettingsPage() {
     return (
       <div className="py-12 text-center">
         <p className="text-slate-600 mb-4">
-          Complétez votre profil pour accéder aux paramètres.
+          Complète ton profil pour accéder aux réglages.
         </p>
         <a
           href="/profile"
@@ -108,9 +108,9 @@ export default function SettingsPage() {
           <Settings className="text-indigo-600" size={24} />
         </div>
         <div>
-          <h1 className="text-2xl font-bold text-slate-800">Paramètres</h1>
+          <h1 className="text-2xl font-bold text-slate-800">Ton jardin secret</h1>
           <p className="text-sm text-slate-500">
-            Notifications, emails et confidentialité
+            Notifications, emails et vie privée
           </p>
         </div>
       </div>
@@ -138,7 +138,7 @@ export default function SettingsPage() {
 
       <GlassCard>
         <h2 className="text-lg font-bold text-slate-800 mb-4">
-          Données & confidentialité
+          Données & vie privée
         </h2>
         <RgpdSection
           consentAnalytics={prefs.consentAnalytics}

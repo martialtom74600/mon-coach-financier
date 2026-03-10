@@ -8,7 +8,7 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { userId } = auth();
-  if (!userId) return new NextResponse('Non autorisé', { status: 401 });
+  if (!userId) return new NextResponse('Tu n\'as pas accès à ça.', { status: 401 });
 
   const { id } = await params;
   if (!id || typeof id !== 'string' || id.length > 100) {
@@ -26,6 +26,6 @@ export async function PATCH(
       return new NextResponse(error.message, { status: error.status });
     }
     logger.error('API_PATCH_INSIGHT', { userId, insightId: id }, error);
-    return new NextResponse('Erreur interne', { status: 500 });
+    return new NextResponse('Oups, petit bug. Réessaie ?', { status: 500 });
   }
 }

@@ -30,7 +30,7 @@ async function getOrCreateProfileId(userId: string): Promise<string> {
 /** GET — Récupère les préférences du profil (crée User + profil si absent) */
 export async function GET() {
   const { userId } = await auth();
-  if (!userId) return new NextResponse('Non autorisé', { status: 401 });
+  if (!userId) return new NextResponse('Tu n\'as pas accès à ça.', { status: 401 });
 
   try {
     const profileId = await getOrCreateProfileId(userId);
@@ -41,14 +41,14 @@ export async function GET() {
       return new NextResponse(error.message, { status: error.status });
     }
     logger.error('API_GET_PREFERENCES', { userId }, error);
-    return new NextResponse('Erreur interne', { status: 500 });
+    return new NextResponse('Oups, petit bug. Réessaie ?', { status: 500 });
   }
 }
 
 /** PATCH — Met à jour les préférences (merge partiel) */
 export async function PATCH(req: Request) {
   const { userId } = await auth();
-  if (!userId) return new NextResponse('Non autorisé', { status: 401 });
+  if (!userId) return new NextResponse('Tu n\'as pas accès à ça.', { status: 401 });
 
   try {
     const body = await req.json();
@@ -66,6 +66,6 @@ export async function PATCH(req: Request) {
       return new NextResponse(error.message, { status: error.status });
     }
     logger.error('API_PATCH_PREFERENCES', { userId }, error);
-    return new NextResponse('Erreur interne', { status: 500 });
+    return new NextResponse('Oups, petit bug. Réessaie ?', { status: 500 });
   }
 }

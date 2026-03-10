@@ -34,6 +34,9 @@
     "web-push": "^3.6.7",
     "zod": "^4.3.6"
   },
+  "overrides": {
+    "@clerk/clerk-js": "5.15.1"
+  },
   "devDependencies": {
     "@types/node": "^20",
     "@types/react": "^18",

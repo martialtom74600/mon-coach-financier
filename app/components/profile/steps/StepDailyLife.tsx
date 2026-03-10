@@ -23,15 +23,15 @@ export function StepDailyLife({
 }: StepProps) {
   return (
     <WizardLayout
-      title="Dépenses Courantes"
-      subtitle="Tout ce qui est variable et lissé (Courses, Loisirs...)"
+      title="Le quotidien (courses, sorties...)"
+      subtitle="Tout ce qui bouge chaque mois : courses, resto, loisirs..."
       icon={ShoppingCart}
       error={error}
       compact={editMode}
       footer={
         editMode && onSave ? (
           <Button onClick={() => onSave?.()} disabled={isSaving} className="w-full sm:w-auto">
-            {isSaving ? <Loader2 className="animate-spin" /> : 'Enregistrer'}
+            {isSaving ? <Loader2 className="animate-spin" /> : 'C\'est bon'}
           </Button>
         ) : (
           <>
@@ -50,8 +50,7 @@ export function StepDailyLife({
           <AlertCircle className="shrink-0 mt-0.5" size={18} />
           <div>
             <span className="font-bold block mb-1">Pas de date nécessaire</span>
-            Ces dépenses seront &quot;lissées&quot; sur tout le mois par notre algorithme (divisées par 30j) pour
-            simuler une consommation réaliste.
+            On les répartit sur le mois (divisées par 30j) pour simuler une conso réaliste.
           </div>
         </div>
 
@@ -59,7 +58,7 @@ export function StepDailyLife({
           mode="expert"
           hideDate={true}
           defaultOpen={true}
-          title="Dépenses Courantes & Loisirs"
+          title="Quotidien & Loisirs"
           icon={ShoppingCart}
           colorClass="text-indigo-600"
           items={formData.variableCosts}

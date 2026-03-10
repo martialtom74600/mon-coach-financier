@@ -41,11 +41,11 @@ export function DiagnosticCard({ result }: DiagnosticCardProps) {
         <div className="p-5 flex flex-col gap-2">
           <div className="flex justify-between items-start">
             <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-              Moyens Théoriques
+              Budget mensuel
             </div>
             {result.isBudgetOk ? (
             <Badge color="emerald" className="inline-flex items-center gap-1 border border-emerald-200">
-              <CheckCircle size={12} /> Validé
+              <CheckCircle size={12} /> OK
             </Badge>
           ) : (
             <Badge color="rose" className="inline-flex items-center gap-1 border border-rose-200">
@@ -54,11 +54,11 @@ export function DiagnosticCard({ result }: DiagnosticCardProps) {
           )}
           </div>
           <div>
-            <div className="text-sm font-bold text-slate-800">Budget Mensuel</div>
+            <div className="text-sm font-bold text-slate-800">Budget mensuel</div>
             <p className="text-xs text-slate-500 mt-1 leading-snug">
               {result.isBudgetOk
-                ? 'Cet achat rentre dans ton niveau de vie global.'
-                : "Attention, tu vis au-dessus de tes revenus ce mois-ci."}
+                ? 'Cet achat rentre dans ton budget.'
+                : "Ce mois-ci, tu dépenses plus que tu gagnes."}
             </p>
           </div>
         </div>
@@ -66,11 +66,11 @@ export function DiagnosticCard({ result }: DiagnosticCardProps) {
         <div className="p-5 flex flex-col gap-2">
           <div className="flex justify-between items-start">
             <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-              Réalité Compte
+              Trésorerie
             </div>
             {result.isCashflowOk ? (
             <Badge color="emerald" className="inline-flex items-center gap-1 border border-emerald-200">
-              <CheckCircle size={12} /> Validé
+              <CheckCircle size={12} /> OK
             </Badge>
           ) : (
             <Badge color="rose" className="inline-flex items-center gap-1 border border-rose-200">
@@ -82,8 +82,8 @@ export function DiagnosticCard({ result }: DiagnosticCardProps) {
             <div className="text-sm font-bold text-slate-800">Trésorerie J+45</div>
             <p className="text-xs text-slate-500 mt-1 leading-snug">
               {result.isCashflowOk
-                ? 'Aucun découvert prévu sur les 45 prochains jours.'
-                : `Risque de découvert (Min: ${formatCurrency(result.lowestProjectedBalance)}).`}
+                ? 'Pas de découvert en vue sur 45 jours.'
+                : `Découvert possible (min: ${formatCurrency(result.lowestProjectedBalance)}).`}
             </p>
           </div>
         </div>
@@ -105,7 +105,7 @@ export function DiagnosticCard({ result }: DiagnosticCardProps) {
       {result.issues.length > 0 && (
         <div className="px-5 pb-4 bg-white">
           <div className="pt-4 border-t border-slate-100">
-            <p className="text-xs font-bold text-slate-400 mb-2">Points d&apos;attention :</p>
+            <p className="text-xs font-bold text-slate-400 mb-2">À garder en tête :</p>
             {result.issues.map((issue: AnalysisIssue, i: number) => (
               <div
                 key={i}

@@ -9,7 +9,7 @@ export const dynamic = 'force-dynamic';
 
 export async function GET() {
   const { userId } = auth();
-  if (!userId) return new NextResponse("Non autorisé", { status: 401 });
+  if (!userId) return new NextResponse("Tu n'as pas accès à ça.", { status: 401 });
 
   try {
     const profile = await userService.getCachedProfile(userId);
@@ -19,7 +19,7 @@ export async function GET() {
       return new NextResponse(error.message, { status: error.status });
     }
     logger.error("API_GET_USER", { userId }, error);
-    return new NextResponse("Erreur interne", { status: 500 });
+    return new NextResponse("Oups, petit bug. Réessaie ?", { status: 500 });
   }
 }
 
@@ -27,7 +27,7 @@ export async function POST(req: Request) {
   const { userId } = auth();
   const userAuth = await currentUser();
 
-  if (!userId || !userAuth) return new NextResponse("Non autorisé", { status: 401 });
+  if (!userId || !userAuth) return new NextResponse("Tu n'as pas accès à ça.", { status: 401 });
 
   try {
     const body = await req.json();
@@ -52,6 +52,6 @@ export async function POST(req: Request) {
       return new NextResponse(error.message, { status: error.status });
     }
     logger.error("API_POST_USER", { userId }, error);
-    return new NextResponse("Erreur interne lors de la sauvegarde", { status: 500 });
+    return new NextResponse("Oups, la sauvegarde a planté. Tu réessaies ?", { status: 500 });
   }
 }

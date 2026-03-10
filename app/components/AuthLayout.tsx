@@ -20,7 +20,7 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
             OS 2.0
           </h1>
           <p className="text-slate-400 text-xl max-w-md leading-relaxed">
-            L&apos;intelligence artificielle qui transforme vos revenus en patrimoine. 100% Automatisé.
+            L&apos;intelligence artificielle qui transforme tes revenus en patrimoine. 100% Automatisé.
           </p>
         </div>
         <div className="relative z-10 flex gap-8 text-xs font-bold text-slate-500 uppercase tracking-widest">

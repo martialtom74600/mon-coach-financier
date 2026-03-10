@@ -370,38 +370,38 @@ export const analyzePurchaseImpact = (
 
   let verdict: AnalysisResult['verdict'] = 'green';
   let smartTitle = "Feu vert";
-  let smartMessage = "Tout est ok.";
+  let smartMessage = "Tout roule.";
   let score = 100;
   const issues: AnalysisIssue[] = [];
   const tips: AnalysisTip[] = [];
 
   if (isPast) { 
-      verdict = 'green'; smartTitle = "Mise à jour"; smartMessage = "Historique mis à jour."; 
+      verdict = 'green'; smartTitle = "Mis à jour"; smartMessage = "C'est enregistré."; 
   } else if (paymentMode === PaymentMode.CASH_SAVINGS && !isBudgetOk) {
-      verdict = 'red'; smartTitle = "Fonds insuffisants"; smartMessage = `Manque ${formatCurrency(amount - currentStats.matelas)} d'épargne.`; score = 0;
+      verdict = 'red'; smartTitle = "Pas assez de côté"; smartMessage = `Il te manque ${formatCurrency(amount - currentStats.matelas)} pour y arriver.`; score = 0;
   } else if (isBudgetOk && isCashflowOk) {
-      verdict = 'green'; smartTitle = "Fonce !"; smartMessage = "Validé : Budget et Trésorerie OK.";
+      verdict = 'green'; smartTitle = "Fonce !"; smartMessage = "Budget OK, trésorerie OK. Tu peux y aller.";
   } else if (isBudgetOk && !isCashflowOk) {
-      verdict = 'orange'; smartTitle = "Attends un peu"; smartMessage = "Risque de découvert. Attends une rentrée d'argent."; score = 40;
+      verdict = 'orange'; smartTitle = "Aïe, ton compte va faire la tête"; smartMessage = "Risque de découvert. On attend une rentrée d'argent ?"; score = 40;
   } else if (!isBudgetOk && isCashflowOk) {
-      verdict = 'orange'; smartTitle = "Attention au budget"; smartMessage = "Reste à vivre trop faible."; score = 45;
+      verdict = 'orange'; smartTitle = "Budget un peu tendu"; smartMessage = "Ton reste à vivre serait trop juste ce mois-ci."; score = 45;
   } else {
-      verdict = 'red'; smartTitle = "Impossible"; smartMessage = "Ni budget, ni trésorerie."; score = 10;
+      verdict = 'red'; smartTitle = "Pas cette fois"; smartMessage = "Budget et trésorerie : les deux disent non. On repousse ?"; score = 10;
   }
 
   if (!isPast && !isReimbursable) {
     if (newSafetyMonths < 3) {
-      issues.push({ text: `Matelas en danger : il ne couvrirait plus que ${round(newSafetyMonths)} mois de dépenses.`, level: 'red' });
+      issues.push({ text: `Ton matelas passerait sous ${round(newSafetyMonths)} mois de sécu. Un peu risqué.`, level: 'red' });
     }
     if (creditCost > amount * 0.10) {
-      issues.push({ text: `Coût du crédit élevé : ${formatCurrency(creditCost)} d'intérêts, soit ${round(creditCost / amount * 100)}% du prix.`, level: 'orange' });
+      issues.push({ text: `Le crédit te coûterait ${formatCurrency(creditCost)} d'intérêts (${round(creditCost / amount * 100)}% du prix). À garder en tête.`, level: 'orange' });
     }
     if (opportunityCost > amount) {
-      tips.push({ text: `Cet argent investi vaudrait ${formatCurrency(amount + opportunityCost)} dans 10 ans.` });
+      tips.push({ text: `Cet argent placé vaudrait ${formatCurrency(amount + opportunityCost)} dans 10 ans. Food for thought.` });
     }
   }
   if (isReimbursable) {
-    tips.push({ text: `Pensez à suivre le remboursement.` });
+    tips.push({ text: `Pense à suivre qui te doit quoi.` });
   }
 
   return { verdict, score: Math.max(0, score), isBudgetOk, isCashflowOk, smartTitle, smartMessage, issues, tips, newMatelas, newRV: newRemainingToLive, newSafetyMonths, newEngagementRate: 0, realCost: round(realCost), creditCost: round(creditCost), opportunityCost: round(opportunityCost), timeToWork, lowestProjectedBalance: round(lowestProjectedBalance), projectedCurve };

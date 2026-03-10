@@ -13,10 +13,10 @@ export class ServiceError extends Error {
   }
 
   static forbidden() {
-    return new ServiceError('Ressource introuvable ou non autorisée', 404, 'FORBIDDEN');
+    return new ServiceError('Oups, on ne trouve pas ou t\'as pas accès.', 404, 'FORBIDDEN');
   }
 
   static internal(detail?: string) {
-    return new ServiceError(detail ?? 'Erreur interne', 500, 'INTERNAL');
+    return new ServiceError(detail ?? 'Oups, petit bug de notre côté. Réessaie dans un instant ?', 500, 'INTERNAL');
   }
 }

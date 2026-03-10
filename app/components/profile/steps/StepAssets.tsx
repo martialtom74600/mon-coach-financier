@@ -54,6 +54,7 @@ export function StepAssets({
   editMode,
   onSave,
   isSaving,
+  hideFooter,
 }: StepProps) {
   const hasAsset = (labelSubString: string) => {
     return formData.assetsUi.some((i) =>
@@ -83,32 +84,36 @@ export function StepAssets({
 
   return (
     <WizardLayout
-      title="Votre Patrimoine"
-      subtitle="Faisons l'inventaire complet (Comptes & Investissements)."
+      title="Ton argent"
+      subtitle="Tes comptes et investissements."
       icon={ShieldCheck}
       error={error}
       compact={editMode}
       footer={
-        editMode && onSave ? (
-          <Button onClick={() => onSave?.()} disabled={isSaving} className="w-full sm:w-auto">
-            {isSaving ? <Loader2 className="animate-spin" /> : 'Enregistrer'}
-          </Button>
-        ) : (
-          <>
-            <Button variant="ghost" onClick={onPrev}>
-              Retour
-            </Button>
-            <Button onClick={onNext} className="w-full sm:w-auto" size="lg">
-              Découvrir mon verdict <ArrowRight className="ml-2" size={18} />
-            </Button>
-          </>
-        )
+        hideFooter
+          ? undefined
+          : editMode && onSave
+            ? (
+                <Button onClick={() => onSave?.()} disabled={isSaving} className="w-full sm:w-auto">
+                  {isSaving ? <Loader2 className="animate-spin" /> : 'C\'est bon'}
+                </Button>
+              )
+            : (
+                <>
+                  <Button variant="ghost" onClick={onPrev}>
+                    Retour
+                  </Button>
+                  <Button onClick={onNext} className="w-full sm:w-auto" size="lg">
+                    Voir où t&apos;en es <ArrowRight className="ml-2" size={18} />
+                  </Button>
+                </>
+              )
       }
     >
       <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2">
         <div>
           <label className="block text-xs font-bold text-slate-500 uppercase mb-3">
-            Qu&apos;est-ce que vous possédez ?
+            Qu&apos;est-ce que tu as de côté ?
           </label>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
             {ASSET_TYPES.map((type) => {
@@ -126,7 +131,7 @@ export function StepAssets({
                     </div>
                     {isSelected && (
                       <div className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-white ${type.color}`}>
-                        AJOUTÉ
+                        Ajouté !
                       </div>
                     )}
                   </div>
@@ -146,7 +151,7 @@ export function StepAssets({
                 <TrendingUp size={16} />
               </div>
               <span className="text-sm font-bold text-slate-700 uppercase tracking-wide">
-                Détail de vos comptes
+                Détail de tes comptes
               </span>
             </div>
 
@@ -178,7 +183,7 @@ export function StepAssets({
                     <div className={`grid ${isCC ? 'grid-cols-1' : 'grid-cols-12'} gap-4`}>
                       <div className={isCC ? 'col-span-1' : 'col-span-5'}>
                         <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">
-                          Solde Actuel (Stock)
+                          Solde actuel
                         </label>
                         <div className="relative">
                           <input
@@ -199,7 +204,7 @@ export function StepAssets({
                         <>
                           <div className="col-span-4">
                             <label className="block text-[10px] font-bold text-indigo-400 uppercase mb-1">
-                              Versement / Mois
+                              Versement / mois
                             </label>
                             <div className="relative">
                               <input
@@ -218,7 +223,7 @@ export function StepAssets({
                           </div>
                           <div className="col-span-3">
                             <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">
-                              Jour
+                              Jour du mois
                             </label>
                             <div className="relative">
                               <input
@@ -250,9 +255,9 @@ export function StepAssets({
             <Card className="p-4 bg-slate-900 text-white flex justify-between items-center rounded-xl shadow-lg shadow-slate-200/50">
               <div className="flex flex-col">
                 <span className="text-xs text-slate-400 font-medium uppercase tracking-wider">
-                  Patrimoine Total Estimé
+                  Total estimé
                 </span>
-                <span className="text-xs text-slate-500">Cash + Investissements</span>
+                <span className="text-xs text-slate-500">Cash + investissements</span>
               </div>
               <span className="text-2xl font-black">{formatCurrency(totalAssets)}</span>
             </Card>

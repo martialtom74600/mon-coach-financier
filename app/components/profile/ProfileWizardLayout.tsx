@@ -115,7 +115,7 @@ export const LiveSummary = ({ formData, stats, currentStep }: LiveSummaryProps) 
           <User size={64} />
         </div>
         <div className="relative z-10">
-          <h3 className="text-xs font-bold text-indigo-500 uppercase tracking-widest mb-1">Votre Profil</h3>
+          <h3 className="text-xs font-bold text-indigo-500 uppercase tracking-widest mb-1">Ton profil</h3>
           <div className="text-2xl font-black text-slate-800 truncate">{formData.firstName || 'Invité'}</div>
           <div className="flex flex-wrap gap-2 mt-3">
             {formData.age && (
@@ -141,7 +141,7 @@ export const LiveSummary = ({ formData, stats, currentStep }: LiveSummaryProps) 
       {(currentStep >= 3 || income > 0) && (
         <Card className="p-6 border-slate-200 shadow-lg">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="font-bold text-slate-900">Synthèse Mensuelle</h3>
+            <h3 className="font-bold text-slate-900">Synthèse du mois</h3>
             <Badge variant="outline" className={badgeColor}>
               {Math.round(ratio)}% Engagés
             </Badge>
@@ -162,14 +162,14 @@ export const LiveSummary = ({ formData, stats, currentStep }: LiveSummaryProps) 
             </div>
             <div className="flex justify-between items-center text-sm">
               <span className="text-slate-500 flex items-center gap-2">
-                <div className="w-2 h-2 rounded-full bg-orange-400" /> Charges Fixes
+                <div className="w-2 h-2 rounded-full bg-orange-400" /> Charges fixes
               </span>
               <span className="font-bold text-slate-900 text-rose-600">-{formatCurrency(fixed)}</span>
             </div>
             {variable > 0 && (
               <div className="flex justify-between items-center text-sm">
                 <span className="text-slate-500 flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full bg-yellow-400" /> Dépenses Courantes
+                  <div className="w-2 h-2 rounded-full bg-yellow-400" /> Quotidien
                 </span>
                 <span className="font-bold text-slate-700">-{formatCurrency(variable)}</span>
               </div>

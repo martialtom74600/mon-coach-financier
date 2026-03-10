@@ -115,14 +115,14 @@ export default function ProactiveInsightsCard({ insights, onDismiss, onOpenGuide
     <GlassCard className="border-l-4 border-l-indigo-400">
       <div className="flex items-center justify-between mb-2">
         <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest">
-          Alertes & Insights
+          Alertes & Pépites
         </h3>
         <span className="text-xs font-bold text-indigo-600 bg-indigo-50 px-2 py-1 rounded-full">
           {insights.length} alerte{insights.length > 1 ? 's' : ''}
         </span>
       </div>
       <p className="text-[11px] text-slate-400 mb-3">
-        Cliquez sur × pour masquer {durationLabel} — {snoozeLabel}
+        Clique sur × pour masquer — {snoozeLabel}
       </p>
       <div className="space-y-3">
         {insights.map((insight) => {
@@ -156,7 +156,7 @@ export default function ProactiveInsightsCard({ insights, onDismiss, onOpenGuide
                 onClick={(e) => { e.stopPropagation(); handleDismiss(insight.id); }}
                 disabled={dismissing.has(insight.id)}
                 className="p-1.5 rounded-lg hover:bg-slate-200/50 text-slate-400 hover:text-slate-600 transition-colors disabled:opacity-50 shrink-0"
-                aria-label={`Masquer ${durationLabel}`}
+                aria-label="Masquer"
               >
                 <X size={16} />
               </button>

@@ -37,7 +37,7 @@ export default function Navigation() {
           {/* 1. BILAN */}
           <Link href="/" className={`flex flex-col items-center justify-center gap-1 h-full ${isActive('/') ? 'text-indigo-600' : 'text-slate-400'}`}>
             <LayoutDashboard size={20} strokeWidth={isActive('/') ? 2.5 : 2} />
-            <span className={`text-[9px] ${isActive('/') ? 'font-bold' : 'font-medium'}`}>Bilan</span>
+            <span className={`text-[9px] ${isActive('/') ? 'font-bold' : 'font-medium'}`}>Le QG</span>
           </Link>
 
           {/* 2. OBJECTIFS (Nouveau !) */}
@@ -57,7 +57,7 @@ export default function Navigation() {
           {/* 4. HISTORIQUE */}
           <Link href="/history" className={`flex flex-col items-center justify-center gap-1 h-full ${isActive('/history') ? 'text-indigo-600' : 'text-slate-400'}`}>
             <History size={20} strokeWidth={isActive('/history') ? 2.5 : 2} />
-            <span className={`text-[9px] ${isActive('/history') ? 'font-bold' : 'font-medium'}`}>History</span>
+            <span className={`text-[9px] ${isActive('/history') ? 'font-bold' : 'font-medium'}`}>Rétro</span>
           </Link>
 
           {/* 5. PROFIL */}
@@ -69,7 +69,7 @@ export default function Navigation() {
           {/* 6. PARAMÈTRES */}
           <Link href="/settings" className={`flex flex-col items-center justify-center gap-1 h-full ${isActive('/settings') ? 'text-indigo-600' : 'text-slate-400'}`}>
             <Settings size={20} strokeWidth={isActive('/settings') ? 2.5 : 2} />
-            <span className={`text-[9px] ${isActive('/settings') ? 'font-bold' : 'font-medium'}`}>Param.</span>
+            <span className={`text-[9px] ${isActive('/settings') ? 'font-bold' : 'font-medium'}`}>Réglages</span>
           </Link>
 
         </div>
@@ -96,13 +96,13 @@ export default function Navigation() {
           
           <Link href="/" className={getLinkClass('/')}>
             <LayoutDashboard size={20} />
-            <span>Mon bilan</span>
+            <span>Le QG</span>
           </Link>
 
           {/* Ajout du lien Objectifs ici */}
           <Link href="/goals" className={getLinkClass('/goals')}>
             <Target size={20} />
-            <span>Mes objectifs</span>
+            <span>Tes objectifs</span>
           </Link>
 
           <Link href="/simulator" className={getLinkClass('/simulator')}>
@@ -112,25 +112,25 @@ export default function Navigation() {
 
           <Link href="/history" className={getLinkClass('/history')}>
             <History size={20} />
-            <span>Historique</span>
+            <span>Le Rétro</span>
           </Link>
 
           <div className="mt-auto pt-6 border-t border-slate-100">
-             <div className="text-xs font-bold text-slate-400 uppercase tracking-wider px-3 mb-2 mt-4">Configuration</div>
+             <div className="text-xs font-bold text-slate-400 uppercase tracking-wider px-3 mb-2 mt-4">Ton coin</div>
              <Link href="/profile" className={getLinkClass('/profile')}>
                 <User size={20} />
-                <span>Mon profil</span>
+                <span>Ton profil</span>
              </Link>
              <Link href="/settings" className={getLinkClass('/settings')}>
                 <Settings size={20} />
-                <span>Paramètres</span>
+                <span>Ton jardin secret</span>
              </Link>
           </div>
         </div>
 
         <div className="p-4">
           <div className="bg-slate-50 rounded-xl p-3 text-center border border-slate-100">
-            <p className="text-[10px] text-slate-400 font-medium">Version 2.0 &bull; Coach Goals</p>
+            <p className="text-[10px] text-slate-400 font-medium">v2.0 &bull; Coach Goals</p>
           </div>
         </div>
       </div>

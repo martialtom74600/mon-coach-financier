@@ -61,7 +61,7 @@ export const CONSTANTS = {
 
 // ✅ CONFIGURATION VISUELLE DES CATÉGORIES (Basé sur Enum Prisma)
 export const GOAL_CATEGORIES: Record<GoalCategory, { id: GoalCategory, priority: number, label: string, icon: string, description: string }> = {
-  EMERGENCY:   { id: 'EMERGENCY',   priority: 1, label: 'Matelas de Sécurité', icon: '🛡️', description: 'Épargne de précaution' },
+  EMERGENCY:   { id: 'EMERGENCY',   priority: 1, label: 'Matelas de sécu', icon: '🛡️', description: 'Épargne de précaution' },
   REAL_ESTATE: { id: 'REAL_ESTATE', priority: 2, label: 'Immobilier',          icon: '🏠', description: 'Achat résidence' },
   OTHER:       { id: 'OTHER',       priority: 3, label: 'Autre / Dette',       icon: '💳', description: 'Divers / Remboursement' },
   VEHICLE:     { id: 'VEHICLE',     priority: 3, label: 'Véhicule',            icon: '🚗', description: 'Voiture, Moto' },

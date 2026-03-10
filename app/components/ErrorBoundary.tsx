@@ -62,7 +62,7 @@ export default class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBo
             {section} n&apos;a pas pu se charger
           </h3>
           <p className="text-sm text-slate-500 mt-1">
-            Une erreur de calcul s&apos;est produite. Vos données sont intactes.
+            Oups, un petit bug de calcul. Tes données sont intactes, pas de panique.
           </p>
         </div>
         {process.env.NODE_ENV === 'development' && (

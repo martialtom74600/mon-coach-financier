@@ -172,14 +172,14 @@ export default function HistoryPage() {
       <div className="lg:col-span-8 space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
-            <History className="text-indigo-500" /> Vision Financière
+            <History className="text-indigo-500" /> Ta vision
           </h2>
           <ViewModeToggle
             value={viewMode}
             onChange={(v) => setViewMode(v)}
             options={[
               { value: 'calendar', label: 'Calendrier', icon: CalendarIcon },
-              { value: 'list', label: 'Historique', icon: List },
+              { value: 'list', label: 'Rétro', icon: List },
             ]}
             className="self-start sm:self-auto"
           />
@@ -195,7 +195,7 @@ export default function HistoryPage() {
               <EmptyListState
                 icon={LayoutGrid}
                 title="C'est encore vide ici"
-                message="Tes futures simulations s'afficheront ici."
+                message="Tes prochaines simulations s'afficheront ici."
                 buttonLabel="Faire une simulation"
                 onAction={() => router.push('/simulator')}
               />
@@ -230,7 +230,7 @@ export default function HistoryPage() {
       <ConfirmDialog
         open={confirmDelete.open}
         title="Supprimer cette simulation ?"
-        message="Veux-tu vraiment supprimer cette simulation ?"
+        message="Tu es sûr de vouloir supprimer ?"
         confirmLabel="Supprimer"
         cancelLabel="Annuler"
         variant="danger"

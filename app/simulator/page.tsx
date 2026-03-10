@@ -86,7 +86,7 @@ export default function SimulatorPage() {
       });
     } catch (error) {
       console.error('Erreur sauvegarde', error);
-      showToast('Impossible de sauvegarder la décision.');
+      showToast('Oups, on n\'a pas pu enregistrer ta décision. Tu réessaies ?');
     } finally {
       setIsSaving(false);
     }
@@ -99,8 +99,8 @@ export default function SimulatorPage() {
       <ProfileEmptyPrompt
         variant="compact"
         title="Profil manquant"
-        message="Pour simuler un achat, nous avons besoin de connaître ton budget."
-        buttonLabel="Configurer mon Profil"
+        message="Pour simuler un achat, on a besoin de connaître ton budget."
+        buttonLabel="Configurer mon profil"
         onAction={() => router.push('/profile')}
         icon={Settings}
       />
@@ -121,7 +121,7 @@ export default function SimulatorPage() {
         {step === 'result' && result && (
           <div className="space-y-6 animate-fade-in">
             <BackLink
-              label="Modifier la saisie"
+              label="Modifier"
               onClick={() => setStep('input')}
               variant="indigo"
             />
@@ -134,7 +134,7 @@ export default function SimulatorPage() {
       <div className="lg:col-span-5 xl:col-span-4 lg:sticky lg:top-24 space-y-6">
         <Card className="p-6 bg-white border-slate-100 shadow-sm">
           <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2">
-            <Wallet size={20} className="text-slate-400" /> Mon Contexte
+            <Wallet size={20} className="text-slate-400" /> Ton contexte
           </h3>
           <div className="space-y-4">
             <div className="flex justify-between items-center p-3 bg-slate-50 rounded-lg">
@@ -201,7 +201,7 @@ export default function SimulatorPage() {
               <Button onClick={handleSavePurchase} className="w-full shadow-xl" disabled={isSaving}>
                 {isSaving ? '...' : (
                   <>
-                    <Save size={18} /> Enregistrer la décision
+                    <Save size={18} /> Noter ma décision
                   </>
                 )}
               </Button>

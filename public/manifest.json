@@ -1,7 +1,7 @@
 {
   "name": "Mon Coach Financier",
   "short_name": "Coach Fi",
-  "description": "Prenez le contrôle de votre budget et arrêtez les achats impulsifs.",
+  "description": "Reprends les commandes de ton argent et arrête les achats impulsifs.",
   "id": "/",
   "start_url": "/",
   "scope": "/", 

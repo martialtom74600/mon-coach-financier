@@ -32,7 +32,7 @@ export default function RgpdSection({
     try {
       const res = await fetch('/api/me/export');
       if (!res.ok) {
-        showToast('Export non disponible', 'error');
+        showToast('Rien à exporter pour l\'instant.', 'error');
         return;
       }
       const blob = await res.blob();
@@ -42,9 +42,9 @@ export default function RgpdSection({
       a.download = `mes-donnees-${new Date().toISOString().slice(0, 10)}.json`;
       a.click();
       URL.revokeObjectURL(url);
-      showToast('Export téléchargé', 'success');
+      showToast('Export téléchargé !', 'success');
     } catch {
-      showToast('Erreur lors de l\'export', 'error');
+      showToast('Oups, l\'export a coincé. Tu réessaies ?', 'error');
     } finally {
       setExporting(false);
     }
@@ -56,15 +56,15 @@ export default function RgpdSection({
       const res = await fetch('/api/me', { method: 'DELETE' });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        showToast(data.error || 'Erreur lors de la suppression', 'error');
+        showToast(data.error || 'Oups, la suppression a coincé. Tu réessaies ?', 'error');
         setDeleteOpen(false);
         return;
       }
-      showToast('Compte supprimé', 'success');
+      showToast('C\'est fait. À bientôt !', 'success');
       setDeleteOpen(false);
       window.location.href = '/';
     } catch {
-      showToast('Erreur lors de la suppression', 'error');
+      showToast('Oups, la suppression a coincé. Tu réessaies ?', 'error');
       setDeleteOpen(false);
     } finally {
       setDeleting(false);
@@ -76,7 +76,7 @@ export default function RgpdSection({
       <div className="space-y-3">
         <ContextToggle
           label="Statistiques anonymes"
-          subLabel="Nous utilisons des données agrégées pour améliorer le service"
+          subLabel="On utilise des données agrégées pour améliorer le service"
           icon={Shield}
           checked={consentAnalytics}
           onChange={onConsentAnalyticsChange}
@@ -84,7 +84,7 @@ export default function RgpdSection({
           disabled={saving}
         />
         <ContextToggle
-          label="Prospection commerciale"
+          label="Offres et actualités"
           subLabel="Recevoir des offres et actualités (optionnel)"
           icon={Shield}
           checked={consentMarketing}
@@ -95,7 +95,7 @@ export default function RgpdSection({
       </div>
 
       <div className="pt-4 border-t border-slate-200 space-y-3">
-        <p className="text-sm font-medium text-slate-700">Vos données</p>
+        <p className="text-sm font-medium text-slate-700">Tes données</p>
         <div className="flex flex-col sm:flex-row gap-3">
           <Button
             variant="outline"
@@ -122,7 +122,7 @@ export default function RgpdSection({
       <ConfirmDialog
         open={deleteOpen}
         title="Supprimer mon compte"
-        message="Cette action est irréversible. Toutes vos données (profil, objectifs, historique) seront définitivement supprimées."
+        message="C'est définitif. Toutes tes données seront supprimées."
         confirmLabel="Supprimer définitivement"
         variant="danger"
         onConfirm={handleDelete}

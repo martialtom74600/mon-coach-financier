@@ -22,7 +22,7 @@ export async function GET() {
 /** POST — Enregistre une subscription push pour l'utilisateur connecté */
 export async function POST(req: Request) {
   const { userId } = auth();
-  if (!userId) return new NextResponse('Non autorisé', { status: 401 });
+  if (!userId) return new NextResponse('Tu n\'as pas accès à ça.', { status: 401 });
 
   try {
     const body = await req.json();
@@ -33,6 +33,6 @@ export async function POST(req: Request) {
     return NextResponse.json({ success: true });
   } catch (error) {
     logger.error('API_POST_NOTIFICATIONS_SUBSCRIBE', { userId }, error);
-    return new NextResponse('Erreur interne', { status: 500 });
+    return new NextResponse('Oups, petit bug. Réessaie ?', { status: 500 });
   }
 }

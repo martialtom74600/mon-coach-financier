@@ -36,10 +36,10 @@ export function SimulatorForm({ purchase, setPurchase, onAnalyze }: SimulatorFor
     <>
       <div className="mb-2">
         <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-          <ShoppingBag className="text-indigo-600" /> Simulateur d&apos;Achat
+          <ShoppingBag className="text-indigo-600" /> Simulateur d&apos;achat
         </h1>
         <p className="text-slate-500 text-sm mt-1">
-          Est-ce que cet achat rentre dans ton budget sans casser tes objectifs ?
+          Cet achat, il rentre dans ton budget sans casser tes objectifs ?
         </p>
       </div>
       <Card className="p-6 md:p-8">

@@ -24,7 +24,7 @@ export function StepFixedCosts({
 }: StepProps) {
   return (
     <WizardLayout
-      title="Revenus & Charges Fixes"
+      title="Revenus & Charges fixes"
       subtitle="Ce qui tombe à date fixe chaque mois."
       icon={Wallet}
       error={error}
@@ -32,7 +32,7 @@ export function StepFixedCosts({
       footer={
         editMode && onSave ? (
           <Button onClick={() => onSave?.()} disabled={isSaving} className="w-full sm:w-auto">
-            {isSaving ? <Loader2 className="animate-spin" /> : 'Enregistrer'}
+            {isSaving ? <Loader2 className="animate-spin" /> : 'C\'est bon'}
           </Button>
         ) : (
           <>
@@ -63,12 +63,12 @@ export function StepFixedCosts({
           <div className="p-4 bg-slate-50 rounded-xl border border-slate-100 mb-6">
             <h3 className="text-sm font-bold text-slate-700 mb-3 flex items-center gap-2">
               <Home size={16} className="text-indigo-500" />
-              {formData.housing?.status === HousingStatus.TENANT ? 'Votre Loyer' : 'Votre Crédit Immo'}
+              {formData.housing?.status === HousingStatus.TENANT ? 'Ton loyer' : 'Ton crédit immo'}
             </h3>
             <div className="flex gap-4">
               <div className="flex-1">
                 <InputGroup
-                  label="Montant Mensuel"
+                  label="Montant mensuel"
                   type="number"
                   placeholder="800"
                   value={formData.housing?.monthlyCost || ''}
@@ -80,7 +80,7 @@ export function StepFixedCosts({
               </div>
               <div className="w-24">
                 <InputGroup
-                  label="Jour"
+                  label="Jour du mois"
                   type="number"
                   placeholder="5"
                   value={formData.housing?.paymentDay || ''}
@@ -96,7 +96,7 @@ export function StepFixedCosts({
         <AccordionSection
           mode="expert"
           defaultOpen={false}
-          title="Factures Fixes"
+          title="Factures fixes"
           icon={CreditCard}
           colorClass="text-slate-600"
           items={formData.fixedCosts}
@@ -118,7 +118,7 @@ export function StepFixedCosts({
         <AccordionSection
           mode="expert"
           defaultOpen={false}
-          title="Dépenses Annuelles"
+          title="Dépenses annuelles"
           icon={Calendar}
           colorClass="text-orange-500"
           items={formData.annualExpenses}
@@ -129,7 +129,7 @@ export function StepFixedCosts({
         <AccordionSection
           mode="expert"
           defaultOpen={false}
-          title="Crédits Conso"
+          title="Crédits conso"
           icon={AlertCircle}
           colorClass="text-rose-500"
           items={formData.credits}

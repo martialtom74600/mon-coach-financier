@@ -100,7 +100,7 @@ export default function DashboardClient({ profile, firstName, initialInsights = 
       <ProfileEmptyPrompt
         variant="full"
         title={`Bonjour, ${firstName || ''}.`}
-        message="Pour construire votre GPS financier, nous devons d'abord comprendre votre point de départ."
+        message="Pour construire ton GPS financier, on doit d'abord comprendre ton point de départ."
         buttonLabel="Lancer l'analyse"
         onAction={() => router.push('/profile')}
         icon={Zap}
@@ -119,7 +119,7 @@ export default function DashboardClient({ profile, firstName, initialInsights = 
       <ProfileEmptyPrompt
         variant="full"
         title={`Bonjour, ${profile.firstName || firstName || ''}.`}
-        message="Pour construire votre GPS financier, nous devons d'abord comprendre votre point de départ."
+        message="Pour construire ton GPS financier, on doit d'abord comprendre ton point de départ."
         buttonLabel="Lancer l'analyse"
         onAction={() => router.push('/profile')}
         icon={Zap}

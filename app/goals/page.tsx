@@ -118,7 +118,7 @@ export default function GoalsPage() {
       });
     } catch (error) {
       console.error("Erreur sauvegarde objectif", error);
-      showToast("Impossible de sauvegarder l'objectif.");
+      showToast("Oups, on n'a pas pu sauvegarder. Tu réessaies ?");
     } finally {
       setIsSaving(false);
     }
@@ -131,7 +131,7 @@ export default function GoalsPage() {
       await deleteGoal(id);
     } catch (e) {
       console.error(e);
-      showToast('Erreur lors de la suppression');
+      showToast('Oups, la suppression a coincé. Tu réessaies ?');
     }
   });
 
@@ -146,12 +146,12 @@ export default function GoalsPage() {
         <div className="mb-2 flex justify-between items-end">
           <div>
             <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-              <Target className="text-emerald-600" /> {step === 'list' ? 'Mes Objectifs' : 'Nouveau Projet'}
+              <Target className="text-emerald-600" /> {step === 'list' ? 'Tes objectifs' : 'Nouveau Projet'}
             </h1>
             <p className="text-slate-500 text-sm mt-1">
               {step === 'input' && inputStep === 'check'
-                ? 'Analyse de faisabilité...'
-                : 'Planifie ton avenir financier.'}
+                ? 'On calcule...'
+                : 'Planifie où tu veux aller.'}
             </p>
           </div>
           {step === 'list' && (
@@ -200,7 +200,7 @@ export default function GoalsPage() {
               <EmptyListState
                 variant="compact"
                 icon={LayoutGrid}
-                message="Aucun objectif pour le moment."
+                message="Aucun objectif pour l'instant."
                 buttonLabel="Créer mon premier objectif"
                 onAction={() => {
                   setStep('input');
@@ -219,7 +219,7 @@ export default function GoalsPage() {
       <ConfirmDialog
         open={confirmDelete.open}
         title="Supprimer cet objectif ?"
-        message="Cette action est irréversible."
+        message="C'est définitif."
         confirmLabel="Supprimer"
         cancelLabel="Annuler"
         variant="danger"

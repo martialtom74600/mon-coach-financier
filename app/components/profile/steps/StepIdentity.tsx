@@ -9,33 +9,33 @@ import type { StepProps } from '../ProfileWizard.types';
 export function StepIdentity({ formData, updateForm, onNext, error, editMode, onSave, isSaving }: StepProps) {
   return (
     <WizardLayout
-      title="Qui êtes-vous ?"
-      subtitle="Ces infos calibrent nos projections."
+      title="C'est qui, toi ?"
+      subtitle="On en a besoin pour te donner des chiffres qui collent à ta vie."
       icon={User}
       error={error}
       compact={editMode}
       footer={
         editMode && onSave ? (
           <Button onClick={() => onSave?.()} className="w-full" size="lg" disabled={isSaving}>
-            {isSaving ? <Loader2 className="animate-spin" /> : 'Enregistrer'}
+            {isSaving ? <Loader2 className="animate-spin" /> : 'C\'est bon'}
           </Button>
         ) : (
           <Button onClick={onNext} className="w-full" size="lg">
-            C&apos;est parti <ArrowRight className="ml-2" size={18} />
+            C&apos;est parti ! <ArrowRight className="ml-2" size={18} />
           </Button>
         )
       }
     >
       <div className="space-y-6">
         <InputGroup
-          label="Votre Prénom"
+          label="Ton prénom"
           placeholder="Ex: Thomas"
           value={formData.firstName || ''}
           onChange={(val: string) => updateForm({ ...formData, firstName: val })}
         />
         <div className={`transition-opacity duration-500 ${formData.firstName ? 'opacity-100' : 'opacity-30'}`}>
           <InputGroup
-            label="Votre Âge"
+            label="Ton âge"
             type="number"
             placeholder="30"
             value={formData.age || ''}

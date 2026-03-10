@@ -39,9 +39,9 @@ export default function AssetChart({ assetId, assetName, className = '' }: Asset
     fetch(`/api/assets/${assetId}/history`)
       .then((res) => {
         if (!res.ok) {
-          if (res.status === 401) throw new Error('Non autorisé');
+          if (res.status === 401) throw new Error('Accès refusé');
           if (res.status === 403) throw new Error('Accès refusé');
-          throw new Error('Erreur de chargement');
+          throw new Error('Oups, ça n\'a pas chargé. Réessaie ?');
         }
         return res.json();
       })
@@ -58,7 +58,7 @@ export default function AssetChart({ assetId, assetName, className = '' }: Asset
           }))
         );
       })
-      .catch((err) => setError(err instanceof Error ? err.message : 'Erreur'))
+      .catch((err) => setError(err instanceof Error ? err.message : 'Oups'))
       .finally(() => setLoading(false));
   }, [assetId, isExpanded]);
 
@@ -92,19 +92,19 @@ export default function AssetChart({ assetId, assetName, className = '' }: Asset
           )}
           {error && (
             <p className="text-sm text-rose-600 py-4 text-center">
-              {error === 'Accès refusé' || error === 'Non autorisé'
-                ? 'Sauvegardez d\'abord cet actif pour voir son évolution.'
+              {error === 'Accès refusé'
+                ? 'Sauvegarde d\'abord cet actif pour voir son évolution.'
                 : error}
             </p>
           )}
           {!loading && !error && singlePoint && (
             <p className="text-sm text-slate-500 py-4 text-center">
-              Un seul point enregistré. Modifiez la valeur et sauvegardez pour tracer l&apos;évolution.
+              Un seul point enregistré. Modifie la valeur et sauvegarde pour tracer l&apos;évolution.
             </p>
           )}
           {!loading && !error && chartData.length === 0 && !singlePoint && (
             <p className="text-sm text-slate-500 py-4 text-center">
-              Aucun historique. Modifiez la valeur et sauvegardez pour commencer à tracer.
+              Aucun historique. Modifie la valeur et sauvegarde pour commencer à tracer.
             </p>
           )}
           {!loading && !error && canShowChart && (

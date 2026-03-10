@@ -22,7 +22,7 @@ export default function EmailSection({
     <div className="space-y-3">
       <ContextToggle
         label="Alertes par email"
-        subLabel="Recevez les alertes importantes (solde bas, prélèvements à venir)"
+        subLabel="Reçois les alertes importantes (solde bas, prélèvements à venir)"
         icon={Mail}
         checked={emailAlerts}
         onChange={onEmailAlertsChange}
@@ -30,7 +30,7 @@ export default function EmailSection({
       />
       <ContextToggle
         label="Newsletter"
-        subLabel="Conseils et astuces pour optimiser votre budget"
+        subLabel="Conseils et astuces pour optimiser ton budget"
         icon={Mail}
         checked={emailNewsletter}
         onChange={onEmailNewsletterChange}

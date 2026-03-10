@@ -153,7 +153,7 @@ export type SectionPayload = {
 };
 
 export const mapSectionToPayload = (
-  section: 'identity' | 'situation' | 'charges' | 'assets' | 'strategy',
+  section: 'identity' | 'situation' | 'revenues' | 'charges' | 'assets' | 'strategy',
   formData: FormProfile,
   funBudget?: number,
 ): SectionPayload => {
@@ -177,6 +177,7 @@ export const mapSectionToPayload = (
           children: formData.household?.children ?? 0,
         },
       };
+    case 'revenues':
     case 'charges': {
       const full = mapFormToPayload(formData, funBudget ?? formData.funBudget ?? 0);
       const validItems = full.items.filter(
