@@ -134,6 +134,66 @@ export const mapFormToEngineProfile = (formData: FormProfile): Profile => {
   } as Profile;
 };
 
+/** Payload partiel pour sauvegarde par section (K.4) */
+export type SectionPayload = {
+  firstName?: string;
+  profile?: {
+    age?: number;
+    persona?: string;
+    housingStatus?: string;
+    housingCost?: number;
+    housingPaymentDay?: number;
+    adults?: number;
+    children?: number;
+    funBudget?: number;
+  };
+  items?: Array<{ name: string; amount: number; category: string; frequency?: string; dayOfMonth?: number | null }>;
+  assets?: Array<{ id?: string; name: string; type: string; currentValue: number; monthlyFlow?: number; transferDay?: number }>;
+  goals?: Array<unknown>;
+};
+
+export const mapSectionToPayload = (
+  section: 'identity' | 'situation' | 'charges' | 'assets' | 'strategy',
+  formData: FormProfile,
+  funBudget?: number,
+): SectionPayload => {
+  const age = formData.age ? parseInt(String(formData.age)) : undefined;
+  const housing = formData.housing;
+
+  switch (section) {
+    case 'identity':
+      return {
+        firstName: formData.firstName || undefined,
+        profile: age !== undefined && !isNaN(age) ? { age } : undefined,
+      };
+    case 'situation':
+      return {
+        profile: {
+          persona: formData.persona as string,
+          housingStatus: housing?.status as string,
+          housingCost: housing?.monthlyCost ?? 0,
+          housingPaymentDay: housing?.paymentDay ?? 1,
+          adults: formData.household?.adults ?? 1,
+          children: formData.household?.children ?? 0,
+        },
+      };
+    case 'charges': {
+      const full = mapFormToPayload(formData, funBudget ?? formData.funBudget ?? 0);
+      return { items: full.items };
+    }
+    case 'assets': {
+      const full = mapFormToPayload(formData, funBudget ?? formData.funBudget ?? 0);
+      return { assets: full.assets };
+    }
+    case 'strategy':
+      return {
+        profile: { funBudget: funBudget ?? formData.funBudget ?? 0 },
+      };
+    default:
+      return {};
+  }
+};
+
 export const parseNumber = (val: string | number | undefined): number =>
   parseFloat(String(val).replace(/\s/g, '').replace(',', '.')) || 0;
 

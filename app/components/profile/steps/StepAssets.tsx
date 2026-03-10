@@ -4,6 +4,7 @@ import {
   ShieldCheck,
   ArrowRight,
   Trash2,
+  Loader2,
   TrendingUp,
   Wallet,
   Landmark,
@@ -50,6 +51,9 @@ export function StepAssets({
   onNext,
   onPrev,
   error,
+  editMode,
+  onSave,
+  isSaving,
 }: StepProps) {
   const hasAsset = (labelSubString: string) => {
     return formData.assetsUi.some((i) =>
@@ -83,15 +87,22 @@ export function StepAssets({
       subtitle="Faisons l'inventaire complet (Comptes & Investissements)."
       icon={ShieldCheck}
       error={error}
+      compact={editMode}
       footer={
-        <>
-          <Button variant="ghost" onClick={onPrev}>
-            Retour
+        editMode && onSave ? (
+          <Button onClick={() => onSave?.()} disabled={isSaving} className="w-full sm:w-auto">
+            {isSaving ? <Loader2 className="animate-spin" /> : 'Enregistrer'}
           </Button>
-          <Button onClick={onNext} className="w-full sm:w-auto" size="lg">
-            Découvrir mon verdict <ArrowRight className="ml-2" size={18} />
-          </Button>
-        </>
+        ) : (
+          <>
+            <Button variant="ghost" onClick={onPrev}>
+              Retour
+            </Button>
+            <Button onClick={onNext} className="w-full sm:w-auto" size="lg">
+              Découvrir mon verdict <ArrowRight className="ml-2" size={18} />
+            </Button>
+          </>
+        )
       }
     >
       <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2">

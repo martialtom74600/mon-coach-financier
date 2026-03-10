@@ -8,3 +8,4 @@ export * as goalService from './goalService';
 export * as decisionService from './decisionService';
 export * as insightService from './insightService';
 export * as notificationService from './notificationService';
+export * as preferencesService from './preferencesService';

@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { 
   PlusCircle, History, Shield, User, 
-  LayoutDashboard, Target // <--- Import de l'icône Target
+  LayoutDashboard, Target, Settings
 } from 'lucide-react';
 
 export default function Navigation() {
@@ -32,7 +32,7 @@ export default function Navigation() {
         className="md:hidden fixed bottom-0 left-0 right-0 bg-white/90 backdrop-blur-md border-t border-slate-200 z-50 shadow-[0_-4px_15px_rgba(0,0,0,0.05)]"
         style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
       >
-        <div className="grid grid-cols-5 h-16 items-center"> {/* Passage à 5 colonnes pour tout caser */}
+        <div className="grid grid-cols-6 h-16 items-center">
           
           {/* 1. BILAN */}
           <Link href="/" className={`flex flex-col items-center justify-center gap-1 h-full ${isActive('/') ? 'text-indigo-600' : 'text-slate-400'}`}>
@@ -64,6 +64,12 @@ export default function Navigation() {
           <Link href="/profile" className={`flex flex-col items-center justify-center gap-1 h-full ${isActive('/profile') ? 'text-indigo-600' : 'text-slate-400'}`}>
             <User size={20} strokeWidth={isActive('/profile') ? 2.5 : 2} />
             <span className={`text-[9px] ${isActive('/profile') ? 'font-bold' : 'font-medium'}`}>Profil</span>
+          </Link>
+
+          {/* 6. PARAMÈTRES */}
+          <Link href="/settings" className={`flex flex-col items-center justify-center gap-1 h-full ${isActive('/settings') ? 'text-indigo-600' : 'text-slate-400'}`}>
+            <Settings size={20} strokeWidth={isActive('/settings') ? 2.5 : 2} />
+            <span className={`text-[9px] ${isActive('/settings') ? 'font-bold' : 'font-medium'}`}>Param.</span>
           </Link>
 
         </div>
@@ -114,6 +120,10 @@ export default function Navigation() {
              <Link href="/profile" className={getLinkClass('/profile')}>
                 <User size={20} />
                 <span>Mon profil</span>
+             </Link>
+             <Link href="/settings" className={getLinkClass('/settings')}>
+                <Settings size={20} />
+                <span>Paramètres</span>
              </Link>
           </div>
         </div>

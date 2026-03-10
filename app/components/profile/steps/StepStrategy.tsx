@@ -8,7 +8,7 @@ import { formatCurrency } from '@/app/lib/definitions';
 import { getInputValue, parseNumber } from '../ProfileWizard.mappers';
 import type { StepProps } from '../ProfileWizard.types';
 
-export function StepStrategy({ formData, onConfirm, isSaving, onPrev, stats }: StepProps) {
+export function StepStrategy({ formData, onConfirm, isSaving, onPrev, stats, editMode, onSave }: StepProps) {
   const [lifestyleInput, setLifestyleInput] = useState<string | number>('');
 
   useEffect(() => {
@@ -24,19 +24,31 @@ export function StepStrategy({ formData, onConfirm, isSaving, onPrev, stats }: S
       title="Le Verdict"
       subtitle="C'est le moment de vérité."
       icon={Flag}
+      compact={editMode}
       footer={
-        <>
-          <Button variant="ghost" onClick={onPrev}>
-            Retour
-          </Button>
+        editMode && onSave ? (
           <Button
-            onClick={() => onConfirm!(userLifestyle, cashSavingsCapacity)}
+            onClick={() => onSave(userLifestyle)}
+            disabled={isSaving}
             className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 text-white"
             size="lg"
           >
-            {isSaving ? <Loader2 className="animate-spin" /> : 'Valider ma stratégie'}
+            {isSaving ? <Loader2 className="animate-spin" /> : 'Enregistrer'}
           </Button>
-        </>
+        ) : (
+          <>
+            <Button variant="ghost" onClick={onPrev}>
+              Retour
+            </Button>
+            <Button
+              onClick={() => onConfirm!(userLifestyle, cashSavingsCapacity)}
+              className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 text-white"
+              size="lg"
+            >
+              {isSaving ? <Loader2 className="animate-spin" /> : 'Valider ma stratégie'}
+            </Button>
+          </>
+        )
       }
     >
       <div className="space-y-8 animate-in zoom-in-95 duration-500">

@@ -53,6 +53,35 @@ export function buildProfileForClient(raw: RawProfile): Profile | null {
   } as Profile;
 }
 
+/** Crée User + FinancialProfile minimal si absents (pour accès paramètres sans profil). */
+export async function ensureUserAndProfile(
+  userId: string,
+  email: string,
+  firstName?: string,
+): Promise<string> {
+  const user = await prisma.user.upsert({
+    where: { id: userId },
+    update: {},
+    create: {
+      id: userId,
+      email,
+      firstName: firstName ?? '',
+    },
+  });
+
+  let profile = await prisma.financialProfile.findUnique({
+    where: { userId: user.id },
+    select: { id: true },
+  });
+  if (!profile) {
+    profile = await prisma.financialProfile.create({
+      data: { userId: user.id },
+      select: { id: true },
+    });
+  }
+  return profile.id;
+}
+
 export async function getFullUserProfile(userId: string) {
   const user = await prisma.user.findUnique({
     where: { id: userId },

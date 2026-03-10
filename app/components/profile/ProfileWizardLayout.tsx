@@ -15,27 +15,44 @@ import type {
   FormProfile,
 } from './ProfileWizard.types';
 
-export const WizardLayout = ({ title, subtitle, icon: Icon, children, footer, error }: WizardLayoutProps) => (
-  <div className="w-full max-w-2xl mx-auto lg:mx-0 animate-in fade-in slide-in-from-bottom-4 duration-500">
-    <div className="text-center lg:text-left mb-8">
-      <div className="inline-flex p-3 bg-indigo-50 text-indigo-600 rounded-2xl mb-4">
-        <Icon size={28} />
-      </div>
-      <h1 className="text-3xl font-black text-slate-900 mb-2">{title}</h1>
-      <p className="text-slate-500 text-lg max-w-md mx-auto lg:mx-0">{subtitle}</p>
-    </div>
-    <Card className="p-6 md:p-10 shadow-xl shadow-slate-200/40 border-slate-100">
-      {children}
-      {error && (
-        <div className="mt-6 p-4 bg-rose-50 border border-rose-200 rounded-xl flex items-start gap-3 text-rose-700 animate-in slide-in-from-top-2">
-          <AlertTriangle className="shrink-0 mt-0.5" size={20} />
-          <div className="text-sm font-bold">{error}</div>
+export const WizardLayout = ({ title, subtitle, icon: Icon, children, footer, error, compact }: WizardLayoutProps) => (
+  <div className={`w-full max-w-2xl mx-auto lg:mx-0 ${compact ? '' : 'animate-in fade-in slide-in-from-bottom-4 duration-500'}`}>
+    {!compact && (
+      <div className="text-center lg:text-left mb-8">
+        <div className="inline-flex p-3 bg-indigo-50 text-indigo-600 rounded-2xl mb-4">
+          <Icon size={28} />
         </div>
-      )}
-      {footer && (
-        <div className="mt-8 pt-6 border-t border-slate-50 flex items-center justify-between gap-4">{footer}</div>
-      )}
-    </Card>
+        <h1 className="text-3xl font-black text-slate-900 mb-2">{title}</h1>
+        <p className="text-slate-500 text-lg max-w-md mx-auto lg:mx-0">{subtitle}</p>
+      </div>
+    )}
+    {compact ? (
+      <div>
+        {children}
+        {error && (
+          <div className="mt-4 p-4 bg-rose-50 border border-rose-200 rounded-xl flex items-start gap-3 text-rose-700 text-sm font-bold">
+            <AlertTriangle className="shrink-0 mt-0.5" size={20} />
+            {error}
+          </div>
+        )}
+        {footer && (
+          <div className="mt-6 pt-4 border-t border-slate-100 flex items-center justify-between gap-4">{footer}</div>
+        )}
+      </div>
+    ) : (
+      <Card className="p-6 md:p-10 shadow-xl shadow-slate-200/40 border-slate-100">
+        {children}
+        {error && (
+          <div className="mt-6 p-4 bg-rose-50 border border-rose-200 rounded-xl flex items-start gap-3 text-rose-700 animate-in slide-in-from-top-2">
+            <AlertTriangle className="shrink-0 mt-0.5" size={20} />
+            <div className="text-sm font-bold">{error}</div>
+          </div>
+        )}
+        {footer && (
+          <div className="mt-8 pt-6 border-t border-slate-50 flex items-center justify-between gap-4">{footer}</div>
+        )}
+      </Card>
+    )}
   </div>
 );
 

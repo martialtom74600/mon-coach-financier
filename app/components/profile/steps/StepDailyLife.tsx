@@ -1,6 +1,6 @@
 'use client';
 
-import { ShoppingCart, Car, HeartHandshake, User, Coffee, ArrowRight, AlertCircle } from 'lucide-react';
+import { ShoppingCart, Car, HeartHandshake, User, Coffee, ArrowRight, AlertCircle, Loader2 } from 'lucide-react';
 import Button from '@/app/components/ui/Button';
 import AccordionSection from '@/app/components/AccordionSection';
 import { WizardLayout } from '../ProfileWizardLayout';
@@ -17,6 +17,9 @@ export function StepDailyLife({
   onNext,
   onPrev,
   error,
+  editMode,
+  onSave,
+  isSaving,
 }: StepProps) {
   return (
     <WizardLayout
@@ -24,15 +27,22 @@ export function StepDailyLife({
       subtitle="Tout ce qui est variable et lissé (Courses, Loisirs...)"
       icon={ShoppingCart}
       error={error}
+      compact={editMode}
       footer={
-        <>
-          <Button variant="ghost" onClick={onPrev}>
-            Retour
+        editMode && onSave ? (
+          <Button onClick={() => onSave?.()} disabled={isSaving} className="w-full sm:w-auto">
+            {isSaving ? <Loader2 className="animate-spin" /> : 'Enregistrer'}
           </Button>
-          <Button onClick={onNext}>
-            Patrimoine <ArrowRight className="ml-2" size={18} />
-          </Button>
-        </>
+        ) : (
+          <>
+            <Button variant="ghost" onClick={onPrev}>
+              Retour
+            </Button>
+            <Button onClick={onNext}>
+              Patrimoine <ArrowRight className="ml-2" size={18} />
+            </Button>
+          </>
+        )
       }
     >
       <div className="space-y-6">

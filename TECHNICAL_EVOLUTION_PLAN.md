@@ -724,6 +724,57 @@ Chaque étape est **atomique** : elle peut être livrée indépendamment, testé
 
 ---
 
+### PHASE K — Profil & Paramètres
+
+> Priorité : **MOYENNE-HAUTE**. Valeur produit élevée : édition ciblée, préférences, RGPD.
+> **Plan détaillé** : voir `PROFILE_SETTINGS_IMPLEMENTATION_PLAN.md`.
+
+#### K.1 — [TERMINÉ] Modèle UserPreferences
+
+- **Quoi** : Nouveau modèle Prisma pour stocker préférences (push, emails, consentements RGPD).
+- **Pourquoi** : Aucun espace actuel pour les choix utilisateur. Les notifications sont gérées par prompt silencieux.
+- **Implémentation réalisée** : Modèle `UserPreferences` dans `schema.prisma` ; `preferencesService.ts` (getPreferences, updatePreferences, updateConsents) ; `GET/PATCH /api/preferences` ; schémas Zod `updatePreferencesSchema`, `preferencesResponseSchema` ; tests `preferencesService.test.ts`. Schema appliqué via `prisma db push` (migration shadow DB en échec).
+- **Impact** : Migration Prisma, nouveau `preferencesService`, route `GET/PATCH /api/preferences`.
+- **Fichiers touchés** : `schema.prisma`, `preferencesService.ts`, `api/preferences/route.ts`, `validations.ts`, `__tests__/lib/preferencesService.test.ts`.
+
+#### K.2 — [TERMINÉ] Page Settings
+
+- **Quoi** : Page `/settings` avec sections Notifications, Emails, RGPD.
+- **Pourquoi** : Centraliser les préférences et consentements dans une interface dédiée.
+- **Implémentation réalisée** : Page `app/settings/page.tsx` ; `NotificationSection` (toggle push + subscription) ; `EmailSection` (alertes, newsletter) ; `RgpdSection` (consentements, export, suppression) ; routes `GET /api/me/export`, `DELETE /api/me` ; lien Paramètres dans Navigation (desktop + mobile).
+- **Impact** : Nouvelle page, composants `NotificationSection`, `EmailSection`, `RgpdSection`.
+- **Fichiers touchés** : `app/settings/page.tsx`, `app/components/settings/*`, `app/api/me/route.ts`, `app/api/me/export/route.ts`, `Navigation.tsx`.
+
+#### K.3 — [TERMINÉ] Vue Profil récap
+
+- **Quoi** : Page `/profile` affiche un récapitulatif personnalisé au lieu du wizard direct.
+- **Pourquoi** : Profil complet = vue récap, pas re-parcourir le tunnel. Ton personnalisé.
+- **Implémentation réalisée** : `ProfileView.tsx` avec blocs Identité (prénom, âge, persona, logement), Situation financière (revenus, charges, patrimoine), Objectifs (liste) ; `isProfileComplete(profile)` ; page `/profile` : si `?edit=1` ou profil incomplet → wizard, sinon → ProfileView ; lien "Modifier mon profil complet" → `/profile?edit=1`.
+- **Impact** : `ProfileView.tsx`, logique onboarding vs profil existant.
+- **Fichiers touchés** : `app/profile/page.tsx`, `ProfileView.tsx`.
+
+#### K.4 — Édition par section
+
+- **Quoi** : Modifier une section (Identité, Charges, Actifs...) sans refaire tout le wizard.
+- **Pourquoi** : Friction actuelle = tout refaire pour changer un champ.
+- **Impact** : Modal/drawer ou page `/profile/edit` avec onglets. Réutilisation des steps.
+- **Fichiers touchés** : `ProfileEditSection.tsx`, `profile/edit/page.tsx`, mappers partiels.
+
+#### K.5 — Intégration RGPD
+
+- **Quoi** : Export des données, suppression du compte, consentements tracés.
+- **Pourquoi** : Conformité RGPD, droit à l'effacement.
+- **Impact** : `GET /api/me/export`, `DELETE /api/me`, section RGPD dans Settings.
+- **Fichiers touchés** : `api/me/export/route.ts`, `api/me/route.ts`, `RgpdSection.tsx`.
+
+#### K.6 — Navigation & UX
+
+- **Quoi** : Lien Paramètres, ton personnalisé ("Bonjour, {firstName}").
+- **Pourquoi** : Rendre la navigation claire et l'expérience moins impersonnelle.
+- **Fichiers touchés** : `Navigation.tsx`, textes dans ProfileView et Settings.
+
+---
+
 ### PHASE J — Préparation au Scale
 
 > Priorité : **BASSE** (pertinent à 10 000+ utilisateurs).
@@ -764,6 +815,7 @@ Chaque étape est **atomique** : elle peut être livrée indépendamment, testé
 | **G** — Refactoring frontend | Moyen (découpe, composants) | **MOYEN** (maintenabilité) | 🟡 MOYEN TERME |
 | **H** — Pagination + Index | Faible (DB + 1 route) | **MOYEN** (scalabilité) | 🟡 MOYEN TERME |
 | **I** — Moteur proactif | Élevé (nouveau module) | **ÉLEVÉ** (différenciation produit) | 🔵 LONG TERME |
+| **K** — Profil & Paramètres | Moyen (~5 j) | **ÉLEVÉ** (UX, RGPD, préférences) | 🟡 MOYEN TERME |
 | **J** — Scale | Élevé (refactoring profond) | **ÉLEVÉ** (viabilité entreprise) | 🔵 LONG TERME |
 
 ---

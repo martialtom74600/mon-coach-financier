@@ -46,6 +46,8 @@ export interface WizardLayoutProps {
   children: React.ReactNode;
   footer?: React.ReactNode;
   error?: string | null;
+  /** Mode compact : masque le header (pour édition par section, aligné Settings/ProfileView) */
+  compact?: boolean;
 }
 
 export interface SelectionTileProps {
@@ -80,4 +82,8 @@ export interface StepProps {
   isSaving?: boolean;
   stats?: { income: number; fixed: number; variable: number; investments: number; ratio: number; remaining: number } | null;
   error?: string | null;
+  /** Mode édition par section (K.4) : affiche "Enregistrer" au lieu de "Continuer" */
+  editMode?: boolean;
+  /** Callback de sauvegarde. Pour StepStrategy, reçoit le funBudget (lifestyle). */
+  onSave?: (lifestyle?: number) => void | Promise<void>;
 }

@@ -82,7 +82,7 @@ export default function RootLayout({
             <main className={`min-h-screen transition-all duration-300 ${isConnected ? 'md:pl-64 pb-28 md:pb-0' : 'p-0'}`}>
               
               {/* CONTENEUR CENTRÉ : Largeur max contrainte seulement si connecté */}
-              <div className={isConnected ? "max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 md:pt-10" : "w-full h-full"}>
+              <div className={isConnected ? "w-full max-w-7xl xl:max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 pt-6 md:pt-10" : "w-full h-full"}>
                 
                 {/* HEADER (Titre, Profil...) uniquement si connecté */}
                 <SignedIn>

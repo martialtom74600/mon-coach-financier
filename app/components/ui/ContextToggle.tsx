@@ -25,6 +25,7 @@ export interface ContextToggleProps {
   checked: boolean;
   onChange: (checked: boolean) => void;
   variant?: 'emerald' | 'indigo';
+  disabled?: boolean;
 }
 
 export default function ContextToggle({
@@ -34,12 +35,15 @@ export default function ContextToggle({
   checked,
   onChange,
   variant = 'indigo',
+  disabled = false,
 }: ContextToggleProps) {
   const styles = VARIANT_STYLES[variant];
 
   return (
     <label
-      className={`flex items-center gap-4 p-4 border rounded-xl cursor-pointer transition-all duration-200 ${checked ? styles.container : 'bg-white border-slate-200 hover:bg-slate-50'}`}
+      className={`flex items-center gap-4 p-4 border rounded-xl transition-all duration-200 ${
+        disabled ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'
+      } ${checked ? styles.container : 'bg-white border-slate-200 hover:bg-slate-50'}`}
     >
       <div
         className={`p-2 rounded-lg ${checked ? styles.icon : 'bg-slate-100 text-slate-400'}`}
@@ -59,6 +63,7 @@ export default function ContextToggle({
         type="checkbox"
         className="hidden"
         checked={checked}
+        disabled={disabled}
         onChange={(e) => onChange(e.target.checked)}
       />
     </label>

@@ -1,6 +1,6 @@
 'use client';
 
-import { Wallet, Home, CreditCard, Zap, Calendar, AlertCircle, ArrowRight, Banknote } from 'lucide-react';
+import { Wallet, Home, CreditCard, Zap, Calendar, AlertCircle, ArrowRight, Banknote, Loader2 } from 'lucide-react';
 import Button from '@/app/components/ui/Button';
 import InputGroup from '@/app/components/ui/InputGroup';
 import AccordionSection from '@/app/components/AccordionSection';
@@ -18,6 +18,9 @@ export function StepFixedCosts({
   onNext,
   onPrev,
   error,
+  editMode,
+  onSave,
+  isSaving,
 }: StepProps) {
   return (
     <WizardLayout
@@ -25,15 +28,22 @@ export function StepFixedCosts({
       subtitle="Ce qui tombe à date fixe chaque mois."
       icon={Wallet}
       error={error}
+      compact={editMode}
       footer={
-        <>
-          <Button variant="ghost" onClick={onPrev}>
-            Retour
+        editMode && onSave ? (
+          <Button onClick={() => onSave?.()} disabled={isSaving} className="w-full sm:w-auto">
+            {isSaving ? <Loader2 className="animate-spin" /> : 'Enregistrer'}
           </Button>
-          <Button onClick={onNext}>
-            Vie Quotidienne <ArrowRight className="ml-2" size={18} />
-          </Button>
-        </>
+        ) : (
+          <>
+            <Button variant="ghost" onClick={onPrev}>
+              Retour
+            </Button>
+            <Button onClick={onNext}>
+              Vie Quotidienne <ArrowRight className="ml-2" size={18} />
+            </Button>
+          </>
+        )
       }
     >
       <div className="space-y-6">

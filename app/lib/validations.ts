@@ -149,6 +149,7 @@ export const updateDecisionSchema = z.object({
 // ============================================================================
 
 export const updateProfileSchema = z.object({
+  firstName: z.string().min(1).max(100).optional(),
   age: z.coerce.number().int().min(0).max(120).nullable().optional(),
   persona: UserPersonaEnum.nullable().optional(),
   housingStatus: HousingStatusEnum.nullable().optional(),
@@ -157,6 +158,30 @@ export const updateProfileSchema = z.object({
   adults: z.coerce.number().int().min(1).max(20).optional(),
   children: z.coerce.number().int().min(0).max(20).optional(),
   funBudget: amount.optional(),
+});
+
+// ============================================================================
+// PREFERENCES (K.1 — Profil & Paramètres)
+// ============================================================================
+
+export const updatePreferencesSchema = z.object({
+  pushEnabled: z.boolean().optional(),
+  emailAlerts: z.boolean().optional(),
+  emailNewsletter: z.boolean().optional(),
+  consentAnalytics: z.boolean().optional(),
+  consentMarketing: z.boolean().optional(),
+});
+
+export const preferencesResponseSchema = z.object({
+  id: z.string(),
+  pushEnabled: z.boolean(),
+  emailAlerts: z.boolean(),
+  emailNewsletter: z.boolean(),
+  consentAnalytics: z.boolean(),
+  consentMarketing: z.boolean(),
+  consentUpdatedAt: z.string().datetime(),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime(),
 });
 
 // ============================================================================
@@ -368,6 +393,7 @@ const housingResponseSchema = z.object({
 
 export const profileAPIResponseSchema = z.object({
   id: z.string().optional(),
+  profileId: z.string().optional(), // FinancialProfile.id — requis pour isProfileComplete (éviter le tunnel wizard)
   email: z.string().optional(),
   firstName: z.string().nullable().optional(),
 

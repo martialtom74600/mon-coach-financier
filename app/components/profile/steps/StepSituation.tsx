@@ -1,27 +1,34 @@
 'use client';
 
-import { Briefcase, Target, GraduationCap, Armchair, Building, Home, CheckCircle, HeartHandshake, ArrowRight } from 'lucide-react';
+import { Briefcase, Target, GraduationCap, Armchair, Building, Home, CheckCircle, HeartHandshake, ArrowRight, Loader2 } from 'lucide-react';
 import Button from '@/app/components/ui/Button';
 import { WizardLayout, SelectionTile, CounterControl } from '../ProfileWizardLayout';
 import { UserPersona, HousingStatus } from '@/app/lib/definitions';
 import type { StepProps } from '../ProfileWizard.types';
 
-export function StepSituation({ formData, updateForm, onNext, onPrev, error }: StepProps) {
+export function StepSituation({ formData, updateForm, onNext, onPrev, error, editMode, onSave, isSaving }: StepProps) {
   return (
     <WizardLayout
       title="Votre Situation"
       subtitle="Adaptons la stratégie à votre profil."
       icon={Briefcase}
       error={error}
+      compact={editMode}
       footer={
-        <>
-          <Button variant="ghost" onClick={onPrev}>
-            Retour
+        editMode && onSave ? (
+          <Button onClick={() => onSave?.()} disabled={isSaving} className="w-full sm:w-auto">
+            {isSaving ? <Loader2 className="animate-spin" /> : 'Enregistrer'}
           </Button>
-          <Button onClick={onNext}>
-            Continuer <ArrowRight className="ml-2" size={18} />
-          </Button>
-        </>
+        ) : (
+          <>
+            <Button variant="ghost" onClick={onPrev}>
+              Retour
+            </Button>
+            <Button onClick={onNext}>
+              Continuer <ArrowRight className="ml-2" size={18} />
+            </Button>
+          </>
+        )
       }
     >
       <div className="space-y-8">
