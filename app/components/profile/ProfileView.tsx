@@ -782,7 +782,7 @@ export default function ProfileView({ profile, refreshData }: ProfileViewProps) 
             Voir où t&apos;en es
             <ArrowRight size={16} />
           </Link>
-          <Link href="/profile?edit=1" className="text-slate-500 font-medium hover:underline text-sm">
+          <Link href="/profile/edit" className="text-slate-500 font-medium hover:underline text-sm">
             Tout reprendre depuis le début →
           </Link>
         </div>

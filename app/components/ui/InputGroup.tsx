@@ -27,10 +27,10 @@ const InputGroup = ({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all"
+        className="w-full min-h-[44px] px-4 py-3 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all"
       />
       {suffix && (
-        <span className="absolute right-3 top-3 text-slate-400 text-sm">
+        <span className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 text-sm">
           {suffix}
         </span>
       )}

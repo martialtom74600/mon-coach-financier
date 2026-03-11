@@ -43,7 +43,7 @@ export function HistoryItemCard({
     >
       <button
         onClick={(e) => onDelete(item.id, e)}
-        className="absolute top-4 right-4 p-2 bg-white text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-full transition-all opacity-0 group-hover:opacity-100 shadow-sm border border-slate-100"
+        className="absolute top-4 right-4 min-w-[44px] min-h-[44px] flex items-center justify-center bg-white text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-full transition-all opacity-100 md:opacity-0 md:group-hover:opacity-100 shadow-sm border border-slate-100"
         title="Supprimer"
       >
         {isDeleting ? (
@@ -81,33 +81,33 @@ export function HistoryItemCard({
         </div>
         <div className="flex items-center gap-3 mt-3">
           <span className="text-xs text-slate-500 font-medium">Tu regrettes ou pas ?</span>
-          <div className="flex items-center gap-1 p-0.5 rounded-xl bg-slate-100/80 border border-slate-200/80">
+          <div className="flex items-center gap-2 p-1 rounded-xl bg-slate-100/80 border border-slate-200/80">
             <button
               onClick={() => onOutcome(item.id, 'SATISFIED')}
               disabled={isUpdating}
               title="J'ai bien fait"
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all disabled:opacity-60 disabled:cursor-not-allowed ${outcome === 'SATISFIED' ? 'bg-emerald-500 text-white shadow-sm' : 'text-slate-500 hover:bg-white hover:text-emerald-600'}`}
+              className={`flex items-center gap-1.5 min-h-[44px] px-4 py-2 rounded-lg text-sm font-medium transition-all disabled:opacity-60 disabled:cursor-not-allowed ${outcome === 'SATISFIED' ? 'bg-emerald-500 text-white shadow-sm' : 'text-slate-500 hover:bg-white hover:text-emerald-600'}`}
             >
-              <ThumbsUp size={14} strokeWidth={2.5} />
-              <span className="hidden sm:inline">Oui</span>
+              <ThumbsUp size={16} strokeWidth={2.5} />
+              <span>Oui</span>
             </button>
             <button
               onClick={() => onOutcome(item.id, 'REGRETTED')}
               disabled={isUpdating}
               title="Je regrette"
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all disabled:opacity-60 disabled:cursor-not-allowed ${outcome === 'REGRETTED' ? 'bg-rose-500 text-white shadow-sm' : 'text-slate-500 hover:bg-white hover:text-rose-600'}`}
+              className={`flex items-center gap-1.5 min-h-[44px] px-4 py-2 rounded-lg text-sm font-medium transition-all disabled:opacity-60 disabled:cursor-not-allowed ${outcome === 'REGRETTED' ? 'bg-rose-500 text-white shadow-sm' : 'text-slate-500 hover:bg-white hover:text-rose-600'}`}
             >
-              <ThumbsDown size={14} strokeWidth={2.5} />
-              <span className="hidden sm:inline">Non</span>
+              <ThumbsDown size={16} strokeWidth={2.5} />
+              <span>Non</span>
             </button>
             {outcome && (
               <button
                 onClick={() => onOutcome(item.id, null)}
                 disabled={isUpdating}
                 title="Réinitialiser"
-                className="ml-1 p-1.5 rounded-lg text-slate-400 hover:bg-slate-200/60 hover:text-slate-600 transition-colors"
+                className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg text-slate-400 hover:bg-slate-200/60 hover:text-slate-600 transition-colors"
               >
-                <RotateCcw size={12} />
+                <RotateCcw size={16} />
               </button>
             )}
           </div>

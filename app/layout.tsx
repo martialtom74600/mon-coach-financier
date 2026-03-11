@@ -30,14 +30,13 @@ export const metadata: Metadata = {
   },
 };
 
-// AJOUT IMPORTANT : viewportFit: 'cover' pour gérer le "Notch" et la barre du bas sur iPhone
+// viewportFit: 'cover' pour gérer le "Notch" et la barre du bas sur iPhone
+// maximumScale et userScalable retirés pour l'accessibilité (zoom autorisé)
 export const viewport: Viewport = {
   themeColor: '#4f46e5',
   width: 'device-width',
   initialScale: 1,
-  maximumScale: 1,
-  userScalable: false,
-  viewportFit: 'cover', 
+  viewportFit: 'cover',
 };
 
 export default function RootLayout({

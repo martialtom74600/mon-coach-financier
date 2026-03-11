@@ -48,7 +48,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
       {toast && (
         <div
           role="alert"
-          className={`fixed bottom-6 left-4 right-4 md:left-auto md:right-6 md:max-w-sm z-50 px-4 py-3 rounded-xl border shadow-lg animate-fade-in ${variantStyles[toast.variant]}`}
+          className={`fixed bottom-24 left-4 right-4 md:bottom-6 md:left-auto md:right-6 md:max-w-sm z-50 px-4 py-3 rounded-xl border shadow-lg animate-fade-in ${variantStyles[toast.variant]}`}
         >
           {toast.message}
         </div>

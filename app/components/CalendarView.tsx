@@ -28,7 +28,7 @@ const DayDetailModal = ({ day, onClose }: { day: TimelineDay, onClose: () => voi
               Solde : {formatCurrency(day.balance ?? 0)}
             </div>
           </div>
-          <button onClick={onClose} className="p-2 bg-white rounded-full hover:bg-slate-200 transition-colors text-slate-500">
+          <button onClick={onClose} className="min-w-[44px] min-h-[44px] flex items-center justify-center bg-white rounded-full hover:bg-slate-200 transition-colors text-slate-500" aria-label="Fermer">
             <X size={20} />
           </button>
         </div>

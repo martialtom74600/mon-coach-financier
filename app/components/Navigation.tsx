@@ -1,15 +1,16 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { 
   PlusCircle, History, Shield, User, 
-  LayoutDashboard, Target, Settings
+  LayoutDashboard, Target, Settings, Menu, X
 } from 'lucide-react';
 
 export default function Navigation() {
   const pathname = usePathname();
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const isActive = (path: string) => pathname === path;
 
   const getLinkClass = (path: string) => {
@@ -26,54 +27,128 @@ export default function Navigation() {
   return (
     <>
       {/* =========================================================
-          VERSION MOBILE (Bottom Bar)
+          VERSION MOBILE — 4 items + Menu (plus accessible)
+          Zones tactiles 44px min, moins d'icônes = plus d'espace
       ========================================================== */}
       <div 
-        className="md:hidden fixed bottom-0 left-0 right-0 bg-white/90 backdrop-blur-md border-t border-slate-200 z-50 shadow-[0_-4px_15px_rgba(0,0,0,0.05)]"
+        className="md:hidden fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-md border-t border-slate-200 z-50 shadow-[0_-4px_15px_rgba(0,0,0,0.08)]"
         style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
       >
-        <div className="grid grid-cols-6 h-16 items-center">
+        <div className="grid grid-cols-5 h-[72px] items-stretch">
           
-          {/* 1. BILAN */}
-          <Link href="/" className={`flex flex-col items-center justify-center gap-1 h-full ${isActive('/') ? 'text-indigo-600' : 'text-slate-400'}`}>
-            <LayoutDashboard size={20} strokeWidth={isActive('/') ? 2.5 : 2} />
-            <span className={`text-[9px] ${isActive('/') ? 'font-bold' : 'font-medium'}`}>Le QG</span>
+          {/* 1. LE QG */}
+          <Link 
+            href="/" 
+            className={`flex flex-col items-center justify-center gap-0.5 min-h-[44px] active:scale-95 transition-transform ${isActive('/') ? 'text-indigo-600' : 'text-slate-500'}`}
+            aria-label="Le QG"
+          >
+            <LayoutDashboard size={24} strokeWidth={isActive('/') ? 2.5 : 2} />
+            <span className={`text-[11px] font-medium ${isActive('/') ? 'font-bold' : ''}`}>QG</span>
           </Link>
 
-          {/* 2. OBJECTIFS (Nouveau !) */}
-          <Link href="/goals" className={`flex flex-col items-center justify-center gap-1 h-full ${isActive('/goals') ? 'text-indigo-600' : 'text-slate-400'}`}>
-            <Target size={20} strokeWidth={isActive('/goals') ? 2.5 : 2} />
-            <span className={`text-[9px] ${isActive('/goals') ? 'font-bold' : 'font-medium'}`}>Objectifs</span>
+          {/* 2. OBJECTIFS */}
+          <Link 
+            href="/goals" 
+            className={`flex flex-col items-center justify-center gap-0.5 min-h-[44px] active:scale-95 transition-transform ${isActive('/goals') ? 'text-indigo-600' : 'text-slate-500'}`}
+            aria-label="Objectifs"
+          >
+            <Target size={24} strokeWidth={isActive('/goals') ? 2.5 : 2} />
+            <span className={`text-[11px] font-medium ${isActive('/goals') ? 'font-bold' : ''}`}>Objectifs</span>
           </Link>
 
-          {/* 3. SIMULATEUR (Central) */}
-          <Link href="/simulator" className="flex flex-col items-center justify-center relative group h-full">
-            <div className={`absolute -top-5 p-2.5 rounded-full shadow-xl border-4 border-white transition-transform duration-200 active:scale-95 bg-indigo-600 text-white`}>
-                <PlusCircle size={24} strokeWidth={2.5} />
+          {/* 3. SIMULATEUR (Central, FAB) */}
+          <Link 
+            href="/simulator" 
+            className="flex flex-col items-center justify-center relative min-h-[44px] active:scale-95 transition-transform"
+            aria-label="Simuler un achat"
+          >
+            <div className={`absolute -top-6 p-3 rounded-full shadow-xl border-4 border-white transition-transform bg-indigo-600 text-white ${isActive('/simulator') ? 'ring-2 ring-indigo-300' : ''}`}>
+              <PlusCircle size={28} strokeWidth={2.5} />
             </div>
-            <span className={`text-[9px] font-bold mt-7 ${isActive('/simulator') ? 'text-indigo-600' : 'text-slate-500'}`}>Simuler</span>
+            <span className={`text-[11px] font-bold mt-8 ${isActive('/simulator') ? 'text-indigo-600' : 'text-slate-600'}`}>Simuler</span>
           </Link>
 
-          {/* 4. HISTORIQUE */}
-          <Link href="/history" className={`flex flex-col items-center justify-center gap-1 h-full ${isActive('/history') ? 'text-indigo-600' : 'text-slate-400'}`}>
-            <History size={20} strokeWidth={isActive('/history') ? 2.5 : 2} />
-            <span className={`text-[9px] ${isActive('/history') ? 'font-bold' : 'font-medium'}`}>Rétro</span>
+          {/* 4. RÉTRO */}
+          <Link 
+            href="/history" 
+            className={`flex flex-col items-center justify-center gap-0.5 min-h-[44px] active:scale-95 transition-transform ${isActive('/history') ? 'text-indigo-600' : 'text-slate-500'}`}
+            aria-label="Le Rétro"
+          >
+            <History size={24} strokeWidth={isActive('/history') ? 2.5 : 2} />
+            <span className={`text-[11px] font-medium ${isActive('/history') ? 'font-bold' : ''}`}>Rétro</span>
           </Link>
 
-          {/* 5. PROFIL */}
-          <Link href="/profile" className={`flex flex-col items-center justify-center gap-1 h-full ${isActive('/profile') ? 'text-indigo-600' : 'text-slate-400'}`}>
-            <User size={20} strokeWidth={isActive('/profile') ? 2.5 : 2} />
-            <span className={`text-[9px] ${isActive('/profile') ? 'font-bold' : 'font-medium'}`}>Profil</span>
-          </Link>
-
-          {/* 6. PARAMÈTRES */}
-          <Link href="/settings" className={`flex flex-col items-center justify-center gap-1 h-full ${isActive('/settings') ? 'text-indigo-600' : 'text-slate-400'}`}>
-            <Settings size={20} strokeWidth={isActive('/settings') ? 2.5 : 2} />
-            <span className={`text-[9px] ${isActive('/settings') ? 'font-bold' : 'font-medium'}`}>Réglages</span>
-          </Link>
-
+          {/* 5. MENU (ouvre bottom sheet) */}
+          <button
+            type="button"
+            onClick={() => setMobileMenuOpen(true)}
+            className={`flex flex-col items-center justify-center gap-0.5 min-h-[44px] active:scale-95 transition-transform ${mobileMenuOpen || isActive('/profile') || isActive('/settings') ? 'text-indigo-600' : 'text-slate-500'}`}
+            aria-label="Menu"
+            aria-expanded={mobileMenuOpen}
+          >
+            <Menu size={24} strokeWidth={2} />
+            <span className="text-[11px] font-medium">Plus</span>
+          </button>
         </div>
       </div>
+
+      {/* Bottom Sheet — Profil & Réglages */}
+      {mobileMenuOpen && (
+        <>
+          <div 
+            className="md:hidden fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[60] animate-in fade-in duration-200"
+            onClick={() => setMobileMenuOpen(false)}
+            aria-hidden="true"
+          />
+          <div 
+            className="md:hidden fixed bottom-0 left-0 right-0 bg-white rounded-t-3xl shadow-[0_-8px_30px_rgba(0,0,0,0.12)] z-[61] animate-in fade-in slide-in-from-bottom-4 duration-300"
+            style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 24px)' }}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Menu Profil et Réglages"
+          >
+            <div className="flex items-center justify-between p-4 border-b border-slate-100">
+              <h2 className="text-lg font-bold text-slate-800">Mon compte</h2>
+              <button
+                type="button"
+                onClick={() => setMobileMenuOpen(false)}
+                className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors"
+                aria-label="Fermer"
+              >
+                <X size={24} />
+              </button>
+            </div>
+            <div className="p-4 space-y-2">
+              <Link
+                href="/profile"
+                onClick={() => setMobileMenuOpen(false)}
+                className="flex items-center gap-4 min-h-[56px] px-4 rounded-xl hover:bg-slate-50 active:bg-indigo-50 transition-colors"
+              >
+                <div className="w-12 h-12 rounded-xl bg-indigo-100 flex items-center justify-center">
+                  <User size={24} className="text-indigo-600" />
+                </div>
+                <div className="flex-1 text-left">
+                  <span className="font-bold text-slate-800 block">Mon profil</span>
+                  <span className="text-sm text-slate-500">Identité, revenus, objectifs</span>
+                </div>
+              </Link>
+              <Link
+                href="/settings"
+                onClick={() => setMobileMenuOpen(false)}
+                className="flex items-center gap-4 min-h-[56px] px-4 rounded-xl hover:bg-slate-50 active:bg-indigo-50 transition-colors"
+              >
+                <div className="w-12 h-12 rounded-xl bg-slate-100 flex items-center justify-center">
+                  <Settings size={24} className="text-slate-600" />
+                </div>
+                <div className="flex-1 text-left">
+                  <span className="font-bold text-slate-800 block">Réglages</span>
+                  <span className="text-sm text-slate-500">Notifications, confidentialité</span>
+                </div>
+              </Link>
+            </div>
+          </div>
+        </>
+      )}
 
       {/* =========================================================
           VERSION DESKTOP (Sidebar Gauche)
@@ -99,7 +174,6 @@ export default function Navigation() {
             <span>Le QG</span>
           </Link>
 
-          {/* Ajout du lien Objectifs ici */}
           <Link href="/goals" className={getLinkClass('/goals')}>
             <Target size={20} />
             <span>Tes objectifs</span>
