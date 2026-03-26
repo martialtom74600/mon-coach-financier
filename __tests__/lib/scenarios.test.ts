@@ -462,7 +462,8 @@ describe('C.3 — analyzePurchaseImpact (Blind & Logic)', () => {
     expect(result.newMatelas).toBe(expectedNewMatelas);
     expect(result.newSafetyMonths).toBe(expectedNewSafetyMonths);
     expect(result.verdict).toBe('red');
-    expect(result.issues.some((i) => i.text.includes('Matelas en danger'))).toBe(true);
+    expect(result.smartTitle).toBe('Pas assez de côté');
+    expect(result.issues.some((i) => /matelas passerait|mois de sécu/i.test(i.text))).toBe(true);
   });
 
   it('INVARIANT CRÉDIT : realCost = capital + creditCost (annuité constante)', () => {
@@ -507,7 +508,7 @@ describe('C.3 — analyzePurchaseImpact (Blind & Logic)', () => {
     expect(result.opportunityCost).toBe(expectedOpportunityCost);
   });
 
-  it('Achat passé → verdict green "Mise à jour"', () => {
+  it('Achat passé → verdict green "Mis à jour"', () => {
     const purchase: Purchase = {
       name: 'Achat historique',
       amount: 1000,
@@ -518,7 +519,7 @@ describe('C.3 — analyzePurchaseImpact (Blind & Logic)', () => {
     const result = analyzePurchaseImpact(baseStats, purchase);
 
     expect(result.verdict).toBe('green');
-    expect(result.smartTitle).toBe('Mise à jour');
+    expect(result.smartTitle).toBe('Mis à jour');
   });
 
   it('newSafetyMonths = newMatelas / burnRate (calcul théorique)', () => {

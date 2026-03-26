@@ -5,15 +5,12 @@ import Navigation from '@/app/components/Navigation';
 import Header from '@/app/components/Header';
 import { ToastProvider } from '@/app/components/ui/Toast';
 import PushNotificationPrompt from '@/app/components/PushNotificationPrompt';
-import ClerkLoadingFallback from '@/app/components/ClerkLoadingFallback';
+import ClientShell from '@/app/components/ClientShell';
+import AppLoadingOverlay from '@/app/components/AppLoadingOverlay';
+import { FinancialDataProvider } from '@/app/hooks/useFinancialData';
 
 // Imports Clerk
-import { 
-  ClerkProvider, 
-  SignedIn, 
-  ClerkLoading, 
-  ClerkLoaded 
-} from '@clerk/nextjs';
+import { ClerkProvider, SignedIn } from '@clerk/nextjs';
 import { auth } from '@clerk/nextjs/server'; // Pour vérifier l'état côté serveur
 import { frFR } from "@clerk/localizations"; 
 
@@ -39,14 +36,12 @@ export const viewport: Viewport = {
   viewportFit: 'cover',
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  // On vérifie si l'utilisateur est connecté côté serveur
-  // Cela nous permet d'adapter le CSS AVANT que la page ne s'affiche
-  const { userId } = auth();
+  const { userId } = await auth();
   const isConnected = !!userId;
 
   return (
@@ -56,17 +51,10 @@ export default function RootLayout({
           <link rel="apple-touch-icon" href="/icon-192.png" />
         </head>
         <body className={`${inter.className} bg-slate-50 text-slate-900 h-full`}>
-          
-          {/* 1. CHARGEMENT — Sur /sign-in et /sign-up : branding + loader (pas d'écran vide 5s) */}
-          <ClerkLoading>
-            <ClerkLoadingFallback />
-          </ClerkLoading>
-
-          {/* 2. APPLICATION CHARGÉE */}
-          <ClerkLoaded>
+          <ClientShell>
             <ToastProvider>
-            
-            {/* MENU : Seulement si connecté */}
+            <FinancialDataProvider>
+            <AppLoadingOverlay />
             <SignedIn>
               <Navigation />
               <PushNotificationPrompt />
@@ -95,8 +83,9 @@ export default function RootLayout({
 
               </div>
             </main>
+            </FinancialDataProvider>
             </ToastProvider>
-          </ClerkLoaded>
+          </ClientShell>
 
         </body>
       </html>

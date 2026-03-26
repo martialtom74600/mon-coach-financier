@@ -6,7 +6,7 @@ import { logger } from '@/app/lib/logger';
 import { decisionService, ServiceError } from '@/app/services';
 
 export async function PATCH(req: Request, { params }: { params: { id: string } }) {
-  const { userId } = auth();
+  const { userId } = await auth();
   if (!userId) return new NextResponse("Tu n'as pas accès à ça.", { status: 401 });
   const idError = validateId(params.id);
   if (idError) return idError;
@@ -30,7 +30,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
 }
 
 export async function DELETE(req: Request, { params }: { params: { id: string } }) {
-  const { userId } = auth();
+  const { userId } = await auth();
   if (!userId) return new NextResponse("Tu n'as pas accès à ça.", { status: 401 });
   const idError = validateId(params.id);
   if (idError) return idError;

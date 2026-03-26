@@ -2,29 +2,32 @@ import { NextResponse } from 'next/server';
 import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server';
 import { checkRateLimit } from '@/app/lib/ratelimit';
 
-// Routes accessibles sans être connecté
-const isPublicRoute = createRouteMatcher([
-  '/',
-  '/sign-in(.*)',
-  '/sign-up(.*)',
-]);
+// Routes accessibles sans être connecté (le QG `/` est protégé : redirection sign-in gérée par Clerk)
+const isPublicRoute = createRouteMatcher(['/sign-in(.*)', '/sign-up(.*)']);
 
 const isApiRoute = createRouteMatcher(['/api(.*)']);
 // F.3 — Route CRON : protégée par CRON_SECRET dans le handler, pas par Clerk
 const isCronRoute = createRouteMatcher(['/api/cron(.*)']);
+// Webhooks Clerk : signature Svix dans le handler, pas de session
+const isClerkWebhookRoute = createRouteMatcher(['/api/webhooks/clerk']);
 
 export default clerkMiddleware(async (auth, req) => {
-  // E.1 — Rate limiting sur toutes les routes API (20 req/10s par IP)
+  // F.3 — Cron : pas de rate limit ambiant ni Clerk (secret dans le handler)
+  if (isCronRoute(req)) {
+    return NextResponse.next();
+  }
+
+  if (isClerkWebhookRoute(req)) {
+    return NextResponse.next();
+  }
+
+  // E.1 — Rate limiting API : par userId si session, sinon par IP
   if (isApiRoute(req)) {
-    const result = await checkRateLimit(req);
+    const { userId } = auth();
+    const result = await checkRateLimit(req, userId);
     if (!result.success) {
       return new NextResponse('Too Many Requests', { status: 429 });
     }
-  }
-
-  // F.3 — Les routes CRON bypassent Clerk (auth via CRON_SECRET dans le handler)
-  if (isCronRoute(req)) {
-    return NextResponse.next();
   }
 
   // RÈGLE : Si ce n'est PAS une route publique, on bloque l'accès (404/Redirection).

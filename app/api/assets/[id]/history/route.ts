@@ -8,7 +8,7 @@ export async function GET(
   _req: Request,
   { params }: { params: { id: string } }
 ) {
-  const { userId } = auth();
+  const { userId } = await auth();
   if (!userId) return new NextResponse('Tu n\'as pas accès à ça.', { status: 401 });
   const idError = validateId(params.id);
   if (idError) return idError;

@@ -2,15 +2,15 @@
 
 import React from 'react';
 import { usePathname } from 'next/navigation';
-import { UserButton } from '@clerk/nextjs';
+import { UserButton, useUser } from '@clerk/nextjs';
 import { useFinancialData } from '@/app/hooks/useFinancialData';
 
 export default function Header() {
   const pathname = usePathname();
+  const { user } = useUser();
   const { profile } = useFinancialData();
-
-  // Récupération sécurisée du prénom
-  const userName = profile?.firstName ? ` ${profile.firstName}` : '';
+  const greetingName = profile?.firstName?.trim() || user?.firstName;
+  const userName = greetingName ? ` ${greetingName}` : '';
 
   type PageContent = { title: string; emoji: string; subtitle: string };
 
@@ -71,7 +71,7 @@ export default function Header() {
       </div>
       <div className="mt-4 md:mt-0">
         <UserButton
-          afterSignOutUrl="/"
+          afterSignOutUrl="/sign-in"
           appearance={{
             elements: {
               avatarBox: 'w-10 h-10',

@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { redirect } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { useUser } from '@clerk/nextjs';
 import { Settings } from 'lucide-react';
 import GlassCard from '@/app/components/ui/GlassCard';
@@ -24,6 +24,7 @@ interface Preferences {
 }
 
 export default function SettingsPage() {
+  const router = useRouter();
   const { isSignedIn, isLoaded } = useUser();
   const { showToast } = useToast();
   const [prefs, setPrefs] = useState<Preferences | null>(null);
@@ -33,7 +34,7 @@ export default function SettingsPage() {
   useEffect(() => {
     if (!isLoaded) return;
     if (!isSignedIn) {
-      redirect('/sign-in');
+      router.replace('/sign-in');
       return;
     }
 
@@ -41,7 +42,10 @@ export default function SettingsPage() {
       try {
         const res = await fetch('/api/preferences');
         if (!res.ok) {
-          if (res.status === 401) redirect('/sign-in');
+          if (res.status === 401) {
+            router.replace('/sign-in');
+            return;
+          }
           if (res.status === 404) {
             setPrefs(null);
             setLoading(false);
@@ -59,7 +63,7 @@ export default function SettingsPage() {
     };
 
     fetchPrefs();
-  }, [isLoaded, isSignedIn, showToast]);
+  }, [isLoaded, isSignedIn, showToast, router]);
 
   const updatePref = async (updates: Partial<Preferences>) => {
     if (!prefs) return;

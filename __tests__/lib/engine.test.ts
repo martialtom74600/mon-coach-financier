@@ -817,6 +817,6 @@ describe('analyzeProfileHealth', () => {
 
     const expectedSavings = estimateTaxSavings(annualIncome, 3000);
     expect(taxOpp!.potentialGain).toBe(expectedSavings);
-    expect(taxOpp!.message).toContain('économisez');
+    expect(taxOpp!.message).toMatch(/économises/i);
   });
 });

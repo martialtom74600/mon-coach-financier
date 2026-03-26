@@ -7,7 +7,7 @@ export async function PATCH(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { userId } = auth();
+  const { userId } = await auth();
   if (!userId) return new NextResponse('Tu n\'as pas accès à ça.', { status: 401 });
 
   const { id } = await params;

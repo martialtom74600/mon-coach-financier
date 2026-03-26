@@ -68,7 +68,7 @@ describe('detectDanger', () => {
     expect(result[0].id).toBe('danger_deficit');
     expect(result[0].type).toBe('DANGER');
     expect(result[0].severity).toBe('critical');
-    expect(result[0].message).toContain('Déficit structurel');
+    expect(result[0].message).toMatch(/charges dépassent.*revenus/i);
     expect(result[0].message).toContain('-500');
   });
 
@@ -83,7 +83,8 @@ describe('detectDanger', () => {
     expect(result).toHaveLength(1);
     expect(result[0].id).toBe('danger_overheat');
     expect(result[0].severity).toBe('critical');
-    expect(result[0].message).toContain('Fin de mois en négatif');
+    expect(result[0].message).toContain('Fin de mois en rouge');
+    expect(result[0].message).toContain('épargne');
   });
 
   it('sans matelas (matelas < 1000) → 1 insight critical', () => {

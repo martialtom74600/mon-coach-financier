@@ -1,8 +1,8 @@
 import AppLoadingScreen from '@/app/components/AppLoadingScreen';
 
 /**
- * Écran de chargement affiché par Next.js pendant la navigation entre pages
+ * Navigation entre pages : pas de pourcentage mesurable côté Next → barre indéterminée.
  */
 export default function Loading() {
-  return <AppLoadingScreen message="Chargement..." />;
+  return <AppLoadingScreen progress={null} message="Chargement de la page…" />;
 }

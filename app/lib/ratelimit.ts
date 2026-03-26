@@ -28,12 +28,20 @@ export type RateLimitResult = { success: true } | { success: false; remaining: n
  * @param req - La requête Next.js (pour extraire l'IP)
  * @returns { success: true } si OK, { success: false, remaining, reset } si limité
  */
-export async function checkRateLimit(req: NextRequest): Promise<RateLimitResult> {
+/**
+ * @param userId - Si présent (utilisateur Clerk connecté), quota dédié par compte (évite le 429 multi-onglets partagé avec toute une IP).
+ */
+export async function checkRateLimit(
+  req: NextRequest,
+  userId?: string | null,
+): Promise<RateLimitResult> {
   if (!ratelimit) {
     return { success: true };
   }
 
-  const identifier = getIdentifier(req);
+  const identifier = userId?.trim()
+    ? `user:${userId}`
+    : getIdentifier(req);
   const { success, remaining, reset } = await ratelimit.limit(identifier);
 
   if (success) {

@@ -5,6 +5,10 @@ import { prisma } from '@/app/lib/prisma';
 import { serializeDecimals, INITIAL_PROFILE, Profile, HousingStatus } from '@/app/lib/definitions';
 import { z } from 'zod';
 import { saveUserSchema } from '@/app/lib/validations';
+import {
+  clerkWebhookPrimaryEmail,
+  type ClerkWebhookUserBody,
+} from '@/app/lib/clerkWebhookUser';
 
 type WizardData = z.infer<typeof saveUserSchema>;
 
@@ -80,6 +84,34 @@ export async function ensureUserAndProfile(
     });
   }
   return profile.id;
+}
+
+export type { ClerkWebhookUserBody } from '@/app/lib/clerkWebhookUser';
+
+/**
+ * Synchro depuis les webhooks Clerk : identité (email, prénom) + FinancialProfile minimal si absent.
+ * Complète `ensureUserAndProfile` (lazy) qui ne met pas à jour l’identité sur compte existant.
+ */
+export async function syncUserIdentityFromClerkWebhook(data: ClerkWebhookUserBody): Promise<void> {
+  const email = clerkWebhookPrimaryEmail(data);
+  const firstName = data.first_name?.trim() ?? '';
+  await prisma.user.upsert({
+    where: { id: data.id },
+    create: { id: data.id, email, firstName },
+    update: { email, firstName },
+  });
+  const profile = await prisma.financialProfile.findUnique({
+    where: { userId: data.id },
+    select: { id: true },
+  });
+  if (!profile) {
+    await prisma.financialProfile.create({ data: { userId: data.id } });
+  }
+}
+
+/** Suppression locale après `user.deleted` côté Clerk (cascade Prisma sur le profil). */
+export async function deleteLocalUserByClerkId(userId: string): Promise<void> {
+  await prisma.user.deleteMany({ where: { id: userId } });
 }
 
 export async function getFullUserProfile(userId: string) {

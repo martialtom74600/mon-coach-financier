@@ -6,7 +6,7 @@ import { logger } from '@/app/lib/logger';
 import { goalService, ServiceError } from '@/app/services';
 
 export async function POST(req: Request) {
-  const { userId } = auth();
+  const { userId } = await auth();
   if (!userId) return new NextResponse("Tu n'as pas accès à ça.", { status: 401 });
 
   try {

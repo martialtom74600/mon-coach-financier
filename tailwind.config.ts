@@ -10,11 +10,17 @@ const config: Config = {
     extend: {
       animation: {
         'fade-in': 'fadeIn 0.2s ease-out',
+        /** Barre indéterminée : segment qui traverse la piste en boucle */
+        'load-bar': 'loadBarSweep 1.15s linear infinite',
       },
       keyframes: {
         fadeIn: {
           '0%': { opacity: '0', transform: 'translateY(-8px)' },
           '100%': { opacity: '1', transform: 'translateY(0)' },
+        },
+        loadBarSweep: {
+          '0%': { transform: 'translateX(-100%)' },
+          '100%': { transform: 'translateX(350%)' },
         },
       },
       backgroundImage: {
