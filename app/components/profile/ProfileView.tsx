@@ -160,12 +160,7 @@ export interface ProfileViewProps {
   refreshData?: () => Promise<void>;
 }
 
-export function isProfileComplete(profile: Profile | null): boolean {
-  if (!profile) return false;
-  const hasId = profile.profileId && profile.profileId !== 'temp';
-  const hasIdentity = profile.firstName && profile.age;
-  return !!(hasId && hasIdentity);
-}
+export { isProfileComplete } from '@/app/lib/profileCompleteness';
 
 export default function ProfileView({ profile, refreshData }: ProfileViewProps) {
   const { showToast } = useToast();

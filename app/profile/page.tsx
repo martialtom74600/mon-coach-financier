@@ -1,31 +1,30 @@
-'use client';
+import dynamic from 'next/dynamic';
+import { auth } from '@clerk/nextjs/server';
+import { redirect } from 'next/navigation';
+import { UserCircle } from 'lucide-react';
+import PageRouteSkeleton from '@/app/components/ui/PageRouteSkeleton';
+import RoutePageHeader from '@/app/components/layout/RoutePageHeader';
 
-import React from 'react';
-import { useSearchParams } from 'next/navigation';
-import ProfileWizard from '@/app/components/profile/ProfileWizard';
-import ProfileView, { isProfileComplete } from '@/app/components/profile/ProfileView';
-import { useFinancialData } from '@/app/hooks/useFinancialData';
-import PageLoader from '@/app/components/ui/PageLoader';
+const ProfilePageClient = dynamic(() => import('./ProfilePageClient'), {
+  loading: () => <PageRouteSkeleton />,
+});
 
-export default function ProfilePage() {
-  const searchParams = useSearchParams();
-  const editMode = searchParams.get('edit') === '1';
-  const { profile, isLoaded, refreshData } = useFinancialData();
-
-  if (!isLoaded) {
-    return <PageLoader />;
-  }
-
-  const complete = isProfileComplete(profile);
-
-  if (editMode || !complete) {
-    return <ProfileWizard />;
-  }
+export default async function ProfilePage() {
+  const { userId } = await auth();
+  if (!userId) redirect('/sign-in');
 
   return (
-    <ProfileView
-      profile={profile!}
-      refreshData={refreshData}
-    />
+    <>
+      <RoutePageHeader
+        leading={
+          <div className="p-2.5 bg-slate-200/80 rounded-xl" aria-hidden>
+            <UserCircle className="text-slate-700" size={24} />
+          </div>
+        }
+        title="Mon profil"
+        subtitle="Ta situation, ton patrimoine et tes préférences."
+      />
+      <ProfilePageClient />
+    </>
   );
 }

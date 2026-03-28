@@ -6,7 +6,7 @@ import InputGroup from '@/app/components/ui/InputGroup';
 import ContextToggle from '@/app/components/ui/ContextToggle';
 import { PURCHASE_TYPES, PAYMENT_MODES } from '@/app/lib/definitions';
 import type { PurchaseType, PaymentMode } from '@/app/lib/definitions';
-import { RefreshCw, Briefcase, CalendarDays, ShoppingBag } from 'lucide-react';
+import { RefreshCw, Briefcase, CalendarDays } from 'lucide-react';
 
 export interface PurchaseFormState {
   name: string;
@@ -34,14 +34,6 @@ export function SimulatorForm({ purchase, setPurchase, onAnalyze }: SimulatorFor
 
   return (
     <>
-      <div className="mb-2">
-        <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-          <ShoppingBag className="text-indigo-600" /> Simulateur d&apos;achat
-        </h1>
-        <p className="text-slate-500 text-sm mt-1">
-          Cet achat, il rentre dans ton budget sans casser tes objectifs ?
-        </p>
-      </div>
       <Card className="p-6 md:p-8">
         <div className="space-y-6">
           <InputGroup

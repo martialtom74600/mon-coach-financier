@@ -1,31 +1,12 @@
 import { NextResponse } from 'next/server';
-import { auth, currentUser } from '@clerk/nextjs/server';
-import {
-  preferencesService,
-  profileService,
-  userService,
-  ServiceError,
-} from '@/app/services';
+import { auth } from '@clerk/nextjs/server';
+import { preferencesService, ServiceError } from '@/app/services';
 import {
   updatePreferencesSchema,
   validationError,
 } from '@/app/lib/validations';
 import { logger } from '@/app/lib/logger';
-
-/** Récupère le profileId, crée User + profil minimal si absent (accès paramètres sans profil). */
-async function getOrCreateProfileId(userId: string): Promise<string> {
-  try {
-    return await profileService.getProfileId(userId);
-  } catch (error) {
-    if (error instanceof ServiceError && error.status === 404) {
-      const userAuth = await currentUser();
-      const email = userAuth?.emailAddresses[0]?.emailAddress ?? `noemail+${userId}@placeholder.local`;
-      const firstName = userAuth?.firstName ?? '';
-      return userService.ensureUserAndProfile(userId, email, firstName);
-    }
-    throw error;
-  }
-}
+import { getOrCreateProfileId } from '@/app/lib/server/getOrCreateProfileId';
 
 /** GET — Récupère les préférences du profil (crée User + profil si absent) */
 export async function GET() {

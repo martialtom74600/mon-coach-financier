@@ -16,6 +16,7 @@ import Button from '@/app/components/ui/Button';
 import Card from '@/app/components/ui/Card';
 import BackLink from '@/app/components/ui/BackLink';
 import ChartSkeleton from '@/app/components/ui/ChartSkeleton';
+import LazyRender from '@/app/components/ui/LazyRender';
 import { formatCurrency } from '@/app/lib/definitions';
 import type { GoalStrategy, GoalScenarioResult } from '@/app/lib/definitions';
 import type { GoalFormData } from './GoalForm';
@@ -126,7 +127,15 @@ export function GoalSimulation({
             <h3 className="text-sm font-bold text-slate-700 uppercase tracking-wider mb-2">
               Trajectoire prévue
             </h3>
-            <ProjectionChart data={simulation.projectionData.projection} />
+            <LazyRender
+              rootMargin="80px"
+              minHeightClass="min-h-[220px]"
+              fallback={
+                <ChartSkeleton heightClass="h-[220px]" label="Préparation du graphique" className="mt-0" />
+              }
+            >
+              <ProjectionChart data={simulation.projectionData.projection} />
+            </LazyRender>
           </div>
 
           {simulation.diagnosis.strategies.length > 0 && (
