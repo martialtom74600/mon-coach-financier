@@ -1,8 +1,8 @@
-import AppLoadingScreen from '@/app/components/AppLoadingScreen';
+import PageLoader from '@/app/components/ui/PageLoader';
 
 /**
- * Navigation entre pages : pas de pourcentage mesurable côté Next → barre indéterminée.
+ * Navigation RSC : squelette léger (la barre latérale / bas reste visible via le layout).
  */
 export default function Loading() {
-  return <AppLoadingScreen progress={null} message="Chargement de la page…" />;
+  return <PageLoader />;
 }

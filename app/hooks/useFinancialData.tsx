@@ -5,11 +5,12 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useRef,
   useState,
   type ReactNode,
 } from 'react';
 import { useUser } from '@clerk/nextjs';
-import { INITIAL_PROFILE, Profile, FinancialItem, Asset, Goal, HousingStatus } from '@/app/lib/definitions';
+import { INITIAL_PROFILE, Profile, FinancialItem, Asset, Goal } from '@/app/lib/definitions';
 import {
   profileAPIResponseSchema,
   financialItemResponseSchema,
@@ -21,6 +22,13 @@ import {
   parseAPIResponse,
 } from '@/app/lib/validations';
 import { getJsonWithProgress } from '@/app/lib/getJsonWithProgress';
+import { profileFromApiPayload } from '@/app/lib/profileFromApiPayload';
+
+/** Profil déjà résolu côté serveur (layout) pour éviter le 2ᵉ aller-retour réseau au premier rendu. */
+export type FinancialServerPreload = {
+  userId: string;
+  profile: Profile;
+} | null;
 
 interface DecisionInput {
   name: string;
@@ -35,24 +43,45 @@ interface DecisionInput {
   rate?: number | null;
 }
 
-function useFinancialDataState() {
+function useFinancialDataState(serverPreload: FinancialServerPreload) {
   const { user, isLoaded: isClerkLoaded } = useUser();
 
-  const [profile, setProfile] = useState<Profile>(INITIAL_PROFILE);
-  const [isLoadingData, setIsLoadingData] = useState(true);
-  const [loadProgress, setLoadProgress] = useState(0);
+  /** Si le layout a déjà résolu le profil, ne pas attendre un cycle React pour masquer l’overlay (LCP). */
+  const [profile, setProfile] = useState<Profile>(
+    () => serverPreload?.profile ?? INITIAL_PROFILE
+  );
+  const [isLoadingData, setIsLoadingData] = useState(() => serverPreload == null);
+  const [loadProgress, setLoadProgress] = useState(() => (serverPreload ? 100 : 0));
   const [error, setError] = useState<string | null>(null);
+  const syncedUserRef = useRef<string | null>(null);
 
-  const fetchData = useCallback(async () => {
+  const fetchData = useCallback(async (opts?: { background?: boolean }) => {
     if (!user) return;
-    setIsLoadingData(true);
+    const background = opts?.background ?? false;
+    if (!background) {
+      setIsLoadingData(true);
+      setLoadProgress(40);
+    }
     setError(null);
-    setLoadProgress(40);
 
     try {
-      const { ok, status, data: raw } = await getJsonWithProgress('/api/user', (ratio) => {
-        setLoadProgress(40 + Math.round(60 * ratio));
-      });
+      let ok: boolean;
+      let status: number;
+      let raw: unknown;
+
+      if (background) {
+        const res = await fetch('/api/user');
+        status = res.status;
+        ok = res.ok;
+        raw = ok ? await res.json().catch(() => null) : null;
+      } else {
+        const r = await getJsonWithProgress('/api/user', (ratio) => {
+          setLoadProgress(40 + Math.round(60 * ratio));
+        });
+        ok = r.ok;
+        status = r.status;
+        raw = r.data;
+      }
 
       if (ok) {
         if (raw) {
@@ -67,26 +96,7 @@ function useFinancialDataState() {
             return;
           }
 
-          const cleanProfile = {
-            ...INITIAL_PROFILE,
-            ...validated,
-            household: { ...INITIAL_PROFILE.household, ...(validated.household || {}) },
-            housing: {
-              status: validated.housing?.status ?? HousingStatus.TENANT,
-              monthlyCost: validated.housing?.monthlyCost ?? 0,
-              paymentDay: validated.housing?.paymentDay ?? undefined,
-            },
-            assets: validated.assets || [],
-            goals: validated.goals || [],
-            decisions: validated.decisions || [],
-            incomes: validated.incomes || [],
-            fixedCosts: validated.fixedCosts || [],
-            variableCosts: validated.variableCosts || [],
-            credits: validated.credits || [],
-            subscriptions: validated.subscriptions || [],
-            annualExpenses: validated.annualExpenses || [],
-          } as unknown as Profile;
-          setProfile(cleanProfile);
+          setProfile(profileFromApiPayload(validated));
         } else {
           setProfile({ ...INITIAL_PROFILE, firstName: user.firstName || '' });
         }
@@ -98,18 +108,37 @@ function useFinancialDataState() {
       console.error('Erreur fetch:', err);
       setError('Connexion perdue. Vérifie ton réseau et réessaie.');
     } finally {
-      setIsLoadingData(false);
+      if (!background) {
+        setIsLoadingData(false);
+      }
       setLoadProgress(100);
     }
   }, [user]);
 
   useEffect(() => {
-    if (isClerkLoaded && user) fetchData();
-    else if (isClerkLoaded && !user) {
+    if (!isClerkLoaded) return;
+
+    if (!user) {
       setIsLoadingData(false);
       setLoadProgress(100);
+      syncedUserRef.current = null;
+      return;
     }
-  }, [isClerkLoaded, user, fetchData]);
+
+    const uid = user.id;
+    if (syncedUserRef.current === uid) return;
+    syncedUserRef.current = uid;
+
+    if (serverPreload?.userId === uid) {
+      setProfile(serverPreload.profile);
+      setIsLoadingData(false);
+      setLoadProgress(100);
+      void fetchData({ background: true });
+      return;
+    }
+
+    void fetchData();
+  }, [isClerkLoaded, user, fetchData, serverPreload]);
 
   const updateProfileInfo = async (updates: Partial<Profile>) => {
     setProfile((prev) => ({ ...prev, ...updates }));
@@ -334,7 +363,7 @@ function useFinancialDataState() {
     loadProgress,
     error,
     user,
-    refreshData: fetchData,
+    refreshData: () => fetchData(),
     updateProfileInfo,
     addItem,
     deleteItem,
@@ -352,8 +381,14 @@ export type FinancialDataContextValue = ReturnType<typeof useFinancialDataState>
 
 const FinancialDataContext = createContext<FinancialDataContextValue | null>(null);
 
-export function FinancialDataProvider({ children }: { children: ReactNode }) {
-  const value = useFinancialDataState();
+export function FinancialDataProvider({
+  children,
+  serverPreload = null,
+}: {
+  children: ReactNode;
+  serverPreload?: FinancialServerPreload;
+}) {
+  const value = useFinancialDataState(serverPreload ?? null);
   return <FinancialDataContext.Provider value={value}>{children}</FinancialDataContext.Provider>;
 }
 

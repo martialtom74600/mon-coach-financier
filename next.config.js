@@ -3,6 +3,10 @@ const { withSentryConfig } = require('@sentry/nextjs');
 
 // Configuration de base propre
 const nextConfig = {
+  // Réduit fortement le JS client pour les paquets “barrel” (icônes, etc.)
+  experimental: {
+    optimizePackageImports: ['lucide-react', 'recharts', '@nivo/core', '@nivo/sankey'],
+  },
   // Security headers (E.2 — OWASP)
   async headers() {
     return [

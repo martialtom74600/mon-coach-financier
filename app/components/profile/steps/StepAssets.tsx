@@ -1,5 +1,6 @@
 'use client';
 
+import dynamic from 'next/dynamic';
 import {
   ShieldCheck,
   ArrowRight,
@@ -18,7 +19,17 @@ import {
 } from 'lucide-react';
 import Button from '@/app/components/ui/Button';
 import Card from '@/app/components/ui/Card';
-import AssetChart from '@/app/components/AssetChart';
+
+const AssetChart = dynamic(() => import('@/app/components/AssetChart'), {
+  ssr: false,
+  loading: () => (
+    <div
+      className="h-8 w-full max-w-[200px] rounded-md bg-slate-100 animate-pulse"
+      role="status"
+      aria-label="Chargement"
+    />
+  ),
+});
 import { WizardLayout } from '../ProfileWizardLayout';
 import { ASSET_TYPES, formatCurrency } from '@/app/lib/definitions';
 import { AssetType } from '@/app/lib/definitions';

@@ -55,7 +55,7 @@ export function WealthChart({ data }: WealthChartProps) {
             stroke="#6366f1"
             strokeWidth={3}
             fill="url(#colorWealthGray)"
-            animationDuration={1500}
+            animationDuration={400}
           />
         </AreaChart>
       </ResponsiveContainer>

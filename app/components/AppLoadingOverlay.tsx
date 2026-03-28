@@ -1,27 +1,17 @@
 'use client';
 
-import { useEffect, useState } from 'react';
 import AppLoadingScreen from '@/app/components/AppLoadingScreen';
 import { useFinancialData } from '@/app/hooks/useFinancialData';
 
 /**
- * Plein écran uniquement au premier chargement du profil après connexion.
- * Les refreshData() ultérieurs ne bloquent pas toute l’UI (PageLoader local si besoin).
+ * S’affiche seulement quand un chargement **réel** est en cours (`isLoading`).
+ * Avec `serverPreload`, pas d’écran bloquant au premier paint (évite de retarder le LCP).
  */
 export default function AppLoadingOverlay() {
   const { user, isLoading, loadProgress } = useFinancialData();
-  const [initialLoadDone, setInitialLoadDone] = useState(false);
-
-  useEffect(() => {
-    if (!user) setInitialLoadDone(false);
-  }, [user]);
-
-  useEffect(() => {
-    if (user && !isLoading) setInitialLoadDone(true);
-  }, [user, isLoading]);
 
   if (!user) return null;
-  if (initialLoadDone) return null;
+  if (!isLoading) return null;
 
   return (
     <AppLoadingScreen

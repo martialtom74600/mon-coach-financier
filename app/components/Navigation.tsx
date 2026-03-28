@@ -37,8 +37,9 @@ export default function Navigation() {
         <div className="grid grid-cols-5 h-[72px] items-stretch">
           
           {/* 1. LE QG */}
-          <Link 
-            href="/" 
+          <Link
+            prefetch={true}
+            href="/"
             className={`flex flex-col items-center justify-center gap-0.5 min-h-[44px] active:scale-95 transition-transform ${isActive('/') ? 'text-indigo-600' : 'text-slate-500'}`}
             aria-label="Le QG"
           >
@@ -47,8 +48,9 @@ export default function Navigation() {
           </Link>
 
           {/* 2. OBJECTIFS */}
-          <Link 
-            href="/goals" 
+          <Link
+            prefetch={true}
+            href="/goals"
             className={`flex flex-col items-center justify-center gap-0.5 min-h-[44px] active:scale-95 transition-transform ${isActive('/goals') ? 'text-indigo-600' : 'text-slate-500'}`}
             aria-label="Objectifs"
           >
@@ -57,8 +59,9 @@ export default function Navigation() {
           </Link>
 
           {/* 3. SIMULATEUR (Central, FAB) */}
-          <Link 
-            href="/simulator" 
+          <Link
+            prefetch={true}
+            href="/simulator"
             className="flex flex-col items-center justify-center relative min-h-[44px] active:scale-95 transition-transform"
             aria-label="Simuler un achat"
           >
@@ -69,8 +72,9 @@ export default function Navigation() {
           </Link>
 
           {/* 4. RÉTRO */}
-          <Link 
-            href="/history" 
+          <Link
+            prefetch={true}
+            href="/history"
             className={`flex flex-col items-center justify-center gap-0.5 min-h-[44px] active:scale-95 transition-transform ${isActive('/history') ? 'text-indigo-600' : 'text-slate-500'}`}
             aria-label="Le Rétro"
           >
@@ -120,6 +124,7 @@ export default function Navigation() {
             </div>
             <div className="p-4 space-y-2">
               <Link
+                prefetch={true}
                 href="/profile"
                 onClick={() => setMobileMenuOpen(false)}
                 className="flex items-center gap-4 min-h-[56px] px-4 rounded-xl hover:bg-slate-50 active:bg-indigo-50 transition-colors"
@@ -133,6 +138,7 @@ export default function Navigation() {
                 </div>
               </Link>
               <Link
+                prefetch={true}
                 href="/settings"
                 onClick={() => setMobileMenuOpen(false)}
                 className="flex items-center gap-4 min-h-[56px] px-4 rounded-xl hover:bg-slate-50 active:bg-indigo-50 transition-colors"
@@ -156,7 +162,7 @@ export default function Navigation() {
       <div className="hidden md:flex fixed left-0 top-0 bottom-0 w-64 bg-white border-r border-slate-200 flex-col z-50">
         
         <div className="p-6 flex items-center gap-3 mb-2">
-          <Link href="/" className="flex items-center gap-3 hover:opacity-80 transition-opacity group">
+          <Link prefetch={true} href="/" className="flex items-center gap-3 hover:opacity-80 transition-opacity group">
             <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center shadow-lg shadow-indigo-200 group-hover:scale-105 transition-transform">
               <Shield className="text-white" size={20} />
             </div>
@@ -169,33 +175,33 @@ export default function Navigation() {
         <div className="flex-1 px-4 space-y-2 flex flex-col py-4">
           <div className="text-xs font-bold text-slate-400 uppercase tracking-wider px-3 mb-2">Pilotage</div>
           
-          <Link href="/" className={getLinkClass('/')}>
+          <Link prefetch={true} href="/" className={getLinkClass('/')}>
             <LayoutDashboard size={20} />
             <span>Le QG</span>
           </Link>
 
-          <Link href="/goals" className={getLinkClass('/goals')}>
+          <Link prefetch={true} href="/goals" className={getLinkClass('/goals')}>
             <Target size={20} />
             <span>Tes objectifs</span>
           </Link>
 
-          <Link href="/simulator" className={getLinkClass('/simulator')}>
+          <Link prefetch={true} href="/simulator" className={getLinkClass('/simulator')}>
             <PlusCircle size={20} />
             <span>Simulateur achat</span>
           </Link>
 
-          <Link href="/history" className={getLinkClass('/history')}>
+          <Link prefetch={true} href="/history" className={getLinkClass('/history')}>
             <History size={20} />
             <span>Le Rétro</span>
           </Link>
 
           <div className="mt-auto pt-6 border-t border-slate-100">
              <div className="text-xs font-bold text-slate-400 uppercase tracking-wider px-3 mb-2 mt-4">Ton coin</div>
-             <Link href="/profile" className={getLinkClass('/profile')}>
+             <Link prefetch={true} href="/profile" className={getLinkClass('/profile')}>
                 <User size={20} />
                 <span>Ton profil</span>
              </Link>
-             <Link href="/settings" className={getLinkClass('/settings')}>
+             <Link prefetch={true} href="/settings" className={getLinkClass('/settings')}>
                 <Settings size={20} />
                 <span>Ton jardin secret</span>
              </Link>

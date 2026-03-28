@@ -4,11 +4,23 @@ import { useAuth } from '@clerk/nextjs';
 import AppLoadingScreen from '@/app/components/AppLoadingScreen';
 
 /**
- * Remplace ClerkLoading : même contrat (rien tant que la session Clerk n’est pas hydratée).
- * Pourcentage réel : 0 % tant qu’on n’a pas d’étape mesurable côté Clerk (une seule phase binaire).
+ * Si le serveur a déjà vu une session Clerk (`auth().userId`), on affiche l’arbre tout de suite :
+ * évite un écran plein écran jusqu’à l’hydratation Clerk, ce qui retardait fortement le LCP (contenu masqué).
+ * Sign-in / sign-up : pas de session → on attend `isLoaded` comme avant.
  */
-export default function ClientShell({ children }: { children: React.ReactNode }) {
+export default function ClientShell({
+  children,
+  trustServerSession = false,
+}: {
+  children: React.ReactNode;
+  /** Aligné sur `auth().userId` dans le layout. */
+  trustServerSession?: boolean;
+}) {
   const { isLoaded } = useAuth();
+
+  if (trustServerSession) {
+    return <>{children}</>;
+  }
 
   if (!isLoaded) {
     return (

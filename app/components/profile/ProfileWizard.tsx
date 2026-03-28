@@ -12,7 +12,6 @@ import Card from '@/app/components/ui/Card';
 import Button from '@/app/components/ui/Button';
 import { useToast } from '@/app/components/ui/Toast';
 import ProgressBar from '@/app/components/ui/ProgressBar';
-import { Loader2 } from 'lucide-react';
 import type { FormProfile, FormItem } from './ProfileWizard.types';
 import { mapProfileToForm, mapFormToPayload, mapFormToEngineProfile, generateIdHelper } from './ProfileWizard.mappers';
 import { LiveSummary } from './ProfileWizardLayout';
@@ -219,8 +218,10 @@ export default function ProfileWizard() {
 
   if (!isLoaded || !formData)
     return (
-      <div className="h-[50vh] flex items-center justify-center">
-        <Loader2 className="animate-spin text-indigo-600" size={32} />
+      <div className="max-w-3xl mx-auto px-4 py-8 space-y-4" role="status" aria-label="Préparation du profil">
+        <div className="h-10 w-full max-w-md rounded-lg bg-slate-200/80 animate-pulse" />
+        <div className="h-32 rounded-2xl bg-slate-100 animate-pulse" />
+        <div className="h-32 rounded-2xl bg-slate-100 animate-pulse" />
       </div>
     );
 

@@ -1,5 +1,6 @@
 'use client';
 
+import dynamic from 'next/dynamic';
 import {
   CheckCircle,
   AlertTriangle,
@@ -14,10 +15,15 @@ import {
 import Button from '@/app/components/ui/Button';
 import Card from '@/app/components/ui/Card';
 import BackLink from '@/app/components/ui/BackLink';
+import ChartSkeleton from '@/app/components/ui/ChartSkeleton';
 import { formatCurrency } from '@/app/lib/definitions';
 import type { GoalStrategy, GoalScenarioResult } from '@/app/lib/definitions';
 import type { GoalFormData } from './GoalForm';
-import { ProjectionChart } from './GoalProjectionChart';
+
+const ProjectionChart = dynamic(
+  () => import('./GoalProjectionChart').then((m) => m.ProjectionChart),
+  { ssr: false, loading: () => <ChartSkeleton heightClass="h-[200px]" className="mt-4" /> }
+);
 
 const StrategyIcon = ({ type }: { type: string }) => {
   switch (type) {

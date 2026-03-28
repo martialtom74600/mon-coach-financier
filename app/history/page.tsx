@@ -4,6 +4,7 @@ import React, { useMemo, useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation';
 import { History, Calendar as CalendarIcon, List, LayoutGrid } from 'lucide-react';
 import { useFinancialData } from '@/app/hooks/useFinancialData';
+import type { PurchaseDecision } from '@/app/lib/definitions';
 import { generateTimeline } from '@/app/lib/logic';
 import ConfirmDialog from '@/app/components/ui/ConfirmDialog';
 import PageLoader from '@/app/components/ui/PageLoader';
@@ -32,6 +33,25 @@ interface DecisionsStats {
   amountTotal: number;
 }
 
+function decisionToListItem(d: PurchaseDecision): DecisionItem {
+  const dateRaw = d.date as Date | string;
+  const date =
+    typeof dateRaw === 'string'
+      ? dateRaw.slice(0, 10)
+      : dateRaw instanceof Date
+        ? dateRaw.toISOString().slice(0, 10)
+        : String(dateRaw);
+  return {
+    id: d.id,
+    name: d.name,
+    amount: Number(d.amount),
+    date,
+    type: String(d.type),
+    paymentMode: String(d.paymentMode),
+    outcome: d.outcome ? String(d.outcome) : undefined,
+  };
+}
+
 export default function HistoryPage() {
   const router = useRouter();
   const { profile, isLoaded, deleteDecision, updateDecisionOutcome } = useFinancialData();
@@ -57,6 +77,14 @@ export default function HistoryPage() {
     if (!validated) return;
     return validated;
   }, []);
+
+  /** Données déjà dans le profil (préchargement serveur) → liste instantanée avant la pagination API. */
+  useEffect(() => {
+    if (!isLoaded || !profile?.decisions?.length) return;
+    setDecisions((prev) =>
+      prev.length === 0 ? profile.decisions!.slice(0, 20).map(decisionToListItem) : prev,
+    );
+  }, [isLoaded, profile?.decisions]);
 
   useEffect(() => {
     if (!isLoaded) return;
@@ -190,7 +218,7 @@ export default function HistoryPage() {
         {viewMode === 'list' && (
           <div className="space-y-4 animate-fade-in">
             {isLoadingDecisions ? (
-              <PageLoader />
+              <PageLoader variant="compact" />
             ) : decisions.length === 0 ? (
               <EmptyListState
                 icon={LayoutGrid}

@@ -21,12 +21,16 @@ export default clerkMiddleware(async (auth, req) => {
     return NextResponse.next();
   }
 
-  // E.1 — Rate limiting API : par userId si session, sinon par IP
+  // E.1 — Rate limit uniquement sur les mutations (POST/PATCH/PUT/DELETE).
+  // Les GET /api (lectures) évitent un aller-retour Redis → latence bien plus fluide.
   if (isApiRoute(req)) {
-    const { userId } = auth();
-    const result = await checkRateLimit(req, userId);
-    if (!result.success) {
-      return new NextResponse('Too Many Requests', { status: 429 });
+    const method = req.method.toUpperCase();
+    if (['POST', 'PATCH', 'PUT', 'DELETE'].includes(method)) {
+      const { userId } = auth();
+      const result = await checkRateLimit(req, userId);
+      if (!result.success) {
+        return new NextResponse('Too Many Requests', { status: 429 });
+      }
     }
   }
 

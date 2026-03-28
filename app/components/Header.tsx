@@ -69,7 +69,7 @@ export default function Header() {
           {content.subtitle}
         </p>
       </div>
-      <div className="mt-4 md:mt-0">
+      <div className="mt-4 md:mt-0 flex items-center justify-start md:justify-end min-h-10 min-w-10 shrink-0">
         <UserButton
           afterSignOutUrl="/sign-in"
           appearance={{
