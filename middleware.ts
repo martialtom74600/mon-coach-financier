@@ -2,6 +2,21 @@ import { NextResponse } from 'next/server';
 import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server';
 import { checkRateLimit } from '@/app/lib/ratelimit';
 
+/** Ne jamais appeler auth().protect() sur ces chemins : redirection HTML casserait le SW, le manifest et le mode PWA. */
+function isPwaOrAuthAssetPath(pathname: string): boolean {
+  if (pathname === '/manifest.json') return true;
+  if (pathname.endsWith('.webmanifest')) return true;
+  if (pathname === '/sw.js') return true;
+  if (
+    pathname.startsWith('/workbox-') &&
+    (pathname.endsWith('.js') || pathname.endsWith('.js.map'))
+  ) {
+    return true;
+  }
+  if (/^\/worker-[^/]+\.js(\.map)?$/.test(pathname)) return true;
+  return false;
+}
+
 // Routes accessibles sans être connecté (le QG `/` est protégé : redirection sign-in gérée par Clerk)
 const isPublicRoute = createRouteMatcher(['/sign-in(.*)', '/sign-up(.*)']);
 
@@ -12,6 +27,10 @@ const isCronRoute = createRouteMatcher(['/api/cron(.*)']);
 const isClerkWebhookRoute = createRouteMatcher(['/api/webhooks/clerk']);
 
 export default clerkMiddleware(async (auth, req) => {
+  if (isPwaOrAuthAssetPath(req.nextUrl.pathname)) {
+    return NextResponse.next();
+  }
+
   // F.3 — Cron : pas de rate limit ambiant ni Clerk (secret dans le handler)
   if (isCronRoute(req)) {
     return NextResponse.next();
@@ -35,9 +54,12 @@ export default clerkMiddleware(async (auth, req) => {
   }
 
   // RÈGLE : Si ce n'est PAS une route publique, on bloque l'accès (404/Redirection).
-  // La redirection / → /sign-in se fait dans page.tsx (évite les conflits de timing après connexion)
+  // unauthenticatedUrl relatif : reste dans le scope PWA (pas d’Account Portal clerk.com → pas de barre Safari/Chrome).
   if (!isPublicRoute(req)) {
-    auth().protect();
+    auth().protect({
+      unauthenticatedUrl: '/sign-in',
+      unauthorizedUrl: '/sign-in',
+    });
   }
 
   return NextResponse.next();
@@ -48,8 +70,5 @@ export const config = {
     // Configuration standard pour ignorer les fichiers statiques (images, css...)
     '/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)',
     '/(api|trpc)(.*)',
-    // PWA : sw.js et worker-*.js doivent passer par le middleware pour que Clerk soit initialisé
-    '/sw.js',
-    '/worker-:hash.js',
   ],
 };
