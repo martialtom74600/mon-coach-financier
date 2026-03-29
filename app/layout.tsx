@@ -5,7 +5,7 @@ import { Suspense } from 'react';
 import { ClerkProvider } from '@clerk/nextjs';
 import { frFR } from '@clerk/localizations';
 import { getClerkAllowedRedirectOrigins } from '@/app/lib/clerkAppOrigin';
-import RootLayoutShell from '@/app/RootLayoutShell';
+import RootClientGate from '@/app/RootClientGate';
 import LayoutStreamFallback from '@/app/components/LayoutStreamFallback';
 
 /** `optional` : le texte (LCP hero) peut s’afficher tout de suite avec le fallback ; évite d’attendre le WOFF2 sur 4G. */
@@ -39,7 +39,7 @@ export const viewport: Viewport = {
 
 /**
  * Layout racine synchrone : premier HTML tout de suite (fond + Suspense).
- * Le travail lent (auth + profil) vit dans RootLayoutShell (async + streaming).
+ * Le gate client léger ici ; le préchargement profil vit dans `app/(main)/layout.tsx` (streaming).
  */
 export default function RootLayout({
   children,
@@ -70,7 +70,7 @@ export default function RootLayout({
           style={{ backgroundColor: SHELL_BG }}
         >
           <Suspense fallback={<LayoutStreamFallback />}>
-            <RootLayoutShell>{children}</RootLayoutShell>
+            <RootClientGate>{children}</RootClientGate>
           </Suspense>
         </body>
       </html>
