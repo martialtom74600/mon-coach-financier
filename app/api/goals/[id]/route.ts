@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { revalidateTag } from 'next/cache';
+import { invalidateProfileCache } from '@/app/lib/cacheTags';
 import { auth } from '@clerk/nextjs/server';
 import { updateGoalSchema, validationError, validateId } from '@/app/lib/validations';
 import { logger } from '@/app/lib/logger';
@@ -17,8 +17,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     if (!parsed.success) return validationError(parsed.error);
 
     const updatedGoal = await goalService.updateGoal(userId, params.id, parsed.data);
-    revalidateTag(`profile-${userId}`);
-    revalidateTag('profile');
+    invalidateProfileCache(userId);
     return NextResponse.json(updatedGoal);
   } catch (error) {
     if (error instanceof ServiceError) {
@@ -37,8 +36,7 @@ export async function DELETE(req: Request, { params }: { params: { id: string } 
 
   try {
     const result = await goalService.deleteGoal(userId, params.id);
-    revalidateTag(`profile-${userId}`);
-    revalidateTag('profile');
+    invalidateProfileCache(userId);
     return NextResponse.json(result);
   } catch (error) {
     if (error instanceof ServiceError) {

@@ -2,7 +2,12 @@ import { cache } from 'react';
 import { unstable_cache } from 'next/cache';
 import { Prisma } from '@prisma/client';
 import { prisma } from '@/app/lib/prisma';
-import { serializeDecimals, INITIAL_PROFILE, Profile, HousingStatus } from '@/app/lib/definitions';
+import { serializeDecimals, Profile } from '@/app/lib/definitions';
+import {
+  normalizeClientProfile,
+  type ClientProfileSource,
+} from '@/app/lib/normalizeClientProfile';
+import { profileCacheTagsForUser } from '@/app/lib/cacheTags';
 import { z } from 'zod';
 import { saveUserSchema } from '@/app/lib/validations';
 import {
@@ -14,47 +19,10 @@ type WizardData = z.infer<typeof saveUserSchema>;
 
 type RawProfile = Awaited<ReturnType<typeof getFullUserProfile>>;
 
-/** Shape minimale pour la fusion (getFullUserProfile peut retourner un objet partiel si !user.profile) */
-interface RawProfileShape {
-  household?: { adults?: number; children?: number };
-  housing?: { status?: string; monthlyCost?: number; paymentDay?: number };
-  assets?: unknown[];
-  goals?: unknown[];
-  decisions?: unknown[];
-  incomes?: unknown[];
-  fixedCosts?: unknown[];
-  variableCosts?: unknown[];
-  credits?: unknown[];
-  subscriptions?: unknown[];
-  annualExpenses?: unknown[];
-  savingsContributions?: unknown[];
-  [key: string]: unknown;
-}
-
-/** Transforme la réponse brute de getFullUserProfile en Profile (même logique que useFinancialData) */
+/** @see normalizeClientProfile — source de vérité partagée avec le client (GET /api/user). */
 export function buildProfileForClient(raw: RawProfile): Profile | null {
-  if (!raw) return null;
-  const r = raw as RawProfileShape;
-  return {
-    ...INITIAL_PROFILE,
-    ...raw,
-    household: { ...INITIAL_PROFILE.household, ...(r.household || {}) },
-    housing: {
-      status: r.housing?.status ?? HousingStatus.TENANT,
-      monthlyCost: r.housing?.monthlyCost ?? 0,
-      paymentDay: r.housing?.paymentDay ?? undefined,
-    },
-    assets: r.assets || [],
-    goals: r.goals || [],
-    decisions: r.decisions || [],
-    incomes: r.incomes || [],
-    fixedCosts: r.fixedCosts || [],
-    variableCosts: r.variableCosts || [],
-    credits: r.credits || [],
-    subscriptions: r.subscriptions || [],
-    annualExpenses: r.annualExpenses || [],
-    savingsContributions: r.savingsContributions || [],
-  } as Profile;
+  if (raw == null) return null;
+  return normalizeClientProfile(raw as ClientProfileSource);
 }
 
 /** Crée User + FinancialProfile minimal si absents (pour accès paramètres sans profil). */
@@ -222,7 +190,7 @@ export const getCachedProfile = cache(async (userId: string) => {
   return unstable_cache(
     async () => getFullUserProfile(userId),
     ['profile', userId],
-    { tags: ['profile', `profile-${userId}`] },
+    { tags: profileCacheTagsForUser(userId) },
   )();
 });
 

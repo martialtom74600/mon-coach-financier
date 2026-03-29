@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { revalidateTag } from 'next/cache';
+import { invalidateProfileCache } from '@/app/lib/cacheTags';
 import { auth } from '@clerk/nextjs/server';
 import { createGoalSchema, validationError } from '@/app/lib/validations';
 import { logger } from '@/app/lib/logger';
@@ -15,8 +15,7 @@ export async function POST(req: Request) {
     if (!parsed.success) return validationError(parsed.error);
 
     const newGoal = await goalService.createGoal(userId, parsed.data);
-    revalidateTag(`profile-${userId}`);
-    revalidateTag('profile');
+    invalidateProfileCache(userId);
     return NextResponse.json(newGoal);
   } catch (error) {
     if (error instanceof ServiceError) {

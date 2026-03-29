@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo, useState, useEffect, useCallback, useRef } from 'react';
+import React, { useMemo, useState, useEffect, useLayoutEffect, useCallback, useRef } from 'react';
 import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
 import { Calendar as CalendarIcon, List, LayoutGrid } from 'lucide-react';
@@ -14,7 +14,16 @@ import { useConfirmDelete } from '@/app/hooks/useConfirmDelete';
 import { HistoryItemCard } from '@/app/components/history/HistoryItemCard';
 import EmptyListState from '@/app/components/ui/EmptyListState';
 import ViewModeToggle from '@/app/components/ui/ViewModeToggle';
-import { decisionsListResponseSchema, parseAPIResponse } from '@/app/lib/validations';
+import {
+  decisionsListResponseSchema,
+  decisionsStatsResponseSchema,
+  parseAPIResponse,
+} from '@/app/lib/validations';
+
+/** Aligné sur GET /api/decisions?limit=… */
+const LIST_PAGE_SIZE = 20;
+/** Plafond `decisions` dans getFullUserProfile — au-delà, les totaux globaux nécessitent /api/decisions/stats */
+const PROFILE_DECISIONS_CAP = 50;
 
 const CalendarView = dynamic(() => import('@/app/components/CalendarView'), {
   ssr: false,
@@ -62,6 +71,23 @@ function decisionToListItem(d: PurchaseDecision): DecisionItem {
   };
 }
 
+function computeStatsFromDecisions(decisions: PurchaseDecision[]): DecisionsStats {
+  let accepted = 0;
+  let rejected = 0;
+  let amountTotal = 0;
+  for (const d of decisions) {
+    amountTotal += Number(d.amount) || 0;
+    if (d.outcome === 'SATISFIED') accepted++;
+    if (d.outcome === 'REGRETTED') rejected++;
+  }
+  return {
+    total: decisions.length,
+    accepted,
+    rejected,
+    amountTotal,
+  };
+}
+
 export default function HistoryPageClient() {
   const router = useRouter();
   const { profile, isLoaded, deleteDecision, updateDecisionOutcome } = useFinancialData();
@@ -77,9 +103,12 @@ export default function HistoryPageClient() {
   const [updatingOutcome, setUpdatingOutcome] = useState<string | null>(null);
   const loadMoreRef = useRef<HTMLDivElement>(null);
   const { state: confirmDelete, openConfirm, closeConfirm, wrapConfirm } = useConfirmDelete();
+  const hasSeededFromProfile = useRef(false);
 
-  const fetchDecisions = useCallback(async (cursor?: string) => {
-    const url = cursor ? `/api/decisions?cursor=${cursor}&limit=20` : '/api/decisions?limit=20';
+  const fetchDecisionsPage = useCallback(async (cursor?: string) => {
+    const url = cursor
+      ? `/api/decisions?cursor=${encodeURIComponent(cursor)}&limit=${LIST_PAGE_SIZE}`
+      : `/api/decisions?limit=${LIST_PAGE_SIZE}`;
     const res = await fetch(url);
     if (!res.ok) return;
     const raw = await res.json();
@@ -88,26 +117,40 @@ export default function HistoryPageClient() {
     return validated;
   }, []);
 
-  /** Données déjà dans le profil (préchargement serveur) → liste instantanée avant la pagination API. */
-  useEffect(() => {
-    if (!isLoaded || !profile?.decisions?.length) return;
-    setDecisions((prev) =>
-      prev.length === 0 ? profile.decisions!.slice(0, 20).map(decisionToListItem) : prev,
-    );
-  }, [isLoaded, profile?.decisions]);
+  const fetchDecisionsStats = useCallback(async () => {
+    const res = await fetch('/api/decisions/stats');
+    if (!res.ok) return;
+    const raw = await res.json();
+    const validated = parseAPIResponse(decisionsStatsResponseSchema, raw, 'GET /api/decisions/stats');
+    return validated?.stats;
+  }, []);
 
-  useEffect(() => {
-    if (!isLoaded) return;
-    setIsLoadingDecisions(true);
-    fetchDecisions().then((data) => {
-      if (data) {
-        setDecisions(data.decisions as DecisionItem[]);
-        setNextCursor(data.nextCursor);
-        setStats(data.stats);
-      }
-      setIsLoadingDecisions(false);
-    });
-  }, [isLoaded, fetchDecisions]);
+  /**
+   * Amorçage depuis le profil préchargé (layout) : même ordre que la BDD (date desc).
+   * Aucun fetch liste au montage ; pagination réseau uniquement via nextCursor (scroll).
+   */
+  useLayoutEffect(() => {
+    if (!isLoaded || hasSeededFromProfile.current) return;
+    hasSeededFromProfile.current = true;
+
+    const raw = profile?.decisions ?? [];
+    const firstPage = raw.slice(0, LIST_PAGE_SIZE).map(decisionToListItem);
+    setDecisions(firstPage);
+    setNextCursor(raw.length > LIST_PAGE_SIZE ? raw[LIST_PAGE_SIZE - 1]!.id : null);
+
+    if (raw.length === 0) {
+      setStats({ total: 0, accepted: 0, rejected: 0, amountTotal: 0 });
+    } else if (raw.length < PROFILE_DECISIONS_CAP) {
+      setStats(computeStatsFromDecisions(raw));
+    } else {
+      setStats(computeStatsFromDecisions(raw));
+      void fetchDecisionsStats().then((s) => {
+        if (s) setStats(s);
+      });
+    }
+
+    setIsLoadingDecisions(false);
+  }, [isLoaded, profile?.decisions, fetchDecisionsStats]);
 
   useEffect(() => {
     if (!nextCursor || isLoadingMore) return;
@@ -117,7 +160,7 @@ export default function HistoryPageClient() {
       (entries) => {
         if (!entries[0]?.isIntersecting) return;
         setIsLoadingMore(true);
-        fetchDecisions(nextCursor).then((data) => {
+        fetchDecisionsPage(nextCursor).then((data) => {
           if (data) {
             setDecisions((prev) => [...prev, ...(data.decisions as DecisionItem[])]);
             setNextCursor(data.nextCursor);
@@ -130,7 +173,7 @@ export default function HistoryPageClient() {
     );
     observer.observe(el);
     return () => observer.disconnect();
-  }, [nextCursor, isLoadingMore, fetchDecisions]);
+  }, [nextCursor, isLoadingMore, fetchDecisionsPage]);
 
   const timeline = useMemo(() => {
     if (!profile) return [];
@@ -162,7 +205,7 @@ export default function HistoryPageClient() {
       await deleteDecision(id);
     } catch (error) {
       console.error('Erreur suppression', error);
-      fetchDecisions().then((data) => {
+      fetchDecisionsPage().then((data) => {
         if (data) {
           setDecisions(data.decisions as DecisionItem[]);
           setNextCursor(data.nextCursor);
@@ -195,8 +238,8 @@ export default function HistoryPageClient() {
     try {
       await updateDecisionOutcome(id, outcome);
     } catch {
-      fetchDecisions().then((data) => {
-        if (data) setStats(data.stats);
+      void fetchDecisionsStats().then((s) => {
+        if (s) setStats(s);
       });
     } finally {
       setUpdatingOutcome(null);

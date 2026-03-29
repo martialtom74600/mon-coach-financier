@@ -1,8 +1,9 @@
 import { redirect } from 'next/navigation';
-import { revalidateTag } from 'next/cache';
 import { auth, currentUser } from '@clerk/nextjs/server';
+import { invalidateProfileCache } from '@/app/lib/cacheTags';
 import { userService, insightService, profileService } from '@/app/services';
 import { computeFinancialPlan, analyzeProfileHealth } from '@/app/lib/logic';
+import type { BudgetResult, OptimizationOpportunity } from '@/app/lib/definitions';
 import { computeTreasuryStatus, isDashboardProfileReady } from '@/app/lib/treasuryStatus';
 import { SafeToSpendCardShell } from '@/app/components/dashboard/SafeToSpendCardShell';
 import { SafeToSpendHero } from '@/app/components/dashboard/SafeToSpendHero';
@@ -11,6 +12,13 @@ import DashboardInsightsSection from '@/app/components/dashboard/DashboardInsigh
 import DashboardPatrimoineGrid from '@/app/components/dashboard/DashboardPatrimoineGrid';
 import DashboardWelcomeGate from '@/app/components/dashboard/DashboardWelcomeGate';
 import type { StoredInsight } from '@/app/components/dashboard/ProactiveInsightsCard';
+
+/** Données calculées une seule fois au rendu serveur, passées à la persistance non bloquante. */
+type HomeInsightPersistenceSnapshot = {
+  profileId: string | null;
+  opportunities: OptimizationOpportunity[];
+  budget: BudgetResult;
+};
 
 function opportunitiesToStoredInsights(
   opportunities: NonNullable<
@@ -30,11 +38,36 @@ function opportunitiesToStoredInsights(
 }
 
 /**
- * Persistance BDD + tags après envoi de la réponse HTML : libère le chemin critique RSC (LCP sur mobile 4G).
- * Sur hébergeur serverless, une petite partie des écritures peut théoriquement ne pas finir si l’isolate s’arrête ;
- * accepté ici au profit du temps de première peinture (re-sync au prochain passage / navigation).
+ * Persistance BDD + tags à partir du snapshot (aucun recalcul moteur).
+ * Voir fallback `scheduleHomeInsightPersistenceLegacy` si l’analyse synchrone échoue.
  */
-function scheduleHomeInsightPersistence(userId: string, profileRaw: Awaited<ReturnType<typeof userService.getCachedProfile>>) {
+function scheduleHomeInsightPersistenceFromSnapshot(
+  userId: string,
+  snapshot: HomeInsightPersistenceSnapshot,
+) {
+  void (async () => {
+    try {
+      await insightService.persistDashboardInsightAnalysis(
+        userId,
+        snapshot.profileId,
+        snapshot.opportunities,
+        snapshot.budget,
+      );
+      invalidateProfileCache(userId);
+    } catch (e) {
+      console.error('Deferred home insight sync', e);
+    }
+  })();
+}
+
+/**
+ * Compat : si `analyzeProfileHealth` échoue sur le chemin synchrone, on conserve l’ancien
+ * chemin arrière-plan (recalcul complet), pour ne pas perdre de persistance.
+ */
+function scheduleHomeInsightPersistenceLegacy(
+  userId: string,
+  profileRaw: Awaited<ReturnType<typeof userService.getCachedProfile>>,
+) {
   void (async () => {
     try {
       const prof = userService.buildProfileForClient(profileRaw);
@@ -58,8 +91,7 @@ function scheduleHomeInsightPersistence(userId: string, profileRaw: Awaited<Retu
 
       await insightService.storeInsights(profileId, analysis.opportunities);
       await insightService.updateLastBudgetSnapshot(profileId, budget);
-      revalidateTag('profile');
-      revalidateTag(`profile-${userId}`);
+      invalidateProfileCache(userId);
     } catch (e) {
       console.error('Deferred home insight sync', e);
     }
@@ -77,10 +109,9 @@ export default async function Home() {
 
   const profile = userService.buildProfileForClient(profileRaw);
 
-  scheduleHomeInsightPersistence(userId, profileRaw);
-
   let insights: StoredInsight[] = [];
   let analysis: Awaited<ReturnType<typeof analyzeProfileHealth>> | null = null;
+  let persistenceSnapshot: HomeInsightPersistenceSnapshot | null = null;
 
   if (profile) {
     try {
@@ -93,9 +124,21 @@ export default async function Home() {
       if (analysis.opportunities.length > 0) {
         insights = opportunitiesToStoredInsights(analysis.opportunities);
       }
+
+      persistenceSnapshot = {
+        profileId: profile.profileId ?? null,
+        opportunities: analysis.opportunities,
+        budget,
+      };
     } catch {
       /* analyses optionnelles : dashboard peut s’afficher sans */
     }
+  }
+
+  if (persistenceSnapshot) {
+    scheduleHomeInsightPersistenceFromSnapshot(userId, persistenceSnapshot);
+  } else {
+    scheduleHomeInsightPersistenceLegacy(userId, profileRaw);
   }
 
   const treasury =

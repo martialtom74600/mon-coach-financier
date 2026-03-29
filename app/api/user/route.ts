@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { revalidateTag } from 'next/cache';
+import { invalidateProfileCache } from '@/app/lib/cacheTags';
 import { auth, currentUser } from '@clerk/nextjs/server';
 import { saveUserSchema, validationError } from '@/app/lib/validations';
 import { logger } from '@/app/lib/logger';
@@ -44,8 +44,7 @@ export async function POST(req: Request) {
       parsed.data,
     );
 
-    revalidateTag(`profile-${userId}`);
-    revalidateTag('profile');
+    invalidateProfileCache(userId);
     return NextResponse.json(result);
   } catch (error) {
     if (error instanceof ServiceError) {

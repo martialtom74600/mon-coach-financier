@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { revalidateTag } from 'next/cache';
+import { invalidateProfileCache } from '@/app/lib/cacheTags';
 import { auth } from '@clerk/nextjs/server';
 import { createDecisionSchema, listDecisionsQuerySchema, validationError } from '@/app/lib/validations';
 import { logger } from '@/app/lib/logger';
@@ -19,8 +19,10 @@ export async function GET(req: Request) {
     });
     if (!parsed.success) return validationError(parsed.error);
 
-    const { decisions, nextCursor } = await decisionService.listDecisions(userId, parsed.data);
-    const stats = await decisionService.getDecisionsStats(userId);
+    const [{ decisions, nextCursor }, stats] = await Promise.all([
+      decisionService.listDecisions(userId, parsed.data),
+      decisionService.getDecisionsStats(userId),
+    ]);
 
     return NextResponse.json({ decisions, nextCursor, stats });
   } catch (error) {
@@ -42,8 +44,7 @@ export async function POST(req: Request) {
     if (!parsed.success) return validationError(parsed.error);
 
     const newDecision = await decisionService.createDecision(userId, parsed.data);
-    revalidateTag(`profile-${userId}`);
-    revalidateTag('profile');
+    invalidateProfileCache(userId);
     return NextResponse.json(newDecision);
   } catch (error) {
     if (error instanceof ServiceError) {

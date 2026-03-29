@@ -342,15 +342,22 @@ export const purchaseDecisionResponseSchema = z.object({
   createdAt: z.string(),
 });
 
+export const decisionsStatsSchema = z.object({
+  total: z.number(),
+  accepted: z.number(),
+  rejected: z.number(),
+  amountTotal: z.number(),
+});
+
 export const decisionsListResponseSchema = z.object({
   decisions: z.array(purchaseDecisionResponseSchema),
   nextCursor: z.string().nullable(),
-  stats: z.object({
-    total: z.number(),
-    accepted: z.number(),
-    rejected: z.number(),
-    amountTotal: z.number(),
-  }),
+  stats: decisionsStatsSchema,
+});
+
+/** GET /api/decisions/stats — totaux globaux sans lister les décisions */
+export const decisionsStatsResponseSchema = z.object({
+  stats: decisionsStatsSchema,
 });
 
 /** Schéma pour les réponses DELETE (success: true) */
@@ -420,9 +427,14 @@ export const profileAPIResponseSchema = z.object({
   goals: z.array(financialGoalResponseSchema).default([]),
   decisions: z.array(purchaseDecisionResponseSchema).default([]),
 
+  /** JSON Prisma — validé en profondeur côté usage ; conservé pour analyse / drift budget */
+  lastBudgetSnapshot: z.unknown().nullable().optional(),
+
   createdAt: z.string().optional(),
   updatedAt: z.string().optional(),
 });
+
+export type ProfileApiPayload = z.infer<typeof profileAPIResponseSchema>;
 
 // ============================================================================
 // HELPER CLIENT — Validation runtime avec log [API CONTRACT BREACH]

@@ -1,9 +1,10 @@
 import { Suspense } from 'react';
 import dynamic from 'next/dynamic';
 import { TrendingUp, Target, ShieldCheck } from 'lucide-react';
-import type { DeepAnalysis, Profile } from '@/app/lib/definitions';
+import type { DeepAnalysis, Profile, SimulationResult } from '@/app/lib/definitions';
 import { computeFinancialPlan, formatCurrency } from '@/app/lib/logic';
 import ChartSkeleton from '@/app/components/ui/ChartSkeleton';
+import GlassCard from '@/app/components/ui/GlassCard';
 import LazyRender from '@/app/components/ui/LazyRender';
 import QuickActionLink from '@/app/components/dashboard/QuickActionLink';
 
@@ -11,8 +12,7 @@ const WealthChart = dynamic(() => import('./WealthChart').then((mod) => mod.Weal
   ssr: false,
 });
 
-function buildWealthChartSeries(profile: Profile): { year: string; amount: number }[] {
-  const simulation = computeFinancialPlan(profile);
+function buildWealthChartSeries(simulation: SimulationResult): { year: string; amount: number }[] {
   const netWorth = simulation.budget.totalWealth;
   const monthlySavings = simulation.budget.capacityToSave;
   const d: { year: string; amount: number }[] = [];
@@ -23,9 +23,6 @@ function buildWealthChartSeries(profile: Profile): { year: string; amount: numbe
   }
   return d;
 }
-
-const glassCardClass =
-  'bg-white border border-slate-100 shadow-sm rounded-3xl p-6 transition-all duration-300 hover:shadow-xl hover:border-indigo-100 hover:-translate-y-0.5';
 
 /**
  * Server Component : structure HTML + données ; Recharts isolé dans un Client Component
@@ -38,8 +35,8 @@ export default function DashboardPatrimoineGrid({
   profile: Profile;
   analysis?: DeepAnalysis | null;
 }) {
-  const chartData = buildWealthChartSeries(profile);
   const simulation = computeFinancialPlan(profile);
+  const chartData = buildWealthChartSeries(simulation);
   const netWorth = simulation.budget.totalWealth;
 
   return (
@@ -89,7 +86,7 @@ export default function DashboardPatrimoineGrid({
       </div>
 
       <div className="lg:col-span-4 space-y-6">
-        <div className={`${glassCardClass} flex items-center gap-5 !p-5`}>
+        <GlassCard className="flex items-center gap-5 !p-5">
           <div className="h-20 w-20 shrink-0 relative flex items-center justify-center">
             <svg className="transform -rotate-90 w-full h-full drop-shadow-lg" aria-hidden>
               <circle cx="40" cy="40" r="34" stroke="#f1f5f9" strokeWidth="8" fill="transparent" />
@@ -128,7 +125,7 @@ export default function DashboardPatrimoineGrid({
                 : 'À calculer'}
             </div>
           </div>
-        </div>
+        </GlassCard>
 
         <div className="grid grid-cols-2 gap-4">
           <QuickActionLink href="/goals" label="Mes Projets" icon={Target} color="indigo" />

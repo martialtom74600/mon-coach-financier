@@ -80,6 +80,24 @@ export async function storeInsights(
   return toCreate.length;
 }
 
+/**
+ * Persiste un résultat d’analyse dashboard déjà calculé (ex. tâche différée après le rendu RSC).
+ * Évite tout second passage `computeFinancialPlan` / `analyzeProfileHealth`.
+ */
+export async function persistDashboardInsightAnalysis(
+  userId: string,
+  profileId: string | null,
+  opportunities: OptimizationOpportunity[],
+  budget: BudgetResult,
+): Promise<void> {
+  let pid = profileId;
+  if (!pid) {
+    pid = await getProfileId(userId);
+  }
+  await storeInsights(pid, opportunities);
+  await updateLastBudgetSnapshot(pid, budget);
+}
+
 /** Liste les insights non lus (ou tous récents) pour un profil */
 export async function listInsights(
   profileId: string,
