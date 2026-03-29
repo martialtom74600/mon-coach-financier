@@ -2,8 +2,15 @@ import { NextResponse } from 'next/server';
 import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server';
 
 /**
- * Edge-only : aucun import Prisma, Upstash, Node ou autre API non-Web.
- * Rate limiting des mutations API : à traiter dans chaque route handler (runtime Node).
+ * Edge (Vercel) : aucun Node / Prisma / Redis.
+ *
+ * Cause racine du crash « Load failed » / 500 middleware avec
+ * `auth().protect({ unauthenticatedUrl: '/sign-in' })` : Clerk appelle alors
+ * `NextResponse.redirect('/sign-in')` avec une URL **relative**. Sur Edge,
+ * la résolution pour `Location` / navigations internes échoue souvent → TypeError.
+ *
+ * Ici : `req.nextUrl.clone()` + `pathname` → URL **absolue même origine** (périmètre PWA OK).
+ * Pour les API sans session : 401 JSON (comportement proche de Clerk pour non-document).
  */
 
 function isPwaOrAuthAssetPath(pathname: string): boolean {
@@ -21,6 +28,7 @@ function isPwaOrAuthAssetPath(pathname: string): boolean {
 }
 
 const isPublicRoute = createRouteMatcher(['/sign-in(.*)', '/sign-up(.*)']);
+const isApiRoute = createRouteMatcher(['/api(.*)']);
 const isCronRoute = createRouteMatcher(['/api/cron(.*)']);
 const isClerkWebhookRoute = createRouteMatcher(['/api/webhooks/clerk']);
 
@@ -34,12 +42,27 @@ export default clerkMiddleware((auth, req) => {
   }
 
   if (!isPublicRoute(req)) {
-    /**
-     * Chemin relatif uniquement : même origine que la PWA (pas de compte Clerk hébergé).
-     * On n’utilise pas `unauthorizedUrl` ici : pour un utilisateur connecté mais non autorisé,
-     * Clerk gère le défaut (évite des redirects ambigus avec les catch-all `/sign-in/[[...]]`).
-     */
-    auth().protect({ unauthenticatedUrl: '/sign-in' });
+    const { userId } = auth();
+
+    if (!userId) {
+      if (isApiRoute(req)) {
+        return NextResponse.json(
+          { error: 'Unauthorized' },
+          { status: 401 },
+        );
+      }
+
+      const signIn = req.nextUrl.clone();
+      signIn.pathname = '/sign-in';
+      signIn.search = '';
+
+      const p = req.nextUrl.pathname;
+      if (p !== '/sign-in' && !p.startsWith('/sign-in/') && p !== '/sign-up' && !p.startsWith('/sign-up/')) {
+        signIn.searchParams.set('redirect_url', req.nextUrl.href);
+      }
+
+      return NextResponse.redirect(signIn);
+    }
   }
 
   return NextResponse.next();
